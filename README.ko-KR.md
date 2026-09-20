@@ -1,8 +1,8 @@
 <div align="center">
-  <a href="https://github.com/alvinunreal/oh-my-opencode-slim/stargazers">
-    <img src="img/v2.jpg" alt="oh-my-opencode-slim V2 Release" style="border-radius: 10px;">
+  <a href="https://github.com/shyrz/mechanicus/stargazers">
+    <img src="img/v2.jpg" alt="mechanicus V2 Release" style="border-radius: 10px;">
   </a>
-  <h3>✨ oh-my-opencode-slim ✨</h3>
+  <h3>✨ mechanicus ✨</h3>
 
   <p><i>코드의 여명에서 일곱 신성한 존재가 나타났습니다. 각자는 불멸의 장인으로서,<br>당신의 명령을 기다리며 혼돈에서 질서를 빚고 한때 불가능하다고 여겨졌던 것을 만들어냅니다.</i></p>
 
@@ -24,7 +24,7 @@
 
 ## 이 플러그인은 무엇인가요
 
-oh-my-opencode-slim은 OpenCode용 에이전트 오케스트레이션 플러그인입니다. 코드베이스 정찰, 최신 문서 조회, 아키텍처 리뷰, UI 작업, 잘 정의된 범위의 구현 작업까지 처리하는 전문 에이전트 팀이 내장되어 있으며, 모두 하나의 오케스트레이터 아래에서 동작합니다.
+mechanicus은 OpenCode용 에이전트 오케스트레이션 플러그인입니다. 코드베이스 정찰, 최신 문서 조회, 아키텍처 리뷰, UI 작업, 잘 정의된 범위의 구현 작업까지 처리하는 전문 에이전트 팀이 내장되어 있으며, 모두 하나의 오케스트레이터 아래에서 동작합니다.
 
 핵심 아이디어는 간단합니다. 하나의 모델이 모든 작업을 처리하도록 강제하는 대신, 각 작업에 가장 적합한 에이전트로 라우팅하여 **품질, 속도, 비용**의 균형을 맞춥니다. Orchestrator는 작업 그래프를 계획하고, 전문 에이전트를 백그라운드 작업으로 배치하며, 계속 진행하기 전에 결과를 조정합니다.
 
@@ -91,21 +91,21 @@ oh-my-opencode-slim은 OpenCode용 에이전트 오케스트레이션 플러그�
 
 
 ```
-Install and configure oh-my-opencode-slim: https://raw.githubusercontent.com/alvinunreal/oh-my-opencode-slim/refs/heads/master/README.md
+Install and configure mechanicus: https://raw.githubusercontent.com/shyrz/mechanicus/refs/heads/master/README.md
 ```
 
 
 ### 수동 설치
 
 ```bash
-bunx oh-my-opencode-slim@latest install
+bunx mechanicus@latest install
 ```
 
 배포된 CLI는 Node.js 호환 번들이므로 Bun이 설치되어 있지 않다면 `npx`도
 사용할 수 있습니다:
 
 ```bash
-npx oh-my-opencode-slim@latest install
+npx mechanicus@latest install
 ```
 
 ### Master 브랜치에서 실행하기
@@ -114,8 +114,8 @@ npx oh-my-opencode-slim@latest install
 방식을 사용하세요:
 
 ```bash
-git clone https://github.com/alvinunreal/oh-my-opencode-slim.git ~/repos/oh-my-opencode-slim
-cd ~/repos/oh-my-opencode-slim
+git clone https://github.com/shyrz/mechanicus.git ~/repos/mechanicus
+cd ~/repos/mechanicus
 bun install
 bun run build
 bun dist/cli/index.js install
@@ -126,7 +126,7 @@ bun dist/cli/index.js install
 나중에 업데이트하려면:
 
 ```bash
-cd ~/repos/oh-my-opencode-slim
+cd ~/repos/mechanicus
 git pull
 bun install
 bun run build
@@ -139,7 +139,7 @@ bun run build
 > [!TIP]
 > 모델과 에이전트는 자신의 워크플로에 맞게 자유롭게 조정하세요. 기본 프리셋은 시작점일 뿐이며, 이 플러그인은 깊은 유연성과 커스터마이징을 제공하도록 설계되었습니다.
 
-설치 중 OpenCode Go를 활성화하려면 `bunx oh-my-opencode-slim@latest install --preset=opencode-go`를 실행하거나, 설치 후 `~/.config/opencode/oh-my-opencode-slim.json`에서 기본 프리셋 이름을 변경하세요.
+설치 중 OpenCode Go를 활성화하려면 `bunx mechanicus@latest install --preset=opencode-go`를 실행하거나, 설치 후 `~/.config/opencode/mechanicus.json`에서 기본 프리셋 이름을 변경하세요.
 
 그 다음:
 
@@ -153,12 +153,12 @@ bun run build
    ```bash
    opencode models --refresh
    ```
-3. **플러그인 설정 파일**을 `~/.config/opencode/oh-my-opencode-slim.json`에서 엽니다.
+3. **플러그인 설정 파일**을 `~/.config/opencode/mechanicus.json`에서 엽니다.
 
 4. **각 에이전트에 사용할 모델을 업데이트합니다**
 
 > [!TIP]
-> **백그라운드 오케스트레이션**의 작동 방식을 이해하는 것을 **권장**합니다. **[Orchestrator 프롬프트](https://github.com/alvinunreal/oh-my-opencode-slim/blob/master/src/agents/orchestrator.ts#L28)** 에는 스케줄러 규칙, 전문 에이전트 라우팅 로직, 작업을 백그라운드 에이전트에 할당하는 시점을 결정하는 임계값이 포함되어 있습니다. `@agentName <task>`로 서브에이전트를 호출해 언제든 수동으로 위임할 수도 있습니다.
+> **백그라운드 오케스트레이션**의 작동 방식을 이해하는 것을 **권장**합니다. **[Orchestrator 프롬프트](https://github.com/shyrz/mechanicus/blob/master/src/agents/orchestrator.ts#L28)** 에는 스케줄러 규칙, 전문 에이전트 라우팅 로직, 작업을 백그라운드 에이전트에 할당하는 시점을 결정하는 임계값이 포함되어 있습니다. `@agentName <task>`로 서브에이전트를 호출해 언제든 수동으로 위임할 수도 있습니다.
 
 > [!TIP]
 > 이제 백그라운드 에이전트가 기본 워크플로이므로 **[Multiplexer Integration](docs/multiplexer-integration.md)** 을 활성화하고 설정하는 것을 **강력히 권장**합니다. 각 에이전트를 전용 Tmux, Zellij, Herdr, cmux, 또는 kitty 창에서 자동으로 열어 주기 때문에, Orchestrator가 세션을 계속 조율하는 동안 전문 에이전트들의 작업을 실시간으로 따라볼 수 있습니다.
@@ -167,7 +167,7 @@ bun run build
 
 ```jsonc
 {
-  "$schema": "https://unpkg.com/oh-my-opencode-slim@latest/oh-my-opencode-slim.schema.json",
+  "$schema": "https://raw.githubusercontent.com/shyrz/mechanicus/master/mechanicus.schema.json",
   "preset": "openai",
   "presets": {
     "openai": {
@@ -584,7 +584,7 @@ ping all agents
 
 > [!TIP]
 > 로컬에서 수정한 번들 스킬을 폐기하고 패키지 업데이트를 적용하려면
-> `bunx oh-my-opencode-slim install --skills=force`를 실행하세요. 이 명령은
+> `bunx mechanicus install --skills=force`를 실행하세요. 이 명령은
 > 설치된 번들 스킬을 패키지 버전으로 의도적으로 교체합니다.
 
 | 스킬 | 용도 | 기본 에이전트 | 호출 방법 |
@@ -596,10 +596,10 @@ ping all agents
 | <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md) | 고위험 또는 병렬 작업을 위한 안전하고 격리된 코딩 레인으로 Git worktree 사용 | `orchestrator` | `work in a worktree` |
 | <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md) | 에이전트가 라이브러리 내부를 검사하도록 의존성 소스를 로컬에 복제 | `orchestrator` | `clone dependencies` |
 | <img src="img/skills/reflect.webp" width="120" alt="Reflect artifact"><br>[`reflect`](src/skills/reflect/SKILL.md) | 반복되는 워크플로 마찰을 재사용 가능한 스킬, 에이전트 또는 설정으로 전환 | `orchestrator` | `/reflect` |
-| <img src="img/skills/oh-my-opencode-slim.webp" width="120" alt="oh-my-opencode-slim artifact"><br>[`oh-my-opencode-slim`](src/skills/oh-my-opencode-slim/SKILL.md) | 플러그인 설정 자체를 안전하게 구성하고 개선 | `orchestrator` | 설정 조정을 요청 |
+| <img src="img/skills/mechanicus.webp" width="120" alt="mechanicus artifact"><br>[`mechanicus`](src/skills/mechanicus/SKILL.md) | 플러그인 설정 자체를 안전하게 구성하고 개선 | `orchestrator` | 설정 조정을 요청 |
 
 스킬 할당은 권한 부여입니다. 에이전트는 부여받은 스킬만 활성화할 수 있습니다.
-`~/.config/opencode/oh-my-opencode-slim.json`의 에이전트별 `skills` 배열로
+`~/.config/opencode/mechanicus.json`의 에이전트별 `skills` 배열로
 구성합니다. 명시적 목록, 전체 허용을 위한 `"*"`, 특정 스킬 거부를 위한
 `"!skill-name"`을 사용할 수 있습니다.
 
@@ -625,7 +625,7 @@ ping all agents
 자동화에서는 다음과 같이 명시적으로 활성화하세요.
 
 ```bash
-bunx oh-my-opencode-slim@latest install --companion=yes
+bunx mechanicus@latest install --companion=yes
 ```
 
 설정, 위치, 크기, 설치 세부 사항은 **[Companion](docs/companion.md)** 을 참고하세요.
@@ -662,7 +662,7 @@ bunx oh-my-opencode-slim@latest install --companion=yes
 | **[Project Customization](docs/project-local-customization.md)** | 저장소별 커스텀 에이전트, 프롬프트 오버라이드, 에이전트별 스킬 및 우선순위 |
 | **[Background Orchestration](docs/background-orchestration.md)** | 네이티브 백그라운드 서브에이전트를 기반으로 한 스케줄러 우선 Orchestrator 모델 |
 | **[Maintainer Guide](docs/maintainers.md)** | 이슈 트리아지 규칙, 라벨 의미, 지원 라우팅, 저장소 유지보수 워크플로우 |
-| **[Skills](docs/skills.md)** | `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `reflect`, `worktrees`, `oh-my-opencode-slim` 등 번들된 스킬 |
+| **[Skills](docs/skills.md)** | `simplify`, `codemap`, `clonedeps`, `deepwork`, `verification-planning`, `reflect`, `worktrees`, `mechanicus` 등 번들된 스킬 |
 | **[MCPs](docs/mcps.md)** | `context7`, `gh_grep` 및 에이전트별 MCP 권한 동작 방식 |
 | **[Tools](docs/tools.md)** | `webfetch`, LSP 도구, 코드 검색, 포매터 등 내장 도구 기능 |
 
@@ -687,119 +687,119 @@ bunx oh-my-opencode-slim@latest install --companion=yes
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://boringdystopia.ai/"><img src="https://avatars.githubusercontent.com/u/204474669?v=4?s=100" width="100px;" alt="Alvin"/><br /><sub><b>Alvin</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=alvinunreal" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/alvinreal"><img src="https://avatars.githubusercontent.com/u/262747402?v=4?s=100" width="100px;" alt="alvinreal"/><br /><sub><b>alvinreal</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=alvinreal" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/imarshallwidjaja"><img src="https://avatars.githubusercontent.com/u/60992624?v=4?s=100" width="100px;" alt="imw"/><br /><sub><b>imw</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=imarshallwidjaja" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/adikpb"><img src="https://avatars.githubusercontent.com/u/67222969?v=4?s=100" width="100px;" alt="Adithya Kozham Burath Bijoy"/><br /><sub><b>Adithya Kozham Burath Bijoy</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=adikpb" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ReqX"><img src="https://avatars.githubusercontent.com/u/14987124?v=4?s=100" width="100px;" alt="ReqX"/><br /><sub><b>ReqX</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ReqX" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/abhideepm"><img src="https://avatars.githubusercontent.com/u/28213051?v=4?s=100" width="100px;" alt="Abhideep Maity"/><br /><sub><b>Abhideep Maity</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=abhideepm" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://boringdystopia.ai/"><img src="https://avatars.githubusercontent.com/u/204474669?v=4?s=100" width="100px;" alt="Alvin"/><br /><sub><b>Alvin</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=alvinunreal" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/alvinreal"><img src="https://avatars.githubusercontent.com/u/262747402?v=4?s=100" width="100px;" alt="alvinreal"/><br /><sub><b>alvinreal</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=alvinreal" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/imarshallwidjaja"><img src="https://avatars.githubusercontent.com/u/60992624?v=4?s=100" width="100px;" alt="imw"/><br /><sub><b>imw</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=imarshallwidjaja" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/adikpb"><img src="https://avatars.githubusercontent.com/u/67222969?v=4?s=100" width="100px;" alt="Adithya Kozham Burath Bijoy"/><br /><sub><b>Adithya Kozham Burath Bijoy</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=adikpb" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ReqX"><img src="https://avatars.githubusercontent.com/u/14987124?v=4?s=100" width="100px;" alt="ReqX"/><br /><sub><b>ReqX</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=ReqX" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/abhideepm"><img src="https://avatars.githubusercontent.com/u/28213051?v=4?s=100" width="100px;" alt="Abhideep Maity"/><br /><sub><b>Abhideep Maity</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=abhideepm" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Daltonganger"><img src="https://avatars.githubusercontent.com/u/17501732?v=4?s=100" width="100px;" alt="Ruben"/><br /><sub><b>Ruben</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Daltonganger" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://horizzon3507.vercel.app/"><img src="https://avatars.githubusercontent.com/u/148660626?v=4?s=100" width="100px;" alt="Gabriel Rodrigues"/><br /><sub><b>Gabriel Rodrigues</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=horizzon3507" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jmvbambico"><img src="https://avatars.githubusercontent.com/u/45126068?v=4?s=100" width="100px;" alt="John Michael Vincent Bambico"/><br /><sub><b>John Michael Vincent Bambico</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=jmvbambico" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/mfold111"><img src="https://avatars.githubusercontent.com/u/261528848?v=4?s=100" width="100px;" alt="Molt Founders"/><br /><sub><b>Molt Founders</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mfold111" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://me.mashiro.best/"><img src="https://avatars.githubusercontent.com/u/22992947?v=4?s=100" width="100px;" alt="Muen Yu"/><br /><sub><b>Muen Yu</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=MuenYu" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/NocturnesLK"><img src="https://avatars.githubusercontent.com/u/102891073?v=4?s=100" width="100px;" alt="NocturnesLK"/><br /><sub><b>NocturnesLK</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=NocturnesLK" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Daltonganger"><img src="https://avatars.githubusercontent.com/u/17501732?v=4?s=100" width="100px;" alt="Ruben"/><br /><sub><b>Ruben</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Daltonganger" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://horizzon3507.vercel.app/"><img src="https://avatars.githubusercontent.com/u/148660626?v=4?s=100" width="100px;" alt="Gabriel Rodrigues"/><br /><sub><b>Gabriel Rodrigues</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=horizzon3507" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jmvbambico"><img src="https://avatars.githubusercontent.com/u/45126068?v=4?s=100" width="100px;" alt="John Michael Vincent Bambico"/><br /><sub><b>John Michael Vincent Bambico</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=jmvbambico" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/mfold111"><img src="https://avatars.githubusercontent.com/u/261528848?v=4?s=100" width="100px;" alt="Molt Founders"/><br /><sub><b>Molt Founders</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=mfold111" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://me.mashiro.best/"><img src="https://avatars.githubusercontent.com/u/22992947?v=4?s=100" width="100px;" alt="Muen Yu"/><br /><sub><b>Muen Yu</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=MuenYu" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/NocturnesLK"><img src="https://avatars.githubusercontent.com/u/102891073?v=4?s=100" width="100px;" alt="NocturnesLK"/><br /><sub><b>NocturnesLK</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=NocturnesLK" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="http://riccardosallusti.it/"><img src="https://avatars.githubusercontent.com/u/466102?v=4?s=100" width="100px;" alt="Riccardo Sallusti"/><br /><sub><b>Riccardo Sallusti</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=rizal72" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Yusyuriv"><img src="https://avatars.githubusercontent.com/u/3993179?v=4?s=100" width="100px;" alt="Yan Li"/><br /><sub><b>Yan Li</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Yusyuriv" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/nghyane"><img src="https://avatars.githubusercontent.com/u/59473462?v=4?s=100" width="100px;" alt="Hoàng Văn Anh Nghĩa"/><br /><sub><b>Hoàng Văn Anh Nghĩa</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=nghyane" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Jyers"><img src="https://avatars.githubusercontent.com/u/76993396?v=4?s=100" width="100px;" alt="Jacob Myers"/><br /><sub><b>Jacob Myers</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Jyers" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/kassieclaire"><img src="https://avatars.githubusercontent.com/u/59930829?v=4?s=100" width="100px;" alt="Kassie Povinelli"/><br /><sub><b>Kassie Povinelli</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=kassieclaire" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/KyleHilliard"><img src="https://avatars.githubusercontent.com/u/178682772?v=4?s=100" width="100px;" alt="KyleHilliard"/><br /><sub><b>KyleHilliard</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=KyleHilliard" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="http://riccardosallusti.it/"><img src="https://avatars.githubusercontent.com/u/466102?v=4?s=100" width="100px;" alt="Riccardo Sallusti"/><br /><sub><b>Riccardo Sallusti</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=rizal72" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Yusyuriv"><img src="https://avatars.githubusercontent.com/u/3993179?v=4?s=100" width="100px;" alt="Yan Li"/><br /><sub><b>Yan Li</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Yusyuriv" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/nghyane"><img src="https://avatars.githubusercontent.com/u/59473462?v=4?s=100" width="100px;" alt="Hoàng Văn Anh Nghĩa"/><br /><sub><b>Hoàng Văn Anh Nghĩa</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=nghyane" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Jyers"><img src="https://avatars.githubusercontent.com/u/76993396?v=4?s=100" width="100px;" alt="Jacob Myers"/><br /><sub><b>Jacob Myers</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Jyers" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/kassieclaire"><img src="https://avatars.githubusercontent.com/u/59930829?v=4?s=100" width="100px;" alt="Kassie Povinelli"/><br /><sub><b>Kassie Povinelli</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=kassieclaire" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/KyleHilliard"><img src="https://avatars.githubusercontent.com/u/178682772?v=4?s=100" width="100px;" alt="KyleHilliard"/><br /><sub><b>KyleHilliard</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=KyleHilliard" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/j5hjun"><img src="https://avatars.githubusercontent.com/u/169322508?v=4?s=100" width="100px;" alt="j5hjun"/><br /><sub><b>j5hjun</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=j5hjun" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/marcFernandez"><img src="https://avatars.githubusercontent.com/u/32362792?v=4?s=100" width="100px;" alt="marcFernandez"/><br /><sub><b>marcFernandez</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=marcFernandez" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/mister-test"><img src="https://avatars.githubusercontent.com/u/212316706?v=4?s=100" width="100px;" alt="mister-test"/><br /><sub><b>mister-test</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mister-test" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/n24q02m"><img src="https://avatars.githubusercontent.com/u/135627235?v=4?s=100" width="100px;" alt="n24q02m"/><br /><sub><b>n24q02m</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=n24q02m" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/oribarilan"><img src="https://avatars.githubusercontent.com/u/8760762?v=4?s=100" width="100px;" alt="oribi"/><br /><sub><b>oribi</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=oribarilan" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/pelidan"><img src="https://avatars.githubusercontent.com/u/45832535?v=4?s=100" width="100px;" alt="pelidan"/><br /><sub><b>pelidan</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=pelidan" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/j5hjun"><img src="https://avatars.githubusercontent.com/u/169322508?v=4?s=100" width="100px;" alt="j5hjun"/><br /><sub><b>j5hjun</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=j5hjun" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/marcFernandez"><img src="https://avatars.githubusercontent.com/u/32362792?v=4?s=100" width="100px;" alt="marcFernandez"/><br /><sub><b>marcFernandez</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=marcFernandez" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/mister-test"><img src="https://avatars.githubusercontent.com/u/212316706?v=4?s=100" width="100px;" alt="mister-test"/><br /><sub><b>mister-test</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=mister-test" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/n24q02m"><img src="https://avatars.githubusercontent.com/u/135627235?v=4?s=100" width="100px;" alt="n24q02m"/><br /><sub><b>n24q02m</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=n24q02m" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/oribarilan"><img src="https://avatars.githubusercontent.com/u/8760762?v=4?s=100" width="100px;" alt="oribi"/><br /><sub><b>oribi</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=oribarilan" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/pelidan"><img src="https://avatars.githubusercontent.com/u/45832535?v=4?s=100" width="100px;" alt="pelidan"/><br /><sub><b>pelidan</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=pelidan" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/xLillium"><img src="https://avatars.githubusercontent.com/u/16964936?v=4?s=100" width="100px;" alt="xLillium"/><br /><sub><b>xLillium</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=xLillium" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/CoolZxp"><img src="https://avatars.githubusercontent.com/u/54017765?v=4?s=100" width="100px;" alt="⁢4.435km/s"/><br /><sub><b>⁢4.435km/s</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=CoolZxp" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/drindr"><img src="https://avatars.githubusercontent.com/u/34709601?v=4?s=100" width="100px;" alt="Drin"/><br /><sub><b>Drin</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=drindr" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://hzu.lol/"><img src="https://avatars.githubusercontent.com/u/42469039?v=4?s=100" width="100px;" alt="Hakim Zulkufli"/><br /><sub><b>Hakim Zulkufli</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=hakimzulkufli" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://bit.ly/2N1ynXZ"><img src="https://avatars.githubusercontent.com/u/14874913?v=4?s=100" width="100px;" alt="Simon Klakegg"/><br /><sub><b>Simon Klakegg</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=sklakegg" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/sudorest"><img src="https://avatars.githubusercontent.com/u/214225921?v=4?s=100" width="100px;" alt="Kiwi"/><br /><sub><b>Kiwi</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=sudorest" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/xLillium"><img src="https://avatars.githubusercontent.com/u/16964936?v=4?s=100" width="100px;" alt="xLillium"/><br /><sub><b>xLillium</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=xLillium" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/CoolZxp"><img src="https://avatars.githubusercontent.com/u/54017765?v=4?s=100" width="100px;" alt="⁢4.435km/s"/><br /><sub><b>⁢4.435km/s</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=CoolZxp" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/drindr"><img src="https://avatars.githubusercontent.com/u/34709601?v=4?s=100" width="100px;" alt="Drin"/><br /><sub><b>Drin</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=drindr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://hzu.lol/"><img src="https://avatars.githubusercontent.com/u/42469039?v=4?s=100" width="100px;" alt="Hakim Zulkufli"/><br /><sub><b>Hakim Zulkufli</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=hakimzulkufli" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://bit.ly/2N1ynXZ"><img src="https://avatars.githubusercontent.com/u/14874913?v=4?s=100" width="100px;" alt="Simon Klakegg"/><br /><sub><b>Simon Klakegg</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=sklakegg" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/sudorest"><img src="https://avatars.githubusercontent.com/u/214225921?v=4?s=100" width="100px;" alt="Kiwi"/><br /><sub><b>Kiwi</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=sudorest" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://trade.xyz/?ref=BZ1RJRXWO"><img src="https://avatars.githubusercontent.com/u/7317522?v=4?s=100" width="100px;" alt="Raxxoor"/><br /><sub><b>Raxxoor</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=dhaern" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/nyanyani"><img src="https://avatars.githubusercontent.com/u/11475482?v=4?s=100" width="100px;" alt="nyanyani"/><br /><sub><b>nyanyani</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=nyanyani" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://nettee.io/"><img src="https://avatars.githubusercontent.com/u/3953668?v=4?s=100" width="100px;" alt="nettee"/><br /><sub><b>nettee</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=nettee" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/atomlink-ye"><img src="https://avatars.githubusercontent.com/u/48194045?v=4?s=100" width="100px;" alt="Link"/><br /><sub><b>Link</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=atomlink-ye" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/blaszewski"><img src="https://avatars.githubusercontent.com/u/14119531?v=4?s=100" width="100px;" alt="Bartosz Łaszewski"/><br /><sub><b>Bartosz Łaszewski</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=blaszewski" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/huilang021x"><img src="https://avatars.githubusercontent.com/u/77293911?v=4?s=100" width="100px;" alt="huilang021x"/><br /><sub><b>huilang021x</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=huilang021x" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://trade.xyz/?ref=BZ1RJRXWO"><img src="https://avatars.githubusercontent.com/u/7317522?v=4?s=100" width="100px;" alt="Raxxoor"/><br /><sub><b>Raxxoor</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=dhaern" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/nyanyani"><img src="https://avatars.githubusercontent.com/u/11475482?v=4?s=100" width="100px;" alt="nyanyani"/><br /><sub><b>nyanyani</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=nyanyani" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://nettee.io/"><img src="https://avatars.githubusercontent.com/u/3953668?v=4?s=100" width="100px;" alt="nettee"/><br /><sub><b>nettee</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=nettee" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/atomlink-ye"><img src="https://avatars.githubusercontent.com/u/48194045?v=4?s=100" width="100px;" alt="Link"/><br /><sub><b>Link</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=atomlink-ye" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/blaszewski"><img src="https://avatars.githubusercontent.com/u/14119531?v=4?s=100" width="100px;" alt="Bartosz Łaszewski"/><br /><sub><b>Bartosz Łaszewski</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=blaszewski" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/huilang021x"><img src="https://avatars.githubusercontent.com/u/77293911?v=4?s=100" width="100px;" alt="huilang021x"/><br /><sub><b>huilang021x</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=huilang021x" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dkovacevic15"><img src="https://avatars.githubusercontent.com/u/24757821?v=4?s=100" width="100px;" alt="Dusan Kovacevic"/><br /><sub><b>Dusan Kovacevic</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=dkovacevic15" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jwcrystal"><img src="https://avatars.githubusercontent.com/u/121911854?v=4?s=100" width="100px;" alt="jwcrystal"/><br /><sub><b>jwcrystal</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=jwcrystal" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://zenstudio.cv/"><img src="https://avatars.githubusercontent.com/u/10528635?v=4?s=100" width="100px;" alt="Nguyen Canh Toan"/><br /><sub><b>Nguyen Canh Toan</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ZenStudioLab" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/tom-dyar"><img src="https://avatars.githubusercontent.com/u/8899513?v=4?s=100" width="100px;" alt="Thomas Dyar"/><br /><sub><b>Thomas Dyar</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=tom-dyar" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/zuuky"><img src="https://avatars.githubusercontent.com/u/6713415?v=4?s=100" width="100px;" alt="zero"/><br /><sub><b>zero</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=zuuky" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DenisBalan"><img src="https://avatars.githubusercontent.com/u/33955091?v=4?s=100" width="100px;" alt="Denis Balan"/><br /><sub><b>Denis Balan</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=DenisBalan" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dkovacevic15"><img src="https://avatars.githubusercontent.com/u/24757821?v=4?s=100" width="100px;" alt="Dusan Kovacevic"/><br /><sub><b>Dusan Kovacevic</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=dkovacevic15" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jwcrystal"><img src="https://avatars.githubusercontent.com/u/121911854?v=4?s=100" width="100px;" alt="jwcrystal"/><br /><sub><b>jwcrystal</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=jwcrystal" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://zenstudio.cv/"><img src="https://avatars.githubusercontent.com/u/10528635?v=4?s=100" width="100px;" alt="Nguyen Canh Toan"/><br /><sub><b>Nguyen Canh Toan</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=ZenStudioLab" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/tom-dyar"><img src="https://avatars.githubusercontent.com/u/8899513?v=4?s=100" width="100px;" alt="Thomas Dyar"/><br /><sub><b>Thomas Dyar</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=tom-dyar" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/zuuky"><img src="https://avatars.githubusercontent.com/u/6713415?v=4?s=100" width="100px;" alt="zero"/><br /><sub><b>zero</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=zuuky" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DenisBalan"><img src="https://avatars.githubusercontent.com/u/33955091?v=4?s=100" width="100px;" alt="Denis Balan"/><br /><sub><b>Denis Balan</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=DenisBalan" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/gustavocaiano"><img src="https://avatars.githubusercontent.com/u/104129313?v=4?s=100" width="100px;" alt="Gustavo Caiano"/><br /><sub><b>Gustavo Caiano</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=gustavocaiano" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ThomasMldr"><img src="https://avatars.githubusercontent.com/u/6631765?v=4?s=100" width="100px;" alt="Thomas Mulder"/><br /><sub><b>Thomas Mulder</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=ThomasMldr" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/maou-shonen"><img src="https://avatars.githubusercontent.com/u/22576780?v=4?s=100" width="100px;" alt="魔王少年(maou shonen)"/><br /><sub><b>魔王少年(maou shonen)</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=maou-shonen" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jelasin"><img src="https://avatars.githubusercontent.com/u/97788570?v=4?s=100" width="100px;" alt="  Jelasin"/><br /><sub><b>  Jelasin</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=jelasin" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/hannespr"><img src="https://avatars.githubusercontent.com/u/40021505?v=4?s=100" width="100px;" alt="Hannes"/><br /><sub><b>Hannes</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=hannespr" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://qwtoe.github.io/"><img src="https://avatars.githubusercontent.com/u/36733893?v=4?s=100" width="100px;" alt="mooozfxs"/><br /><sub><b>mooozfxs</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=qwtoe" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/gustavocaiano"><img src="https://avatars.githubusercontent.com/u/104129313?v=4?s=100" width="100px;" alt="Gustavo Caiano"/><br /><sub><b>Gustavo Caiano</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=gustavocaiano" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/ThomasMldr"><img src="https://avatars.githubusercontent.com/u/6631765?v=4?s=100" width="100px;" alt="Thomas Mulder"/><br /><sub><b>Thomas Mulder</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=ThomasMldr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/maou-shonen"><img src="https://avatars.githubusercontent.com/u/22576780?v=4?s=100" width="100px;" alt="魔王少年(maou shonen)"/><br /><sub><b>魔王少年(maou shonen)</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=maou-shonen" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/jelasin"><img src="https://avatars.githubusercontent.com/u/97788570?v=4?s=100" width="100px;" alt="  Jelasin"/><br /><sub><b>  Jelasin</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=jelasin" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/hannespr"><img src="https://avatars.githubusercontent.com/u/40021505?v=4?s=100" width="100px;" alt="Hannes"/><br /><sub><b>Hannes</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=hannespr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://qwtoe.github.io/"><img src="https://avatars.githubusercontent.com/u/36733893?v=4?s=100" width="100px;" alt="mooozfxs"/><br /><sub><b>mooozfxs</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=qwtoe" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/zackslash"><img src="https://avatars.githubusercontent.com/u/2040617?v=4?s=100" width="100px;" alt="Luke Hines"/><br /><sub><b>Luke Hines</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=zackslash" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/andrewylies"><img src="https://avatars.githubusercontent.com/u/103019336?v=4?s=100" width="100px;" alt="m.seomoon"/><br /><sub><b>m.seomoon</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=andrewylies" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/yolo2h"><img src="https://avatars.githubusercontent.com/u/10754850?v=4?s=100" width="100px;" alt="Yolo"/><br /><sub><b>Yolo</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=yolo2h" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/xinxingi"><img src="https://avatars.githubusercontent.com/u/49302071?v=4?s=100" width="100px;" alt="XinXing"/><br /><sub><b>XinXing</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=xinxingi" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/eltociear"><img src="https://avatars.githubusercontent.com/u/22633385?v=4?s=100" width="100px;" alt="Ikko Eltociear Ashimine"/><br /><sub><b>Ikko Eltociear Ashimine</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=eltociear" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dev-wantap"><img src="https://avatars.githubusercontent.com/u/69743540?v=4?s=100" width="100px;" alt="GWANWOO KIM"/><br /><sub><b>GWANWOO KIM</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=dev-wantap" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/zackslash"><img src="https://avatars.githubusercontent.com/u/2040617?v=4?s=100" width="100px;" alt="Luke Hines"/><br /><sub><b>Luke Hines</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=zackslash" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/andrewylies"><img src="https://avatars.githubusercontent.com/u/103019336?v=4?s=100" width="100px;" alt="m.seomoon"/><br /><sub><b>m.seomoon</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=andrewylies" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/yolo2h"><img src="https://avatars.githubusercontent.com/u/10754850?v=4?s=100" width="100px;" alt="Yolo"/><br /><sub><b>Yolo</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=yolo2h" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/xinxingi"><img src="https://avatars.githubusercontent.com/u/49302071?v=4?s=100" width="100px;" alt="XinXing"/><br /><sub><b>XinXing</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=xinxingi" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/eltociear"><img src="https://avatars.githubusercontent.com/u/22633385?v=4?s=100" width="100px;" alt="Ikko Eltociear Ashimine"/><br /><sub><b>Ikko Eltociear Ashimine</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=eltociear" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dev-wantap"><img src="https://avatars.githubusercontent.com/u/69743540?v=4?s=100" width="100px;" alt="GWANWOO KIM"/><br /><sub><b>GWANWOO KIM</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=dev-wantap" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/OmerFarukOruc"><img src="https://avatars.githubusercontent.com/u/7347742?v=4?s=100" width="100px;" alt="Omer Faruk Oruc"/><br /><sub><b>Omer Faruk Oruc</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=OmerFarukOruc" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://khallaf.uk/"><img src="https://avatars.githubusercontent.com/u/51155980?v=4?s=100" width="100px;" alt="Omar Mohamed Khallaf"/><br /><sub><b>Omar Mohamed Khallaf</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=omar-mohamed-khallaf" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Qesire"><img src="https://avatars.githubusercontent.com/u/102657430?v=4?s=100" width="100px;" alt="Knowingthesea_Qesire"/><br /><sub><b>Knowingthesea_Qesire</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Qesire" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="http://www.flyinghail.net/"><img src="https://avatars.githubusercontent.com/u/157430?v=4?s=100" width="100px;" alt="FENG Hao"/><br /><sub><b>FENG Hao</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=flyinghail" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/smatheusblu"><img src="https://avatars.githubusercontent.com/u/5666794?v=4?s=100" width="100px;" alt="Matheus Nogueira Silveira"/><br /><sub><b>Matheus Nogueira Silveira</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=smatheusblu" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/sktr"><img src="https://avatars.githubusercontent.com/u/44969514?v=4?s=100" width="100px;" alt="sktr"/><br /><sub><b>sktr</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=sktr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/OmerFarukOruc"><img src="https://avatars.githubusercontent.com/u/7347742?v=4?s=100" width="100px;" alt="Omer Faruk Oruc"/><br /><sub><b>Omer Faruk Oruc</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=OmerFarukOruc" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://khallaf.uk/"><img src="https://avatars.githubusercontent.com/u/51155980?v=4?s=100" width="100px;" alt="Omar Mohamed Khallaf"/><br /><sub><b>Omar Mohamed Khallaf</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=omar-mohamed-khallaf" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Qesire"><img src="https://avatars.githubusercontent.com/u/102657430?v=4?s=100" width="100px;" alt="Knowingthesea_Qesire"/><br /><sub><b>Knowingthesea_Qesire</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Qesire" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="http://www.flyinghail.net/"><img src="https://avatars.githubusercontent.com/u/157430?v=4?s=100" width="100px;" alt="FENG Hao"/><br /><sub><b>FENG Hao</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=flyinghail" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/smatheusblu"><img src="https://avatars.githubusercontent.com/u/5666794?v=4?s=100" width="100px;" alt="Matheus Nogueira Silveira"/><br /><sub><b>Matheus Nogueira Silveira</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=smatheusblu" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/sktr"><img src="https://avatars.githubusercontent.com/u/44969514?v=4?s=100" width="100px;" alt="sktr"/><br /><sub><b>sktr</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=sktr" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/bobbyunknown"><img src="https://avatars.githubusercontent.com/u/62272380?v=4?s=100" width="100px;" alt="Insomnia"/><br /><sub><b>Insomnia</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=bobbyunknown" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/andrescastane"><img src="https://avatars.githubusercontent.com/u/13487870?v=4?s=100" width="100px;" alt="Andres Castañeda"/><br /><sub><b>Andres Castañeda</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=andrescastane" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://zaradacht.com/"><img src="https://avatars.githubusercontent.com/u/24251016?v=4?s=100" width="100px;" alt="Zaradacht Taifour (Zack)"/><br /><sub><b>Zaradacht Taifour (Zack)</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Zaradacht" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/fslse"><img src="https://avatars.githubusercontent.com/u/90545544?v=4?s=100" width="100px;" alt="fslse"/><br /><sub><b>fslse</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=fslse" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/linze0721"><img src="https://avatars.githubusercontent.com/u/178997622?v=4?s=100" width="100px;" alt="萧瑟"/><br /><sub><b>萧瑟</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=linze0721" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/SisyphusZheng"><img src="https://avatars.githubusercontent.com/u/146103794?v=4?s=100" width="100px;" alt="Zhi"/><br /><sub><b>Zhi</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=SisyphusZheng" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/bobbyunknown"><img src="https://avatars.githubusercontent.com/u/62272380?v=4?s=100" width="100px;" alt="Insomnia"/><br /><sub><b>Insomnia</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=bobbyunknown" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/andrescastane"><img src="https://avatars.githubusercontent.com/u/13487870?v=4?s=100" width="100px;" alt="Andres Castañeda"/><br /><sub><b>Andres Castañeda</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=andrescastane" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://zaradacht.com/"><img src="https://avatars.githubusercontent.com/u/24251016?v=4?s=100" width="100px;" alt="Zaradacht Taifour (Zack)"/><br /><sub><b>Zaradacht Taifour (Zack)</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Zaradacht" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/fslse"><img src="https://avatars.githubusercontent.com/u/90545544?v=4?s=100" width="100px;" alt="fslse"/><br /><sub><b>fslse</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=fslse" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/linze0721"><img src="https://avatars.githubusercontent.com/u/178997622?v=4?s=100" width="100px;" alt="萧瑟"/><br /><sub><b>萧瑟</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=linze0721" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/SisyphusZheng"><img src="https://avatars.githubusercontent.com/u/146103794?v=4?s=100" width="100px;" alt="Zhi"/><br /><sub><b>Zhi</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=SisyphusZheng" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/824156793"><img src="https://avatars.githubusercontent.com/u/19755784?v=4?s=100" width="100px;" alt="lilili"/><br /><sub><b>lilili</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=824156793" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="http://mikehenke.com/"><img src="https://avatars.githubusercontent.com/u/119844?v=4?s=100" width="100px;" alt="Mike Henke"/><br /><sub><b>Mike Henke</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=mhenke" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/imVinayPandya"><img src="https://avatars.githubusercontent.com/u/5011197?v=4?s=100" width="100px;" alt="Vinay Pandya"/><br /><sub><b>Vinay Pandya</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=imVinayPandya" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/s-shank"><img src="https://avatars.githubusercontent.com/u/241541918?v=4?s=100" width="100px;" alt="Shank"/><br /><sub><b>Shank</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=s-shank" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://rgutzen.github.io/"><img src="https://avatars.githubusercontent.com/u/16289604?v=4?s=100" width="100px;" alt="Robin Gutzen"/><br /><sub><b>Robin Gutzen</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=rgutzen" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dragon-Elec"><img src="https://avatars.githubusercontent.com/u/197374270?v=4?s=100" width="100px;" alt="Yash"/><br /><sub><b>Yash</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=dragon-Elec" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/824156793"><img src="https://avatars.githubusercontent.com/u/19755784?v=4?s=100" width="100px;" alt="lilili"/><br /><sub><b>lilili</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=824156793" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="http://mikehenke.com/"><img src="https://avatars.githubusercontent.com/u/119844?v=4?s=100" width="100px;" alt="Mike Henke"/><br /><sub><b>Mike Henke</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=mhenke" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/imVinayPandya"><img src="https://avatars.githubusercontent.com/u/5011197?v=4?s=100" width="100px;" alt="Vinay Pandya"/><br /><sub><b>Vinay Pandya</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=imVinayPandya" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/s-shank"><img src="https://avatars.githubusercontent.com/u/241541918?v=4?s=100" width="100px;" alt="Shank"/><br /><sub><b>Shank</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=s-shank" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://rgutzen.github.io/"><img src="https://avatars.githubusercontent.com/u/16289604?v=4?s=100" width="100px;" alt="Robin Gutzen"/><br /><sub><b>Robin Gutzen</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=rgutzen" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/dragon-Elec"><img src="https://avatars.githubusercontent.com/u/197374270?v=4?s=100" width="100px;" alt="Yash"/><br /><sub><b>Yash</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=dragon-Elec" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Jiajun0413"><img src="https://avatars.githubusercontent.com/u/184531967?v=4?s=100" width="100px;" alt="Liu Jiajun"/><br /><sub><b>Liu Jiajun</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Jiajun0413" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/umi008"><img src="https://avatars.githubusercontent.com/u/200843810?v=4?s=100" width="100px;" alt="Ulises Millán"/><br /><sub><b>Ulises Millán</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=umi008" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/HighColdHC"><img src="https://avatars.githubusercontent.com/u/35870222?v=4?s=100" width="100px;" alt="HighColdHC"/><br /><sub><b>HighColdHC</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=HighColdHC" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://hardcore.engineer/about"><img src="https://avatars.githubusercontent.com/u/401815?v=4?s=100" width="100px;" alt="Stephan Schielke"/><br /><sub><b>Stephan Schielke</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=stephanschielke" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DanMaly"><img src="https://avatars.githubusercontent.com/u/69809112?v=4?s=100" width="100px;" alt="Daniel Maly"/><br /><sub><b>Daniel Maly</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=DanMaly" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Chewji9875"><img src="https://avatars.githubusercontent.com/u/126886556?v=4?s=100" width="100px;" alt="Chewji"/><br /><sub><b>Chewji</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Chewji9875" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Jiajun0413"><img src="https://avatars.githubusercontent.com/u/184531967?v=4?s=100" width="100px;" alt="Liu Jiajun"/><br /><sub><b>Liu Jiajun</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Jiajun0413" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/umi008"><img src="https://avatars.githubusercontent.com/u/200843810?v=4?s=100" width="100px;" alt="Ulises Millán"/><br /><sub><b>Ulises Millán</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=umi008" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/HighColdHC"><img src="https://avatars.githubusercontent.com/u/35870222?v=4?s=100" width="100px;" alt="HighColdHC"/><br /><sub><b>HighColdHC</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=HighColdHC" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://hardcore.engineer/about"><img src="https://avatars.githubusercontent.com/u/401815?v=4?s=100" width="100px;" alt="Stephan Schielke"/><br /><sub><b>Stephan Schielke</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=stephanschielke" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DanMaly"><img src="https://avatars.githubusercontent.com/u/69809112?v=4?s=100" width="100px;" alt="Daniel Maly"/><br /><sub><b>Daniel Maly</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=DanMaly" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Chewji9875"><img src="https://avatars.githubusercontent.com/u/126886556?v=4?s=100" width="100px;" alt="Chewji"/><br /><sub><b>Chewji</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Chewji9875" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DanielMaly"><img src="https://avatars.githubusercontent.com/u/1443921?v=4?s=100" width="100px;" alt="Daniel Maly"/><br /><sub><b>Daniel Maly</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=DanielMaly" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://giuseppebellamacina.com/"><img src="https://avatars.githubusercontent.com/u/102151655?v=4?s=100" width="100px;" alt="Giuseppe Bellamacina"/><br /><sub><b>Giuseppe Bellamacina</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=GiuseppeBellamacina" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Zhanyuanium"><img src="https://avatars.githubusercontent.com/u/92024923?v=4?s=100" width="100px;" alt="Zhanyuanium"/><br /><sub><b>Zhanyuanium</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=Zhanyuanium" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/kaze-gif"><img src="https://avatars.githubusercontent.com/u/114116466?v=4?s=100" width="100px;" alt="かぜ"/><br /><sub><b>かぜ</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=kaze-gif" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/tsankotsanev"><img src="https://avatars.githubusercontent.com/u/76694544?v=4?s=100" width="100px;" alt="Tsanko Tsanev"/><br /><sub><b>Tsanko Tsanev</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=tsankotsanev" title="Code">💻</a></td>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/shixi-li"><img src="https://avatars.githubusercontent.com/u/40780706?v=4?s=100" width="100px;" alt="cyril"/><br /><sub><b>cyril</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=shixi-li" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/DanielMaly"><img src="https://avatars.githubusercontent.com/u/1443921?v=4?s=100" width="100px;" alt="Daniel Maly"/><br /><sub><b>Daniel Maly</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=DanielMaly" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://giuseppebellamacina.com/"><img src="https://avatars.githubusercontent.com/u/102151655?v=4?s=100" width="100px;" alt="Giuseppe Bellamacina"/><br /><sub><b>Giuseppe Bellamacina</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=GiuseppeBellamacina" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/Zhanyuanium"><img src="https://avatars.githubusercontent.com/u/92024923?v=4?s=100" width="100px;" alt="Zhanyuanium"/><br /><sub><b>Zhanyuanium</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=Zhanyuanium" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/kaze-gif"><img src="https://avatars.githubusercontent.com/u/114116466?v=4?s=100" width="100px;" alt="かぜ"/><br /><sub><b>かぜ</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=kaze-gif" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/tsankotsanev"><img src="https://avatars.githubusercontent.com/u/76694544?v=4?s=100" width="100px;" alt="Tsanko Tsanev"/><br /><sub><b>Tsanko Tsanev</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=tsankotsanev" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/shixi-li"><img src="https://avatars.githubusercontent.com/u/40780706?v=4?s=100" width="100px;" alt="cyril"/><br /><sub><b>cyril</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=shixi-li" title="Code">💻</a></td>
     </tr>
     <tr>
-      <td align="center" valign="top" width="16.66%"><a href="https://github.com/pmolinal"><img src="https://avatars.githubusercontent.com/u/1817596?v=4?s=100" width="100px;" alt="Patricio Molina"/><br /><sub><b>Patricio Molina</b></sub></a><br /><a href="https://github.com/alvinunreal/oh-my-opencode-slim/commits?author=pmolinal" title="Code">💻</a></td>
+      <td align="center" valign="top" width="16.66%"><a href="https://github.com/pmolinal"><img src="https://avatars.githubusercontent.com/u/1817596?v=4?s=100" width="100px;" alt="Patricio Molina"/><br /><sub><b>Patricio Molina</b></sub></a><br /><a href="https://github.com/shyrz/mechanicus/commits?author=pmolinal" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

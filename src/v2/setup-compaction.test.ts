@@ -167,7 +167,7 @@ describe('createSessionCompactionBridge', () => {
       content: [
         {
           type: 'text',
-          text: '<omos-cmd-command data-name="reflect">a b</omos-cmd-command>',
+          text: '<mechanicus-cmd-command data-name="reflect">a b</mechanicus-cmd-command>',
         },
       ],
     };
@@ -188,7 +188,7 @@ describe('createSessionCompactionBridge', () => {
     expect(marker.content).toEqual([
       {
         type: 'text',
-        text: '<omos-cmd-command data-name="reflect">a b</omos-cmd-command>',
+        text: '<mechanicus-cmd-command data-name="reflect">a b</mechanicus-cmd-command>',
       },
     ]);
     expect(assistant.content).toEqual([
@@ -238,7 +238,7 @@ describe('createV2Setup compaction hook', () => {
 
   const readPluginLog = (): string => {
     const files = readDirSync(logDir).filter(
-      (f) => f.startsWith('oh-my-opencode-slim.') && f.endsWith('.log'),
+      (f) => f.startsWith('mechanicus.') && f.endsWith('.log'),
     );
     return files
       .map((f) => readFileSync(path.join(logDir, f), 'utf8'))
@@ -247,12 +247,12 @@ describe('createV2Setup compaction hook', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    fixtureRoot = await mkdtemp('/tmp/omo-v2-compaction-');
+    fixtureRoot = await mkdtemp('/tmp/mechanicus-v2-compaction-');
     projectDir = path.join(fixtureRoot, 'project');
     configDir = path.join(fixtureRoot, 'config');
     logDir = path.join(fixtureRoot, 'logs');
     await Bun.write(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       // Minimal hermetic fixture (mirrors setup.e2e.test.ts): empty
       // plugin config, companion disabled.
       JSON.stringify({ companion: { enabled: false } }),
@@ -265,7 +265,7 @@ describe('createV2Setup compaction hook', () => {
       XDG_CACHE_HOME: path.join(fixtureRoot, 'xdg-cache'),
       OPENCODE_LOG_DIR: logDir,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
   });
 
   afterEach(async () => {

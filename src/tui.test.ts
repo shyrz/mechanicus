@@ -281,7 +281,9 @@ describe('tui sidebar agents', () => {
   });
 
   test('keeps compact agent rows single-line with truncated right-aligned model IDs', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-compact-row-'));
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-compact-row-'),
+    );
     const projectDir = path.join(root, 'project');
     const disposers: Array<() => void> = [];
     let slotPlugin: { slots: { sidebar_content: () => unknown } } | undefined;
@@ -366,7 +368,9 @@ describe('tui sidebar agents', () => {
 
 describe('live TUI activity rendering', () => {
   test('updates a mounted v1 sidebar when an agent becomes active', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-spinner-live-'));
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-spinner-live-'),
+    );
     const projectDir = path.join(root, 'project');
     const originalDataHome = process.env.XDG_DATA_HOME;
     const disposers: Array<() => void> = [];
@@ -484,8 +488,8 @@ describe('readConfigInvalid', () => {
     originalEnv = { ...process.env };
     // Isolate from real user config and env presets
     delete process.env.OPENCODE_CONFIG_DIR;
-    delete process.env.OH_MY_OPENCODE_SLIM_PRESET;
-    configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-env-'));
+    delete process.env.MECHANICUS_PRESET;
+    configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-env-'));
     process.env.XDG_CONFIG_HOME = configHome;
   });
 
@@ -495,13 +499,13 @@ describe('readConfigInvalid', () => {
   });
 
   test('detects invalid config from the current directory without persisted state', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       const configDir = path.join(projectDir, '.opencode');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
+        path.join(configDir, 'mechanicus.json'),
         JSON.stringify({ agents: { oracle: { temperature: 5 } } }),
       );
 
@@ -512,13 +516,13 @@ describe('readConfigInvalid', () => {
   });
 
   test('returns false for valid config', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       const configDir = path.join(projectDir, '.opencode');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
+        path.join(configDir, 'mechanicus.json'),
         JSON.stringify({ agents: { oracle: { model: 'valid/model' } } }),
       );
 
@@ -529,13 +533,13 @@ describe('readConfigInvalid', () => {
   });
 
   test('returns false for config with deprecated fallback keys (loads fine)', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       const configDir = path.join(projectDir, '.opencode');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
+        path.join(configDir, 'mechanicus.json'),
         JSON.stringify({
           fallback: {
             enabled: true,
@@ -555,13 +559,13 @@ describe('readConfigInvalid', () => {
   });
 
   test('returns false for config with normalized disabled_* string', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       const configDir = path.join(projectDir, '.opencode');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
+        path.join(configDir, 'mechanicus.json'),
         JSON.stringify({
           disabled_agents: 'explorer',
           agents: { oracle: { model: 'valid/model' } },
@@ -578,7 +582,7 @@ describe('readConfigInvalid', () => {
   });
 
   test('uses compact sidebar by default', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       fs.mkdirSync(projectDir, { recursive: true });
@@ -590,13 +594,13 @@ describe('readConfigInvalid', () => {
   });
 
   test('allows expanded sidebar config', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-'));
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-'));
     try {
       const projectDir = path.join(tempDir, 'project');
       const configDir = path.join(projectDir, '.opencode');
       fs.mkdirSync(configDir, { recursive: true });
       fs.writeFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
+        path.join(configDir, 'mechanicus.json'),
         JSON.stringify({ compactSidebar: false }),
       );
 
@@ -619,7 +623,7 @@ describe('tui plugin env disable', () => {
   });
 
   test('does not perform setup when plugin is disabled by env', async () => {
-    process.env.OH_MY_OPENCODE_SLIM_DISABLE = '1';
+    process.env.MECHANICUS_DISABLE = '1';
 
     let disposeRegistered = false;
     let renderRequested = false;
@@ -659,7 +663,9 @@ describe('tmux pane registration', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tmux-tui-'));
+    stateDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tmux-tui-'),
+    );
     process.env.XDG_DATA_HOME = stateDirectory;
     process.env.TMUX_PANE = '%42';
   });
@@ -765,7 +771,7 @@ describe('dual-contract plugin module', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
   });
 
   afterEach(() => {
@@ -819,7 +825,9 @@ describe('dual-contract plugin module', () => {
   });
 
   test('setup registers one sidebar.content slot and cleanup disposes it', async () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-v2-'));
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tui-v2-'),
+    );
     let cleanup: (() => void) | undefined;
     try {
       const { ctx, slotClaims, getDisposeCalls } = createV2Context(tempDir);
@@ -841,8 +849,10 @@ describe('dual-contract plugin module', () => {
   });
 
   test('setup returns early without registering a slot when disabled by env', async () => {
-    process.env.OH_MY_OPENCODE_SLIM_DISABLE = '1';
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-v2-'));
+    process.env.MECHANICUS_DISABLE = '1';
+    const tempDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tui-v2-'),
+    );
     try {
       const { ctx, slotClaims } = createV2Context(tempDir);
       const cleanup = await tuiPlugin.setup(ctx as unknown as V2Context);
@@ -1223,7 +1233,7 @@ describe('clickable sidebar sessions', () => {
   }
 
   test('mounted sidebar: 1 session navigates', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-click-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-click-'));
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1275,7 +1285,7 @@ describe('clickable sidebar sessions', () => {
   });
 
   test('mounted sidebar: N sessions expand on first click, child click navigates', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-click-n-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-click-n-'));
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1389,7 +1399,9 @@ describe('clickable sidebar sessions', () => {
   });
 
   test('mounted sidebar without navigate does not act', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-click-none-'));
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-click-none-'),
+    );
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1452,7 +1464,7 @@ describe('clickable sidebar sessions', () => {
   });
 
   test('mounted sidebar: idle row with history is clickable on the whole line', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-dot-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-dot-'));
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1514,7 +1526,7 @@ describe('clickable sidebar sessions', () => {
   });
 
   test('mounted sidebar: live sessions hide the history dot and keep #1197 click', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-dot-live-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-dot-live-'));
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1581,7 +1593,7 @@ describe('clickable sidebar sessions', () => {
   });
 
   test('mounted sidebar: spinner without history does not rebuild the row on animation frames', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-dot-spin-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-dot-spin-'));
     const projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     const restoreDataHome = withIsolatedDataHome(root);
@@ -1636,7 +1648,7 @@ describe('clickable sidebar sessions', () => {
 });
 
 describe('resolveSidebarSlotOrder', () => {
-  const NAME = 'oh-my-opencode-slim';
+  const NAME = 'mechanicus';
 
   test('index 0 lands at 110, right after the host context section', () => {
     expect(resolveSidebarSlotOrder([`file:///w/${NAME}`], NAME)).toBe(110);
@@ -1705,7 +1717,9 @@ describe('resolveSidebarSlotOrder', () => {
   });
 
   test('v1 registration wires tuiConfig.plugin into the slot order', async () => {
-    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-v1-'));
+    const projectDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tui-v1-'),
+    );
     try {
       const captured: { order?: number }[] = [];
       await tuiPlugin.tui(
@@ -1723,7 +1737,7 @@ describe('resolveSidebarSlotOrder', () => {
           tuiConfig: {
             plugin: [
               '@cortexkit/opencode-magic-context@0.42.4',
-              'file:///home/raxxor/workspace/oh-my-opencode-slim',
+              'file:///home/raxxor/workspace/mechanicus',
             ],
           },
           theme: { current: {} },
@@ -1739,7 +1753,9 @@ describe('resolveSidebarSlotOrder', () => {
   });
 
   test('v1 registration falls back to 900 without tuiConfig', async () => {
-    const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-v1-'));
+    const projectDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tui-v1-'),
+    );
     try {
       const captured: { order?: number }[] = [];
       await tuiPlugin.tui(

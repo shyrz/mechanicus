@@ -61,7 +61,7 @@ fallback), the wake condition is children without a terminal `outcome`
   - `observeChatMessage`: real external user activity rearms the no-progress
     cap and records the observed model for continuation prompts.
 - **Gate** (`wake-gate.ts`): Process-local reservation/progress store shared
-  via `globalThis` + `Symbol.for` (`oh-my-opencode-slim.orchestrator-wake-gate`):
+  via `globalThis` + `Symbol.for` (`mechanicus.orchestrator-wake-gate`):
   - `tryBeginWakeEvaluation` / `releaseWakeEvaluation` / `retryAfterWakeEvaluation`:
     single in-flight evaluation per session with waiter re-queueing.
   - `commitWakeReservation`: marks a committed wake and sets `expectingWakeBusy`

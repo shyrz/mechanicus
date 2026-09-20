@@ -22,7 +22,7 @@ import type {
   V2SessionPromptEvent,
 } from './types';
 
-const INTERNAL_KEY = 'oh-my-opencode-slim.internalInitiator';
+const INTERNAL_KEY = 'mechanicus.internalInitiator';
 
 function makeContextEvent(
   messages: Array<{

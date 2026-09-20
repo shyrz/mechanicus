@@ -26,7 +26,7 @@ type WakeGateStore = {
   order: string[];
 };
 
-const STORE_KEY = 'oh-my-opencode-slim.orchestrator-wake-gate';
+const STORE_KEY = 'mechanicus.orchestrator-wake-gate';
 const MAX_TRACKED_SESSIONS = 256;
 
 function getStore(): WakeGateStore {

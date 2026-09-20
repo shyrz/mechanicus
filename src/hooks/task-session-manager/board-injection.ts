@@ -45,7 +45,7 @@ import { extractTaskSummary, isLateCancelledTaskError } from './status-utils';
 // ── Constants ──────────────────────────────────────────────────────────
 
 export const BACKGROUND_JOB_BOARD_METADATA_KEY =
-  'oh-my-opencode-slim.backgroundJobBoard';
+  'mechanicus.backgroundJobBoard';
 
 const BACKGROUND_COMPLETION_COMPLETED = /^Background task completed: /;
 const BACKGROUND_COMPLETION_FAILED = /^Background task failed: /;
@@ -1615,7 +1615,7 @@ function injectCheckpointBoard(
       }
       snapshotState.snapshots.push({
         anchorKey,
-        id: `oh-my-opencode-slim:background-job-board:${encodedSessionID}:${sequence}`,
+        id: `mechanicus:background-job-board:${encodedSessionID}:${sequence}`,
         text: reminder,
         terminalUnreconciledTaskIDs: boardMeta.terminalUnreconciledTaskIDs,
       });

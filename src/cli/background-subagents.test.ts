@@ -113,7 +113,7 @@ describe('background subagents writing', () => {
   });
 
   test('writes managed block without duplicates', () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'omoo-bg-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'mechanicus-bg-'));
     const target = join(tempDir, '.bashrc');
     writeFileSync(target, 'existing=true\n');
 
@@ -190,7 +190,7 @@ describe('configureBackgroundSubagents', () => {
   test.each(['true', '1', 'TRUE'])(
     'returns already enabled without writing the target when Exa is %s',
     async (exaValue) => {
-      tempDir = mkdtempSync(join(tmpdir(), 'omoo-bg-'));
+      tempDir = mkdtempSync(join(tmpdir(), 'mechanicus-bg-'));
       const target = join(tempDir, '.zshrc');
       writeFileSync(target, 'preserve=true\n');
       process.env.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS = 'true';
@@ -220,7 +220,7 @@ describe('configureBackgroundSubagents', () => {
   test.each([undefined, 'yes', 'false'])(
     'writes Exa configuration when Exa is %s',
     async (exaValue) => {
-      tempDir = mkdtempSync(join(tmpdir(), 'omoo-bg-'));
+      tempDir = mkdtempSync(join(tmpdir(), 'mechanicus-bg-'));
       const target = join(tempDir, '.zshrc');
       process.env.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS = 'true';
       if (exaValue === undefined) {
@@ -251,7 +251,7 @@ describe('configureBackgroundSubagents', () => {
   );
 
   test('writes shell config without prompting', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'omoo-bg-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'mechanicus-bg-'));
     delete process.env.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS;
     const log = spyOn(console, 'log').mockImplementation(() => undefined);
     const originalShell = process.env.SHELL;
@@ -285,7 +285,7 @@ describe('configureBackgroundSubagents', () => {
   });
 
   test('returns no configured target when writing shell config fails', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'omoo-bg-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'mechanicus-bg-'));
     delete process.env.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS;
     rmSync(tempDir, { recursive: true, force: true });
     writeFileSync(tempDir, 'not a directory');

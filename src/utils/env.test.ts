@@ -19,7 +19,7 @@ describe('isTruthyEnvValue', () => {
 });
 
 describe('isPluginDisabledByEnv', () => {
-  test('reads OH_MY_OPENCODE_SLIM_DISABLE', () => {
+  test('reads MECHANICUS_DISABLE', () => {
     expect(isPluginDisabledByEnv({ [PLUGIN_DISABLE_ENV]: '1' })).toBe(true);
     expect(isPluginDisabledByEnv({ [PLUGIN_DISABLE_ENV]: '0' })).toBe(false);
   });

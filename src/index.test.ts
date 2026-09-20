@@ -91,7 +91,7 @@ describe('plugin env disable', () => {
   });
 
   test('returns empty hooks without reading plugin context', async () => {
-    process.env.OH_MY_OPENCODE_SLIM_DISABLE = '1';
+    process.env.MECHANICUS_DISABLE = '1';
 
     const ctx = new Proxy(
       {},
@@ -116,17 +116,13 @@ describe('plugin tool registration', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     process.env.OPENCODE_CONFIG_DIR =
-      '/private/tmp/oh-my-opencode-slim-hitl-empty-config';
-    process.env.XDG_CONFIG_HOME =
-      '/private/tmp/oh-my-opencode-slim-hitl-empty-xdg';
-    process.env.XDG_DATA_HOME =
-      '/private/tmp/oh-my-opencode-slim-hitl-empty-data';
-    process.env.XDG_CACHE_HOME =
-      '/private/tmp/oh-my-opencode-slim-hitl-empty-cache';
-    process.env.OPENCODE_LOG_DIR =
-      '/private/tmp/oh-my-opencode-slim-hitl-empty-logs';
+      '/private/tmp/mechanicus-hitl-empty-config';
+    process.env.XDG_CONFIG_HOME = '/private/tmp/mechanicus-hitl-empty-xdg';
+    process.env.XDG_DATA_HOME = '/private/tmp/mechanicus-hitl-empty-data';
+    process.env.XDG_CACHE_HOME = '/private/tmp/mechanicus-hitl-empty-cache';
+    process.env.OPENCODE_LOG_DIR = '/private/tmp/mechanicus-hitl-empty-logs';
   });
 
   afterEach(() => {
@@ -153,8 +149,8 @@ describe('plugin tool registration', () => {
 
     const hooks = await plugin({
       client,
-      directory: '/private/tmp/oh-my-opencode-slim-hitl-project',
-      worktree: '/private/tmp/oh-my-opencode-slim-hitl-project',
+      directory: '/private/tmp/mechanicus-hitl-project',
+      worktree: '/private/tmp/mechanicus-hitl-project',
       serverUrl: new URL('http://127.0.0.1:4096'),
     } as never);
 
@@ -173,7 +169,7 @@ describe('plugin tool registration', () => {
   });
 
   test('does not retain loop-guard state when search-path validation rejects', async () => {
-    const projectDir = await mkdtemp('/tmp/oh-my-opencode-slim-search-hook-');
+    const projectDir = await mkdtemp('/tmp/mechanicus-search-hook-');
     const client = createPluginClient(async () => ({}));
     let hooks: Awaited<ReturnType<typeof plugin>> | undefined;
 
@@ -245,8 +241,8 @@ describe('plugin tool registration', () => {
 
     const hooks = await plugin({
       client,
-      directory: '/private/tmp/oh-my-opencode-slim-dispose-project',
-      worktree: '/private/tmp/oh-my-opencode-slim-dispose-project',
+      directory: '/private/tmp/mechanicus-dispose-project',
+      worktree: '/private/tmp/mechanicus-dispose-project',
       serverUrl: new URL('http://127.0.0.1:4096'),
     } as never);
 
@@ -267,9 +263,9 @@ describe('plugin tool registration', () => {
       abortCalls.push(path.id);
       return {};
     });
-    const configDir = await mkdtemp('/tmp/oh-my-opencode-slim-phase-2r-');
+    const configDir = await mkdtemp('/tmp/mechanicus-phase-2r-');
     await Bun.write(
-      `${configDir}/oh-my-opencode-slim.json`,
+      `${configDir}/mechanicus.json`,
       JSON.stringify({
         backgroundJobs: {
           wallClockTimeoutMs: 60_000,
@@ -281,7 +277,7 @@ describe('plugin tool registration', () => {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: configDir,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     globalThis.setTimeout = clock.setTimeout as typeof globalThis.setTimeout;
     globalThis.clearTimeout =
       clock.clearTimeout as typeof globalThis.clearTimeout;
@@ -375,7 +371,7 @@ describe('plugin reload generation cleanup', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    projectDir = await mkdtemp('/tmp/oh-my-opencode-slim-gens-');
+    projectDir = await mkdtemp('/tmp/mechanicus-gens-');
     process.env = {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: projectDir,
@@ -383,9 +379,9 @@ describe('plugin reload generation cleanup', () => {
       XDG_CACHE_HOME: `${projectDir}/cache`,
       OPENCODE_LOG_DIR: `${projectDir}/logs`,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     await Bun.write(
-      `${projectDir}/oh-my-opencode-slim.json`,
+      `${projectDir}/mechanicus.json`,
       JSON.stringify({ companion: { enabled: false } }),
     );
   });
@@ -487,7 +483,7 @@ describe('plugin reload generation cleanup', () => {
     // writes run, but neither the updater nor spawnIfAvailable touches
     // the network or spawns a child.
     await Bun.write(
-      `${projectDir}/oh-my-opencode-slim.json`,
+      `${projectDir}/mechanicus.json`,
       JSON.stringify({
         companion: {
           enabled: true,
@@ -528,7 +524,7 @@ describe('plugin TUI agent activity', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    projectDir = await mkdtemp('/tmp/oh-my-opencode-slim-tui-activity-');
+    projectDir = await mkdtemp('/tmp/mechanicus-tui-activity-');
     process.env = {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: projectDir,
@@ -536,9 +532,9 @@ describe('plugin TUI agent activity', () => {
       XDG_CACHE_HOME: `${projectDir}/cache`,
       OPENCODE_LOG_DIR: `${projectDir}/logs`,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     await Bun.write(
-      `${projectDir}/oh-my-opencode-slim.json`,
+      `${projectDir}/mechanicus.json`,
       JSON.stringify({ companion: { enabled: false } }),
     );
 
@@ -1276,7 +1272,7 @@ describe('background task admission model resolution', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    projectDir = await mkdtemp('/tmp/oh-my-opencode-slim-concurrency-');
+    projectDir = await mkdtemp('/tmp/mechanicus-concurrency-');
     process.env = {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: projectDir,
@@ -1284,9 +1280,9 @@ describe('background task admission model resolution', () => {
       XDG_CACHE_HOME: `${projectDir}/cache`,
       OPENCODE_LOG_DIR: `${projectDir}/logs`,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     await Bun.write(
-      `${projectDir}/oh-my-opencode-slim.json`,
+      `${projectDir}/mechanicus.json`,
       JSON.stringify({
         companion: { enabled: false },
         backgroundJobs: {
@@ -1506,7 +1502,7 @@ describe('plugin config model inheritance', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
   });
 
   afterEach(async () => {
@@ -1522,10 +1518,7 @@ describe('plugin config model inheritance', () => {
   async function loadConfiguredPlugin(config: Record<string, unknown>) {
     const configDir = await mkdtemp('/tmp/oh-my-opencode-inheritance-');
     configDirs.push(configDir);
-    await Bun.write(
-      `${configDir}/oh-my-opencode-slim.json`,
-      JSON.stringify(config),
-    );
+    await Bun.write(`${configDir}/mechanicus.json`, JSON.stringify(config));
     process.env = {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: configDir,
@@ -1876,10 +1869,7 @@ describe('system.transform orchestrator injection', () => {
   ) {
     const configDir = await mkdtemp('/tmp/oh-my-system-transform-');
     configDirs.push(configDir);
-    await Bun.write(
-      `${configDir}/oh-my-opencode-slim.json`,
-      JSON.stringify(config),
-    );
+    await Bun.write(`${configDir}/mechanicus.json`, JSON.stringify(config));
     process.env = {
       ...originalEnv,
       OPENCODE_CONFIG_DIR: configDir,

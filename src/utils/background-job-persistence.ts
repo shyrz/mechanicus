@@ -55,7 +55,7 @@ export interface BackgroundJobStorageBackend {
   }>;
 }
 
-const KEY_ROOT = 'omo/bgj/';
+const KEY_ROOT = 'mechanicus/bgj/';
 const TOMBSTONE_PREFIX = `${KEY_ROOT}tombstone/`;
 const EPOCH_PREFIX = `${KEY_ROOT}epoch/`;
 const ALIAS_PREFIX = `${KEY_ROOT}alias/`;

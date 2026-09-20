@@ -20,7 +20,7 @@ import {
   type PresetSwitchResult,
   switchPresetOnDisk,
 } from '../tools/preset-switch';
-import omoTui from '../tui';
+import mechanicusTui from '../tui';
 import { isPluginDisabledByEnv } from '../utils/env';
 import { log } from '../utils/logger';
 
@@ -83,15 +83,17 @@ export interface V2PresetTuiContext {
 }
 
 /** Combined v2 TUI context: sidebar surface from `../tui` + preset surface. */
-export type V2TuiPluginContext = Parameters<(typeof omoTui)['setup']>[0] &
+export type V2TuiPluginContext = Parameters<
+  (typeof mechanicusTui)['setup']
+>[0] &
   V2PresetTuiContext;
 
-const PRESET_COMMAND_ID = 'omo.preset';
-const PRESET_COMMAND_TITLE = 'OMO: switch preset';
+const PRESET_COMMAND_ID = 'mechanicus.preset';
+const PRESET_COMMAND_TITLE = 'Mechanicus: switch preset';
 const PRESET_APP_SLOT = 'app';
 
 const NO_PRESETS_MESSAGE =
-  'No presets configured. Define presets in oh-my-opencode-slim.jsonc.';
+  'No presets configured. Define presets in mechanicus.jsonc.';
 
 /**
  * Map a plugin config's presets to `ui.dialog.select` options. Each option's
@@ -205,14 +207,14 @@ function buildPresetLayer(
  * (sidebar) and adds the `/preset` keymap layer.
  */
 const plugin = {
-  id: omoTui.id,
-  tui: omoTui.tui,
+  id: mechanicusTui.id,
+  tui: mechanicusTui.tui,
 
   async setup(ctx: V2TuiPluginContext): Promise<undefined | (() => void)> {
-    if (isPluginDisabledByEnv()) return omoTui.setup(ctx);
+    if (isPluginDisabledByEnv()) return mechanicusTui.setup(ctx);
 
     const disposers: Array<() => void> = [];
-    const baseCleanup = await omoTui.setup(ctx);
+    const baseCleanup = await mechanicusTui.setup(ctx);
     if (typeof baseCleanup === 'function') disposers.push(baseCleanup);
 
     const slotApi = (ctx.ui as { slot?: V2SlotApi } | undefined)?.slot;

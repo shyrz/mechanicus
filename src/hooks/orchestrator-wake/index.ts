@@ -98,9 +98,9 @@ export function isGenuineOperatorMessage(
     if (isObjectRecord(part.metadata)) {
       const metadata = part.metadata as Record<string, unknown>;
       if (
-        metadata['oh-my-opencode-slim.backgroundJobBoard'] === true ||
-        metadata['oh-my-opencode-slim.phaseReminder'] === true ||
-        metadata['oh-my-opencode-slim.internalInitiator'] === true
+        metadata['mechanicus.backgroundJobBoard'] === true ||
+        metadata['mechanicus.phaseReminder'] === true ||
+        metadata['mechanicus.internalInitiator'] === true
       ) {
         return false;
       }

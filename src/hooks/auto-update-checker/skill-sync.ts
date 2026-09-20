@@ -18,13 +18,13 @@ import { getConfigDir } from '../../cli/paths';
 import { log } from '../../utils/logger';
 
 let localProcessToken = (
-  globalThis as { OMO_SKILL_SYNC_PROCESS_TOKEN?: string }
-).OMO_SKILL_SYNC_PROCESS_TOKEN;
+  globalThis as { MECHANICUS_SKILL_SYNC_PROCESS_TOKEN?: string }
+).MECHANICUS_SKILL_SYNC_PROCESS_TOKEN;
 if (!localProcessToken) {
   localProcessToken = crypto.randomUUID();
   (
-    globalThis as { OMO_SKILL_SYNC_PROCESS_TOKEN?: string }
-  ).OMO_SKILL_SYNC_PROCESS_TOKEN = localProcessToken;
+    globalThis as { MECHANICUS_SKILL_SYNC_PROCESS_TOKEN?: string }
+  ).MECHANICUS_SKILL_SYNC_PROCESS_TOKEN = localProcessToken;
 }
 const PROCESS_TOKEN = localProcessToken;
 
@@ -72,7 +72,7 @@ interface SkillSyncOptions {
  * from the published npm package tarballs to allow upgrading existing users.
  *
  * How to populate:
- * 1. Download previous releases of the npm package: `npm pack oh-my-opencode-slim@<version>`
+ * 1. Download previous releases of the npm package: `npm pack mechanicus@<version>`
  * 2. Compute directory hash for each legacy skill directory inside the unpacked tarball:
  *    `import { computeDirectoryHash } from './skill-sync';`
  *    `const hash = computeDirectoryHash('path/to/extracted/package/src/skills/<skill-name>');`
@@ -221,7 +221,7 @@ function isPidRunning(pid: number): boolean {
 const CROSS_HOST_LOCK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Acquires a simple lock under .oh-my-opencode-slim.
+ * Acquires a simple lock under .mechanicus.
  * Avoids stealing active locks purely by time; writes owner metadata
  * and only steals dead same-host pid if detectable.
  */
@@ -612,7 +612,7 @@ export function syncBundledSkillsFromPackage(
     );
   }
 
-  const manifestDir = path.join(getConfigDir(), '.oh-my-opencode-slim');
+  const manifestDir = path.join(getConfigDir(), '.mechanicus');
   const lockDir = path.join(manifestDir, 'skills.lock');
 
   try {

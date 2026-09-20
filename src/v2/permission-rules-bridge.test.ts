@@ -401,10 +401,10 @@ describe('createV2Setup permission rules wiring', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    fixtureRoot = await mkdtemp('/tmp/omo-v2-perm-rules-');
+    fixtureRoot = await mkdtemp('/tmp/mechanicus-v2-perm-rules-');
     const configDir = path.join(fixtureRoot, 'config');
     await Bun.write(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       // Minimal hermetic fixture (mirrors setup-compaction.test.ts) plus
       // one exact-match task-policy entry on a default agent, so the
       // wiring test has a derivable rule waiting for the child event.
@@ -429,7 +429,7 @@ describe('createV2Setup permission rules wiring', () => {
       XDG_CACHE_HOME: path.join(fixtureRoot, 'xdg-cache'),
       OPENCODE_LOG_DIR: path.join(fixtureRoot, 'logs'),
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     resetV2GenerationWarnings();
   });
 

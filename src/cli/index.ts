@@ -70,11 +70,11 @@ export function parseArgs(args: string[]): InstallArgs {
 
 function printHelp(): void {
   console.log(`
-oh-my-opencode-slim installer
+mechanicus installer
 
 Usage:
-  bunx oh-my-opencode-slim install [OPTIONS]
-  bunx oh-my-opencode-slim doctor [OPTIONS]
+  bunx mechanicus install [OPTIONS]
+  bunx mechanicus doctor [OPTIONS]
 
 Options:
   --skills=yes|no|force  Install bundled skills; force replaces existing skill
@@ -102,12 +102,12 @@ OpenAI is active unless --preset selects another generated preset.
 For the full config reference, see docs/configuration.md.
 
 Examples:
-  bunx oh-my-opencode-slim install
-  bunx oh-my-opencode-slim install --no-tui --skills=yes
-  bunx oh-my-opencode-slim install --background-subagents=yes
-  bunx oh-my-opencode-slim install --preset=opencode-go
-  bunx oh-my-opencode-slim install --reset
-  bunx oh-my-opencode-slim doctor
+  bunx mechanicus install
+  bunx mechanicus install --no-tui --skills=yes
+  bunx mechanicus install --background-subagents=yes
+  bunx mechanicus install --preset=opencode-go
+  bunx mechanicus install --reset
+  bunx mechanicus doctor
 `);
 }
 

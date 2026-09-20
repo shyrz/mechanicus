@@ -73,7 +73,7 @@ interface SessionEvent {
 type CloseReason = 'idle' | 'deleted';
 
 const SHARED_STATE_KEY = Symbol.for(
-  'oh-my-opencode-slim.multiplexer-session-manager.state',
+  'mechanicus.multiplexer-session-manager.state',
 );
 
 function getSharedState(): SharedSessionState {

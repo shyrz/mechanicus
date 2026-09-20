@@ -27,7 +27,7 @@ const IMG_HASH = createHash('sha1').update(IMG_BYTES).digest('hex').slice(0, 8);
 const IMG_CONTENT_NAME = `image-${IMG_HASH}.png`;
 const LEGACY_GITIGNORE = '*\n';
 const LEGACY_GITIGNORE_BYTES = Buffer.from(LEGACY_GITIGNORE);
-const LEGACY_GITIGNORE_BACKUP = '.gitignore.oh-my-opencode-slim-legacy';
+const LEGACY_GITIGNORE_BACKUP = '.gitignore.mechanicus-legacy';
 const IMAGES_GITIGNORE = 'images/\n';
 const IMAGES_GITIGNORE_BYTES = Buffer.from(IMAGES_GITIGNORE);
 
@@ -574,11 +574,7 @@ describe('processImageAttachments image routing', () => {
     mkdirSync(path.dirname(nestedImage), { recursive: true });
     writeFileSync(nestedImage, 'x');
 
-    const configPath = path.join(
-      workDir,
-      '.opencode',
-      'oh-my-opencode-slim.json',
-    );
+    const configPath = path.join(workDir, '.opencode', 'mechanicus.json');
     writeFileSync(configPath, '{}');
 
     const ignored = spawnSync(

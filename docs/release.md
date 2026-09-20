@@ -58,9 +58,9 @@ When releasing a new companion binary, update the packaged companion manifest:
 {
   "version": "0.1.3",
   "tag": "companion-v0.1.3",
-  "repo": "alvinunreal/oh-my-opencode-slim",
+  "repo": "shyrz/mechanicus",
   "checksums": {
-    "oh-my-opencode-slim-companion-v0.1.3-aarch64-apple-darwin.tar.gz": "..."
+    "mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz": "..."
   }
 }
 ```
@@ -96,11 +96,11 @@ windows-x64
 Expected release asset names for companion `0.1.3`:
 
 ```text
-oh-my-opencode-slim-companion-v0.1.3-aarch64-apple-darwin.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-apple-darwin.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-pc-windows-msvc.zip
+mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz
+mechanicus-companion-v0.1.3-x86_64-apple-darwin.tar.gz
+mechanicus-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
+mechanicus-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
+mechanicus-companion-v0.1.3-x86_64-pc-windows-msvc.zip
 ```
 
 ## 4. Build and publish companion assets
@@ -153,7 +153,7 @@ gh run download <run-id> \
 
 gh release create companion-v0.1.3 \
   --title "Companion v0.1.3" \
-  --notes "Manual companion binary release for oh-my-opencode-slim." \
+  --notes "Manual companion binary release for mechanicus." \
   /tmp/companion-v0.1.3-assets/*
 ```
 
@@ -273,7 +273,7 @@ Use release notes based on the actual git diff.
 ```bash
 gh release create v2.0.3 \
   --title "v2.0.3" \
-  --notes-file /tmp/oh-my-opencode-slim-v2.0.3-notes.md
+  --notes-file /tmp/mechanicus-v2.0.3-notes.md
 ```
 
 If a release already exists, update it:
@@ -281,7 +281,7 @@ If a release already exists, update it:
 ```bash
 gh release edit v2.0.3 \
   --title "v2.0.3" \
-  --notes-file /tmp/oh-my-opencode-slim-v2.0.3-notes.md
+  --notes-file /tmp/mechanicus-v2.0.3-notes.md
 ```
 
 Verify:
@@ -302,7 +302,7 @@ npm publish
 After publishing, verify the package version:
 
 ```bash
-npm view oh-my-opencode-slim version
+npm view mechanicus version
 ```
 
 ## 11. Current v2.0.3 release checklist

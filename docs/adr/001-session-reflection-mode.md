@@ -6,7 +6,7 @@
 
 ## Context
 
-We are adding a `--sessions` mode to the `/reflect` command in oh-my-opencode-slim. This mode enables cross-session reflection by analyzing past OpenCode sessions to find repeated patterns, friction, and improvement opportunities.
+We are adding a `--sessions` mode to the `/reflect` command in mechanicus. This mode enables cross-session reflection by analyzing past OpenCode sessions to find repeated patterns, friction, and improvement opportunities.
 
 Current `/reflect` only looks at the current conversation and project files. The new mode analyzes historical sessions across all repos to find patterns like:
 - "Which workflows succeed most often?"
@@ -76,17 +76,17 @@ timestamp=2026-06-10T15:08:45.427Z level=INFO run=9bd29194 message=loop session.
 
 ### 5. Storage Location
 
-**Decision:** Store reflection summaries in `~/.config/opencode/oh-my-opencode-slim/reflections/`.
+**Decision:** Store reflection summaries in `~/.config/opencode/mechanicus/reflections/`.
 
 **Rationale:**
-- Existing OMOS directory already contains presets, prompts, orchestrator_append.md
-- Pragmatic: keeps all OMOS data in one place
+- Existing Mechanicus directory already contains presets, prompts, orchestrator_append.md
+- Pragmatic: keeps all Mechanicus data in one place
 - Easy discovery and cleanup
 - Global across projects (sessions are not project-specific)
 
 **Structure:**
 ```
-~/.config/opencode/oh-my-opencode-slim/reflections/
+~/.config/opencode/mechanicus/reflections/
   sessions/
     ses_14de9c68effegtZtlATm42wnz7.json
   weekly/
@@ -98,8 +98,8 @@ timestamp=2026-06-10T15:08:45.427Z level=INFO run=9bd29194 message=loop session.
 **Alternatives considered:**
 | Option | Pros | Cons | Decision |
 |--------|------|------|----------|
-| `~/.config/opencode/oh-my-opencode-slim/reflections/` | Existing directory, single location | Mixes config and data | **Accepted** |
-| `~/.local/share/oh-my-opencode-slim/reflections/` | XDG-compliant, data separation | New directory, splits OMOS data | Rejected |
+| `~/.config/opencode/mechanicus/reflections/` | Existing directory, single location | Mixes config and data | **Accepted** |
+| `~/.local/share/mechanicus/reflections/` | XDG-compliant, data separation | New directory, splits Mechanicus data | Rejected |
 | `.slim/reflections/` (project-local) | Tied to codebase | Sessions are global, not project-specific | Rejected |
 | Ephemeral (no storage) | No disk overhead | Re-analyzes expensive sessions, no trend tracking | Rejected |
 
@@ -147,7 +147,7 @@ OpenCode logs
 ```json
 {
   "session": "ses_14de9c68effegtZtlATm42wnz7",
-  "project": "/home/user/Projects/oh-my-opencode-slim",
+  "project": "/home/user/Projects/mechanicus",
   "timestamp": "2026-06-10T15:08:45.427Z",
   "goal": "Fix CI failure",
   "success": true,
@@ -183,7 +183,7 @@ OpenCode logs
 ## Consequences
 
 - No code changes needed - purely skill instruction updates
-- All OMOS persistent data lives in one directory tree
+- All Mechanicus persistent data lives in one directory tree
 - Reflections are available across all projects (global)
 - LLM manages file I/O, cache, and aggregation
 - Users can inspect or delete reflections manually

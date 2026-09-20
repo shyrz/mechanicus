@@ -22,7 +22,7 @@ let tempDir: string;
 
 beforeEach(() => {
   previousXdgDataHome = process.env.XDG_DATA_HOME;
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui-state-'));
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui-state-'));
   process.env.XDG_DATA_HOME = tempDir;
 });
 
@@ -532,8 +532,8 @@ describe('tui-state persistence', () => {
   });
 
   test('cross-project isolation — different directories write independent state files', () => {
-    const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-a-'));
-    const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-b-'));
+    const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-a-'));
+    const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-b-'));
     try {
       recordTuiAgentModels({ agentModels: { explorer: 'model-a' } }, dirA);
       recordTuiAgentModels({ agentModels: { explorer: 'model-b' } }, dirB);

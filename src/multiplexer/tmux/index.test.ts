@@ -60,7 +60,7 @@ describe('TmuxMultiplexer', () => {
   let stateDirectory: string;
 
   beforeEach(() => {
-    stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tmux-'));
+    stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tmux-'));
     process.env.XDG_DATA_HOME = stateDirectory;
     process.env.TMUX = '/tmp/tmux-test/default,1,0';
     process.env.TMUX_PANE = '%1';

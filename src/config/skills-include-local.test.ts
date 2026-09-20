@@ -13,7 +13,7 @@ const tempDirs: string[] = [];
 
 function makeProject(): string {
   const projectDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'omo-local-skills-'),
+    path.join(os.tmpdir(), 'mechanicus-local-skills-'),
   );
   tempDirs.push(projectDir);
   return projectDir;

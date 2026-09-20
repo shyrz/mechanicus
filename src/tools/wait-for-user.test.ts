@@ -16,9 +16,7 @@ describe('wait_for_user tool', () => {
 
     expect(beginUserWait).toHaveBeenCalledWith('parent-1');
     expect(String(output)).toContain('state: waiting_for_user');
-    expect(String(output)).toContain(
-      'protocol: oh-my-opencode-slim.wait_for_user.v1',
-    );
+    expect(String(output)).toContain('protocol: mechanicus.wait_for_user.v1');
     expect(String(output)).toContain('End this turn now');
   });
 

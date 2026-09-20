@@ -278,7 +278,7 @@ const REPROMPT_DELAY_MS = 500;
  *  the fallback never arrives — a variant of the bug being fixed. */
 const PROMOTE_WAITER_TIMEOUT_MS = 2_000;
 const FALLBACK_IN_PROGRESS_KEY = Symbol.for(
-  'oh-my-opencode-slim.foreground-fallback.in-progress',
+  'mechanicus.foreground-fallback.in-progress',
 );
 
 /** Error name stamped by the v2 client shim's promptAsync when the host

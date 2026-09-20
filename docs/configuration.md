@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Complete reference for all configuration files and options in oh-my-opencode-slim. For repository-specific configurations, custom agents, and prompt directory lookups, see the [Project-local Customization Guide](project-local-customization.md).
+Complete reference for all configuration files and options in mechanicus. For repository-specific configurations, custom agents, and prompt directory lookups, see the [Project-local Customization Guide](project-local-customization.md).
 
 ---
 
@@ -9,27 +9,27 @@ Complete reference for all configuration files and options in oh-my-opencode-sli
 | File | Purpose |
 |------|---------|
 | `~/.config/opencode/opencode.json` | OpenCode core settings (plugin registration, providers) |
-| `~/.config/opencode/oh-my-opencode-slim.json` | Plugin settings - agents, multiplexer, MCPs, council |
-| `~/.config/opencode/oh-my-opencode-slim.jsonc` | Same, but with JSONC (comments + trailing commas). Takes precedence over `.json` if both exist |
-| `.opencode/oh-my-opencode-slim.json` | Project-local overrides (optional, higher precedence than user config) |
+| `~/.config/opencode/mechanicus.json` | Plugin settings - agents, multiplexer, MCPs, council |
+| `~/.config/opencode/mechanicus.jsonc` | Same, but with JSONC (comments + trailing commas). Takes precedence over `.json` if both exist |
+| `.opencode/mechanicus.json` | Project-local overrides (optional, higher precedence than user config) |
 
 > **💡 JSONC recommended:** Use the `.jsonc` extension to add comments and trailing commas. If both `.jsonc` and `.json` exist, `.jsonc` takes precedence.
 
 Set `OPENCODE_CONFIG_DIR` to use a custom user config directory instead of
 `~/.config/opencode`; install and runtime config discovery both honor it.
 
-Set `OH_MY_OPENCODE_SLIM_DISABLE` to `1`, `true`, `yes`, or `on` to make
-oh-my-opencode-slim return during startup without registering agents, tools,
+Set `MECHANICUS_DISABLE` to `1`, `true`, `yes`, or `on` to make
+mechanicus return during startup without registering agents, tools,
 MCPs, hooks, Companion, or the TUI sidebar. This is a temporary escape hatch:
 
 ```bash
-OH_MY_OPENCODE_SLIM_DISABLE=1 opencode
+MECHANICUS_DISABLE=1 opencode
 ```
 
-If OmO-slim detects an invalid plugin config for the current project, the TUI sidebar shows a warning. Run `oh-my-opencode-slim doctor` from your project root for full diagnostics.
+If Mechanicus detects an invalid plugin config for the current project, the TUI sidebar shows a warning. Run `mechanicus doctor` from your project root for full diagnostics.
 
 The TUI sidebar uses the compact layout by default. Set `compactSidebar` to
-`false` in `oh-my-opencode-slim.jsonc` to use the expanded layout:
+`false` in `mechanicus.jsonc` to use the expanded layout:
 
 ```jsonc
 {
@@ -45,7 +45,7 @@ after every active session for that agent becomes idle or is deleted.
 
 ## Prompt Overriding
 
-Customize agent prompts without modifying source code. Create markdown files in `~/.config/opencode/oh-my-opencode-slim/`:
+Customize agent prompts without modifying source code. Create markdown files in `~/.config/opencode/mechanicus/`:
 
 | File | Effect |
 |------|--------|
@@ -57,7 +57,7 @@ When a `preset` is active, the plugin checks preset directories before falling b
 **Example directory structure:**
 
 ```
-~/.config/opencode/oh-my-opencode-slim/
+~/.config/opencode/mechanicus/
   ├── best/
   │   ├── orchestrator.md        # Preset-specific override (used when preset=best)
   │   └── explorer_append.md
@@ -192,12 +192,12 @@ Presets can also be switched at runtime without restarting using the `/preset` c
 
 > **niri note:** `companion-v0.1.3` includes the fixed native companion release.
 > To make it open as a bottom-right overlay, add a niri rule matching its stable
-> `app-id`/title (`oh-my-opencode-slim-companion`), for example:
+> `app-id`/title (`mechanicus-companion`), for example:
 >
 > ```kdl
 > window-rule {
->     match app-id=r"^oh-my-opencode-slim-companion$"
->     match title=r"^oh-my-opencode-slim-companion$"
+>     match app-id=r"^mechanicus-companion$"
+>     match title=r"^mechanicus-companion$"
 >     open-floating true
 >     open-focused false
 >     default-floating-position x=16 y=16 relative-to="bottom-right"
@@ -299,7 +299,7 @@ auto-update to a newer 1.x release, but it won't auto-install 2.x. When a newer
 major is available, the plugin shows a migration command instead.
 
 > Pinned plugin entries in `opencode.json` (for example
-> `"oh-my-opencode-slim@1.0.1"`) are the true version lock. Those stay pinned
+> `"mechanicus@1.0.1"`) are the true version lock. Those stay pinned
 > regardless of `autoUpdate`.
 
 ### Background Job Management
@@ -562,7 +562,7 @@ A custom agent with a long prompt does not need the prompt duplicated into
 every preset block. Put the prompt in a file and define the agent in each
 preset with only `model` (and `variant` if needed):
 
-1. Create `<projectDir>/.opencode/oh-my-opencode-slim/<agentName>.md` with
+1. Create `<projectDir>/.opencode/mechanicus/<agentName>.md` with
    the shared prompt.
 2. In each preset block, define the agent with only the model fields (no
    `prompt`):
@@ -581,19 +581,19 @@ preset with only `model` (and `variant` if needed):
 ```
 
 `loadAgentPrompt` (`src/config/loader.ts:418`) is preset-aware and reads
-`<agentName>.md` from the `oh-my-opencode-slim/` prompts directory. Lookup
+`<agentName>.md` from the `mechanicus/` prompts directory. Lookup
 order:
 
-1. `<projectDir>/.opencode/oh-my-opencode-slim/<preset>/<agentName>.md` (project, preset-specific)
-2. `<projectDir>/.opencode/oh-my-opencode-slim/<agentName>.md` (project, preset-agnostic)
-3. `~/.config/opencode/oh-my-opencode-slim/<preset>/<agentName>.md` (user, preset-specific)
-4. `~/.config/opencode/oh-my-opencode-slim/<agentName>.md` (user, preset-agnostic)
+1. `<projectDir>/.opencode/mechanicus/<preset>/<agentName>.md` (project, preset-specific)
+2. `<projectDir>/.opencode/mechanicus/<agentName>.md` (project, preset-agnostic)
+3. `~/.config/opencode/mechanicus/<preset>/<agentName>.md` (user, preset-specific)
+4. `~/.config/opencode/mechanicus/<agentName>.md` (user, preset-agnostic)
 
 A preset block without `prompt` falls back to the file prompt (if one
 exists), not to a root `agents.<name>.prompt`. The project-level paths (1
 and 2) work universally and are the recommended location for shared
 prompts. User-level paths (3 and 4) can collide with a plugin install
-symlink if `~/.config/opencode/oh-my-opencode-slim/` is symlinked to the
+symlink if `~/.config/opencode/mechanicus/` is symlinked to the
 plugin source.
 
 > **⚠️ Known limitation (#899):** Prompt files take precedence over inline
@@ -729,7 +729,7 @@ The multiplexer hosts child agent sessions in terminal panes. See [Multiplexer I
 
 The desktop companion app provides a visual status overlay showing running and active agents. For quick installation instructions, binary paths, config defaults, and release information, see the full **[Desktop Companion Guide](companion.md)**.
 
-Once installed, configure it in your `oh-my-opencode-slim` settings:
+Once installed, configure it in your `mechanicus` settings:
 
 ```jsonc
 {

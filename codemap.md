@@ -1,8 +1,8 @@
-# Repository Atlas: oh-my-opencode-slim
+# Repository Atlas: mechanicus
 
 ## Project Responsibility
 
-`oh-my-opencode-slim` is an OpenCode plugin that implements a specialist-agent operating model on top of the host runtime. Its core responsibilities include:
+`mechanicus` is an OpenCode plugin that implements a specialist-agent operating model on top of the host runtime. Its core responsibilities include:
 
 - Defining orchestrator and specialist agent factories with permission policies
 - Loading layered plugin configuration and per-agent permissions
@@ -22,7 +22,7 @@ This codemap covers the plugin repository itself and excludes the nested `openco
 | `src/cli/index.ts` | CLI entrypoint for installation/bootstrap workflows. |
 | `src/config/schema.ts` | Source-of-truth runtime config schema used by validation and schema generation. |
 | `src/config/runtime.ts` | Per-directory `RuntimeConfig` singleton: derived getters over the frozen plugin config, pre-mutation host-config snapshot, and preset/model overrides. |
-| `scripts/generate-schema.ts` | Generates `oh-my-opencode-slim.schema.json` from the Zod config schema. |
+| `scripts/generate-schema.ts` | Generates `mechanicus.schema.json` from the Zod config schema. |
 
 ## Repository Directory Map
 

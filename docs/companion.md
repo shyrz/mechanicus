@@ -4,13 +4,13 @@ The desktop companion app provides a floating status overlay showing running and
 
 ## How to Enable in Configuration
 
-You can enable the companion by adding a `companion` section to your setting configuration file (`~/.config/opencode/oh-my-opencode-slim.json` or `.opencode/oh-my-opencode-slim.json`):
+You can enable the companion by adding a `companion` section to your setting configuration file (`~/.config/opencode/mechanicus.json` or `.opencode/mechanicus.json`):
 
 ```jsonc
 {
   "companion": {
     "enabled": true,
-    "binaryPath": "/path/to/oh-my-opencode-slim-companion",
+    "binaryPath": "/path/to/mechanicus-companion",
     "position": "bottom-right",
     "size": "medium",
     "gifPack": "default",
@@ -86,7 +86,7 @@ plugin without Companion enabled.
 For automation, pass `--companion=yes` to install without prompting:
 
 ```bash
-bunx oh-my-opencode-slim install --companion=yes
+bunx mechanicus install --companion=yes
 ```
 
 Pass `--companion=no` to skip the native binary and omit the config block.
@@ -94,15 +94,15 @@ Pass `--companion=no` to skip the native binary and omit the config block.
 ## niri support status
 
 The native `companion-v0.1.3` binary works on niri and exposes a stable
-Wayland app-id/title: `oh-my-opencode-slim-companion`.
+Wayland app-id/title: `mechanicus-companion`.
 
 niri users who want the Companion to behave like an overlay should add a window
 rule to their niri config, for example:
 
 ```kdl
 window-rule {
-    match app-id=r"^oh-my-opencode-slim-companion$"
-    match title=r"^oh-my-opencode-slim-companion$"
+    match app-id=r"^mechanicus-companion$"
+    match title=r"^mechanicus-companion$"
     open-floating true
     open-focused false
     default-floating-position x=16 y=16 relative-to="bottom-right"
@@ -116,7 +116,7 @@ Companion like any other regular xdg-toplevel window. Adjust the `x`/`y` gap or
 Run diagnostics with:
 
 ```bash
-oh-my-opencode-slim doctor
+mechanicus doctor
 ```
 
 ---
@@ -126,13 +126,13 @@ oh-my-opencode-slim doctor
 The runtime looks for the companion binary at:
 
 ```text
-$XDG_DATA_HOME/opencode/storage/oh-my-opencode-slim/bin/oh-my-opencode-slim-companion
+$XDG_DATA_HOME/opencode/storage/mechanicus/bin/mechanicus-companion
 ```
 
 If `XDG_DATA_HOME` is unset, this resolves to:
 
 ```text
-~/.local/share/opencode/storage/oh-my-opencode-slim/bin/oh-my-opencode-slim-companion
+~/.local/share/opencode/storage/mechanicus/bin/mechanicus-companion
 ```
 
 If the binary is not located in this directory, set `companion.binaryPath` to
@@ -178,11 +178,11 @@ plan:
 Current release assets are named:
 
 ```text
-oh-my-opencode-slim-companion-v0.1.3-aarch64-apple-darwin.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-apple-darwin.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
-oh-my-opencode-slim-companion-v0.1.3-x86_64-pc-windows-msvc.zip
+mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz
+mechanicus-companion-v0.1.3-x86_64-apple-darwin.tar.gz
+mechanicus-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
+mechanicus-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
+mechanicus-companion-v0.1.3-x86_64-pc-windows-msvc.zip
 ```
 
 Supported installer targets:
@@ -272,7 +272,7 @@ stay in sync.
 Once the release assets exist, users can run:
 
 ```bash
-bunx oh-my-opencode-slim@beta install --companion=yes
+bunx mechanicus@beta install --companion=yes
 ```
 
 The installer detects the user's OS/architecture, downloads the matching archive

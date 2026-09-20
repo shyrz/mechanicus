@@ -14,7 +14,7 @@ visual analysis.
 ## Install with OpenCode Go Active
 
 ```bash
-bunx oh-my-opencode-slim@latest install --preset=opencode-go
+bunx mechanicus@latest install --preset=opencode-go
 ```
 
 Then authenticate and refresh models:

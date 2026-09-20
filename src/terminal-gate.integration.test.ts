@@ -54,9 +54,9 @@ async function assembly(
   process.env.XDG_CONFIG_HOME = directory;
   process.env.XDG_DATA_HOME = directory;
   process.env.XDG_CACHE_HOME = directory;
-  delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+  delete process.env.MECHANICUS_DISABLE;
   await Bun.write(
-    `${directory}/oh-my-opencode-slim.json`,
+    `${directory}/mechanicus.json`,
     JSON.stringify({
       backgroundJobs: {
         concurrency: { defaultConcurrency: 1 },

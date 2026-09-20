@@ -2,7 +2,7 @@
   "metadata": {
     "version": "1.0.0",
     "last_run": "2026-08-22T21:40:44.787Z",
-    "root": "/home/mhenke/Projects/oh-my-opencode-slim",
+    "root": "/home/mhenke/Projects/mechanicus",
     "include_patterns": [
       "src/**/*.ts",
       "src/**/*.d.ts",

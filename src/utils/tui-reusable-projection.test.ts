@@ -16,7 +16,7 @@ describe('tui-reusable-projection', () => {
   let originalDataHome: string | undefined;
 
   beforeEach(() => {
-    root = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-reusable-proj-'));
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-reusable-proj-'));
     projectDir = path.join(root, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
     originalDataHome = process.env.XDG_DATA_HOME;

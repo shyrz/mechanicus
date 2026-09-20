@@ -459,7 +459,7 @@ describe('parallel same-agent pairing (incident 2026-09-12)', () => {
     // runs, so the real logger is only observable with a pristine
     // module registry (same pattern as runtime-status-reconciliation).
     const logDir = await fsp.mkdtemp(
-      path.join(os.tmpdir(), 'omos-b1-drain-log-'),
+      path.join(os.tmpdir(), 'mechanicus-b1-drain-log-'),
     );
     const workerSource = `
       const { createTaskSessionManagerHook } = await import(
@@ -574,10 +574,7 @@ describe('parallel same-agent pairing (incident 2026-09-12)', () => {
         LOGGER_MODULE_URL: pathToFileURL(
           path.join(import.meta.dir, '../../utils/logger.ts'),
         ).href,
-        LOG_FILE_PATH: path.join(
-          logDir,
-          'oh-my-opencode-slim.drain-fallback-b1.log',
-        ),
+        LOG_FILE_PATH: path.join(logDir, 'mechanicus.drain-fallback-b1.log'),
       },
       stdout: 'pipe',
       stderr: 'pipe',

@@ -57,7 +57,7 @@ export function stateFilePath(): string {
     base,
     'opencode',
     'storage',
-    'oh-my-opencode-slim',
+    'mechanicus',
     'companion-state.json',
   );
 }
@@ -68,13 +68,7 @@ function pidFilePath(): string {
     xdg && path.isAbsolute(xdg)
       ? xdg
       : path.join(os.homedir(), '.local', 'share');
-  return path.join(
-    base,
-    'opencode',
-    'storage',
-    'oh-my-opencode-slim',
-    'companion.pid',
-  );
+  return path.join(base, 'opencode', 'storage', 'mechanicus', 'companion.pid');
 }
 
 function isProcessAlive(pid: number): boolean {
@@ -153,13 +147,13 @@ function defaultBinaryPath(): string {
       : path.join(os.homedir(), '.local', 'share');
   const binaryName =
     os.platform() === 'win32'
-      ? 'oh-my-opencode-slim-companion.exe'
-      : 'oh-my-opencode-slim-companion';
+      ? 'mechanicus-companion.exe'
+      : 'mechanicus-companion';
   return path.join(
     base,
     'opencode',
     'storage',
-    'oh-my-opencode-slim',
+    'mechanicus',
     'bin',
     binaryName,
   );
@@ -493,9 +487,9 @@ export class CompanionManager {
         detached: true,
         env: {
           ...process.env,
-          OH_MY_OPENCODE_SLIM_COMPANION_SESSION_ID: this.id,
+          MECHANICUS_COMPANION_SESSION_ID: this.id,
           ...(this.config.debug === true
-            ? { OH_MY_OPENCODE_SLIM_COMPANION_DEBUG: '1' }
+            ? { MECHANICUS_COMPANION_DEBUG: '1' }
             : {}),
         },
         stdio: 'ignore',

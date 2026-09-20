@@ -10,7 +10,7 @@
  * so it triggers no LLM turn — same channel as the built-in `/models`.
  *
  * All preset mutations are written to the user-level config file
- * (`oh-my-opencode-slim.json[c]`). Applying a preset persists the preset
+ * (`mechanicus.json[c]`). Applying a preset persists the preset
  * name only — the sidebar is NOT refreshed mid-session, because the agent
  * registry is unchanged and showing new models against running agents
  * would be misleading. The new preset takes effect on the next

@@ -191,7 +191,7 @@ describe('revived run tracker', () => {
           {
             type: 'text',
             synthetic: true,
-            metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+            metadata: { 'mechanicus.internalInitiator': true },
           },
         ],
       },

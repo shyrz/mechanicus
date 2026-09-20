@@ -56,4 +56,4 @@ Empty templates created in each folder for fixers to fill with:
 
 ## Installation
 
-Installed automatically via oh-my-opencode-slim installer when custom skills are enabled.
+Installed automatically via mechanicus installer when custom skills are enabled.

@@ -25,21 +25,20 @@ describe('auto-update-checker/cache', () => {
       const existsSpy = spyOn(fs, 'existsSync').mockImplementation(
         (p: string) =>
           p ===
-          '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/package.json',
+          '/home/user/.cache/opencode/packages/mechanicus@latest/package.json',
       );
       const { resolveInstallContext } = await import(
         `./cache?test=${importCounter++}`
       );
 
       const context = resolveInstallContext(
-        '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/node_modules/oh-my-opencode-slim/package.json',
+        '/home/user/.cache/opencode/packages/mechanicus@latest/node_modules/mechanicus/package.json',
       );
 
       expect(context).toEqual({
-        installDir:
-          '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest',
+        installDir: '/home/user/.cache/opencode/packages/mechanicus@latest',
         packageJsonPath:
-          '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/package.json',
+          '/home/user/.cache/opencode/packages/mechanicus@latest/package.json',
       });
 
       existsSpy.mockRestore();
@@ -52,7 +51,7 @@ describe('auto-update-checker/cache', () => {
       );
 
       const context = resolveInstallContext(
-        '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/node_modules/oh-my-opencode-slim/package.json',
+        '/home/user/.cache/opencode/packages/mechanicus@latest/node_modules/mechanicus/package.json',
       );
 
       expect(context).toBeNull();
@@ -78,19 +77,19 @@ describe('auto-update-checker/cache', () => {
       const existsSpy = spyOn(fs, 'existsSync').mockImplementation(
         (p: string) =>
           p ===
-            '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/package.json' ||
+            '/home/user/.cache/opencode/packages/mechanicus@latest/package.json' ||
           p ===
-            '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/node_modules/oh-my-opencode-slim',
+            '/home/user/.cache/opencode/packages/mechanicus@latest/node_modules/mechanicus',
       );
       const readSpy = spyOn(fs, 'readFileSync').mockImplementation(
         (p: string) => {
           if (
             p ===
-            '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/package.json'
+            '/home/user/.cache/opencode/packages/mechanicus@latest/package.json'
           ) {
             return JSON.stringify({
               dependencies: {
-                'oh-my-opencode-slim': '0.9.1',
+                mechanicus: '0.9.1',
               },
             });
           }
@@ -106,7 +105,7 @@ describe('auto-update-checker/cache', () => {
       const rmSyncSpy = spyOn(fs, 'rmSync').mockReturnValue(undefined);
       const mkdirSyncSpy = spyOn(fs, 'mkdirSync').mockReturnValue(undefined);
       const mkdtempSyncSpy = spyOn(fs, 'mkdtempSync').mockReturnValue(
-        '/home/user/.cache/opencode/packages/.oh-my-opencode-slim@0.9.11.staging-test',
+        '/home/user/.cache/opencode/packages/.mechanicus@0.9.11.staging-test',
       );
       const { preparePackageUpdate } = await import(
         `./cache?test=${importCounter++}`
@@ -114,21 +113,20 @@ describe('auto-update-checker/cache', () => {
 
       const result = preparePackageUpdate(
         '0.9.11',
-        'oh-my-opencode-slim',
-        '/home/user/.cache/opencode/packages/oh-my-opencode-slim@latest/node_modules/oh-my-opencode-slim/package.json',
+        'mechanicus',
+        '/home/user/.cache/opencode/packages/mechanicus@latest/node_modules/mechanicus/package.json',
       );
 
       expect(result).toEqual({
         stagingDir:
-          '/home/user/.cache/opencode/packages/.oh-my-opencode-slim@0.9.11.staging-test',
-        targetDir:
-          '/home/user/.cache/opencode/packages/oh-my-opencode-slim@0.9.11',
+          '/home/user/.cache/opencode/packages/.mechanicus@0.9.11.staging-test',
+        targetDir: '/home/user/.cache/opencode/packages/mechanicus@0.9.11',
       });
       expect(writtenData.length).toBeGreaterThan(0);
       expect(JSON.parse(writtenData[0])).toEqual({
         private: true,
         dependencies: {
-          'oh-my-opencode-slim': '0.9.11',
+          mechanicus: '0.9.11',
         },
       });
 
@@ -144,12 +142,12 @@ describe('auto-update-checker/cache', () => {
       const existsSpy = spyOn(fs, 'existsSync').mockImplementation(
         (p: string) =>
           p.endsWith('/.cache/opencode/package.json') ||
-          p.endsWith('/.cache/opencode/node_modules/oh-my-opencode-slim'),
+          p.endsWith('/.cache/opencode/node_modules/mechanicus'),
       );
       const readSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
           dependencies: {
-            'oh-my-opencode-slim': '1.0.1',
+            mechanicus: '1.0.1',
           },
         }),
       );
@@ -159,7 +157,7 @@ describe('auto-update-checker/cache', () => {
         `./cache?test=${importCounter++}`
       );
 
-      const result = preparePackageUpdate('1.0.1', 'oh-my-opencode-slim', null);
+      const result = preparePackageUpdate('1.0.1', 'mechanicus', null);
 
       expect(result).not.toBeNull();
       expect(writeSpy).toHaveBeenCalled();
@@ -173,11 +171,11 @@ describe('auto-update-checker/cache', () => {
 
   describe('publishPackageUpdate transaction', () => {
     function createPackage(dir: string, version: string): void {
-      const packageDir = join(dir, 'node_modules', 'oh-my-opencode-slim');
+      const packageDir = join(dir, 'node_modules', 'mechanicus');
       fs.mkdirSync(packageDir, { recursive: true });
       fs.writeFileSync(
         join(packageDir, 'package.json'),
-        JSON.stringify({ name: 'oh-my-opencode-slim', version }),
+        JSON.stringify({ name: 'mechanicus', version }),
       );
     }
 
@@ -187,12 +185,12 @@ describe('auto-update-checker/cache', () => {
       const stagingDir = fs.mkdtempSync(join(parent, '.staging-'));
       return {
         stagingDir,
-        targetDir: join(parent, `oh-my-opencode-slim@${version}`),
+        targetDir: join(parent, `mechanicus@${version}`),
       };
     }
 
     test('publishes a verified staged package atomically', async () => {
-      const root = fs.mkdtempSync(join(tmpdir(), 'omo-cache-'));
+      const root = fs.mkdtempSync(join(tmpdir(), 'mechanicus-cache-'));
       const prepared = createPrepared(root, '1.2.4');
       createPackage(prepared.stagingDir, '1.2.4');
       const { publishPackageUpdate } = await import(
@@ -208,7 +206,7 @@ describe('auto-update-checker/cache', () => {
     });
 
     test('cleans staging when a valid concurrent target already exists', async () => {
-      const root = fs.mkdtempSync(join(tmpdir(), 'omo-cache-'));
+      const root = fs.mkdtempSync(join(tmpdir(), 'mechanicus-cache-'));
       const prepared = createPrepared(root, '1.2.4');
       createPackage(prepared.stagingDir, '1.2.4');
       createPackage(prepared.targetDir, '1.2.4');
@@ -227,7 +225,7 @@ describe('auto-update-checker/cache', () => {
     });
 
     test('replaces an invalid target and removes its quarantine', async () => {
-      const root = fs.mkdtempSync(join(tmpdir(), 'omo-cache-'));
+      const root = fs.mkdtempSync(join(tmpdir(), 'mechanicus-cache-'));
       const prepared = createPrepared(root, '1.2.4');
       createPackage(prepared.stagingDir, '1.2.4');
       fs.mkdirSync(prepared.targetDir, { recursive: true });
@@ -247,7 +245,7 @@ describe('auto-update-checker/cache', () => {
     });
 
     test('removes an unverifiable freshly published target and staging', async () => {
-      const root = fs.mkdtempSync(join(tmpdir(), 'omo-cache-'));
+      const root = fs.mkdtempSync(join(tmpdir(), 'mechanicus-cache-'));
       const prepared = createPrepared(root, '1.2.4');
       createPackage(prepared.stagingDir, '1.2.3');
       const { publishPackageUpdate } = await import(
@@ -261,7 +259,7 @@ describe('auto-update-checker/cache', () => {
     });
 
     test('restores the prior usable target when replacement verification fails', async () => {
-      const root = fs.mkdtempSync(join(tmpdir(), 'omo-cache-'));
+      const root = fs.mkdtempSync(join(tmpdir(), 'mechanicus-cache-'));
       const prepared = createPrepared(root, '1.2.4');
       createPackage(prepared.targetDir, '1.2.3');
       createPackage(prepared.stagingDir, '1.2.3');
@@ -276,13 +274,13 @@ describe('auto-update-checker/cache', () => {
             join(
               prepared.targetDir,
               'node_modules',
-              'oh-my-opencode-slim',
+              'mechanicus',
               'package.json',
             ),
             'utf-8',
           ),
         ),
-      ).toEqual({ name: 'oh-my-opencode-slim', version: '1.2.3' });
+      ).toEqual({ name: 'mechanicus', version: '1.2.3' });
       expect(fs.existsSync(prepared.stagingDir)).toBe(false);
       expect(
         fs

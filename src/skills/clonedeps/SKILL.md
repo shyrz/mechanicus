@@ -111,15 +111,15 @@ while the `.ignore` allowlist keeps them readable to OpenCode.
 `.gitignore`:
 
 ```gitignore
-# BEGIN oh-my-opencode-slim clonedeps
+# BEGIN mechanicus clonedeps
 .slim/clonedeps/repos/
-# END oh-my-opencode-slim clonedeps
+# END mechanicus clonedeps
 ```
 
 `.ignore`:
 
 ```ignore
-# BEGIN oh-my-opencode-slim clonedeps
+# BEGIN mechanicus clonedeps
 !.slim/
 !.slim/clonedeps.json
 !.slim/clonedeps/
@@ -127,7 +127,7 @@ while the `.ignore` allowlist keeps them readable to OpenCode.
 !.slim/clonedeps/repos/**
 .slim/clonedeps/repos/**/.git/
 .slim/clonedeps/repos/**/.git/**
-# END oh-my-opencode-slim clonedeps
+# END mechanicus clonedeps
 ```
 
 ### Step 5: Clone Sources Manually

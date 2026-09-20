@@ -32,7 +32,7 @@ describe('skills_add / skills_remove directives', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-add-remove-test-'));
     originalEnv = { ...process.env };
     delete process.env.OPENCODE_CONFIG_DIR;
-    delete process.env.OH_MY_OPENCODE_SLIM_PRESET;
+    delete process.env.MECHANICUS_PRESET;
     process.env.XDG_CONFIG_HOME = tempDir;
     projectDir = path.join(tempDir, 'project');
     fs.mkdirSync(projectDir, { recursive: true });
@@ -48,7 +48,7 @@ describe('skills_add / skills_remove directives', () => {
     const userDir = path.join(tempDir, 'opencode');
     fs.mkdirSync(userDir, { recursive: true });
     fs.writeFileSync(
-      path.join(userDir, 'oh-my-opencode-slim.jsonc'),
+      path.join(userDir, 'mechanicus.jsonc'),
       JSON.stringify(config, null, 2),
     );
   }
@@ -57,7 +57,7 @@ describe('skills_add / skills_remove directives', () => {
     const configDir = path.join(projectDir, '.opencode');
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.jsonc'),
+      path.join(configDir, 'mechanicus.jsonc'),
       JSON.stringify(config, null, 2),
     );
   }

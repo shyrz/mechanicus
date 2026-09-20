@@ -250,7 +250,7 @@ async function runTurn(
 function summarizeInjected(messages: any[]): string[] {
   return messages.map((m) => {
     const meta = m.parts?.[0]?.metadata;
-    if (meta?.['oh-my-opencode-slim.backgroundJobBoard'] === true) {
+    if (meta?.['mechanicus.backgroundJobBoard'] === true) {
       return `BOARD(${meta.snapshotID ?? m.info.id})`;
     }
     return `${m.info.role.toUpperCase()}(${m.info.id})`;
@@ -384,8 +384,7 @@ describe('checkpoint-compatible board cache safety', () => {
     const boardMessageOf = (t: TurnResult): any =>
       (t.injected as never[]).find(
         (m: any) =>
-          m.parts?.[0]?.metadata?.['oh-my-opencode-slim.backgroundJobBoard'] ===
-          true,
+          m.parts?.[0]?.metadata?.['mechanicus.backgroundJobBoard'] === true,
       );
 
     const s1turn1 = JSON.stringify(sortValue(boardMessageOf(turn1)));

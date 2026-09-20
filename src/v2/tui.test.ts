@@ -27,10 +27,7 @@ function makeConfig(): PluginConfig {
 }
 
 function userConfigPath(): string {
-  return path.join(
-    process.env.OPENCODE_CONFIG_DIR ?? '',
-    'oh-my-opencode-slim.json',
-  );
+  return path.join(process.env.OPENCODE_CONFIG_DIR ?? '', 'mechanicus.json');
 }
 
 function writeUserConfig(content: Record<string, unknown>): void {
@@ -51,8 +48,10 @@ describe('v2 tui preset plugin', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui2-cfg-'));
-    projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tui2-proj-'));
+    configHome = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-tui2-cfg-'));
+    projectDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tui2-proj-'),
+    );
     process.env.OPENCODE_CONFIG_DIR = configHome;
   });
 
@@ -336,8 +335,8 @@ describe('v2 tui preset plugin', () => {
         const layer = stub.layers[0];
         expect(layer?.mode).toBe('global');
         const command = layer?.commands[0];
-        expect(command?.id).toBe('omo.preset');
-        expect(command?.title).toBe('OMO: switch preset');
+        expect(command?.id).toBe('mechanicus.preset');
+        expect(command?.title).toBe('Mechanicus: switch preset');
         expect(command?.group).toBe('System');
         expect(command?.palette).toBe(true);
         expect(command?.slash).toEqual({ name: 'preset', arguments: true });
@@ -401,7 +400,7 @@ describe('v2 tui preset plugin', () => {
     });
 
     test('setup registers nothing when disabled by env', async () => {
-      process.env.OH_MY_OPENCODE_SLIM_DISABLE = '1';
+      process.env.MECHANICUS_DISABLE = '1';
       const stub = makeSetupCtx();
 
       const cleanup = await tui2Plugin.setup(

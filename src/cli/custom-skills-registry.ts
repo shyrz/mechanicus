@@ -57,16 +57,15 @@ export const CUSTOM_SKILLS: CustomSkill[] = [
     sourcePath: 'src/skills/reflect',
   },
   {
-    name: 'oh-my-opencode-slim',
-    description:
-      'Configure, customize, and safely improve oh-my-opencode-slim setups',
+    name: 'mechanicus',
+    description: 'Configure, customize, and safely improve mechanicus setups',
     allowedAgents: ['orchestrator'],
-    sourcePath: 'src/skills/oh-my-opencode-slim',
+    sourcePath: 'src/skills/mechanicus',
   },
   {
     name: 'worktrees',
     description:
-      'Manage Git worktrees as OMO safe isolated coding lanes for complex/risky/parallel work',
+      'Manage Git worktrees as Mechanicus safe isolated coding lanes for complex/risky/parallel work',
     allowedAgents: ['orchestrator'],
     sourcePath: 'src/skills/worktrees',
   },

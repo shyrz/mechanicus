@@ -46,13 +46,9 @@ export interface CmuxCloseSettlement {
   closed: boolean;
 }
 
-const STORE_KEY = Symbol.for('oh-my-opencode-slim.cmux-session-store');
-const OWNER_GENERATION_KEY = Symbol.for(
-  'oh-my-opencode-slim.cmux-owner-generation',
-);
-const ORPHAN_OBSERVERS_KEY = Symbol.for(
-  'oh-my-opencode-slim.cmux-orphan-observers',
-);
+const STORE_KEY = Symbol.for('mechanicus.cmux-session-store');
+const OWNER_GENERATION_KEY = Symbol.for('mechanicus.cmux-owner-generation');
+const ORPHAN_OBSERVERS_KEY = Symbol.for('mechanicus.cmux-orphan-observers');
 
 interface LatePaneOrphanObserver {
   ownerGeneration: number;

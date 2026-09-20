@@ -244,7 +244,7 @@ describe('auto-update-checker/index', () => {
 
     expect(cacheMocks.preparePackageUpdate).toHaveBeenCalledWith(
       '0.9.11',
-      'oh-my-opencode-slim',
+      'mechanicus',
       undefined,
       'latest',
     );
@@ -253,11 +253,11 @@ describe('auto-update-checker/index', () => {
       expect.objectContaining({ cwd: '/tmp/opencode-staging' }),
     );
     expect(skillSyncMocks.syncBundledSkillsFromPackage).toHaveBeenCalledWith(
-      '/tmp/opencode/node_modules/oh-my-opencode-slim',
+      '/tmp/opencode/node_modules/mechanicus',
     );
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -386,7 +386,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nAdded bundled skills: reflect, worktrees\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -427,7 +427,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nAdded bundled skills: reflect\nStaged skill updates require manual review: worktrees\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -481,7 +481,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nStaged skill updates require manual review: reflect\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -535,7 +535,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -583,7 +583,7 @@ describe('auto-update-checker/index', () => {
 
     expect(
       companionUpdaterMocks.loadCompanionManifestFromPackageRoot,
-    ).toHaveBeenCalledWith('/tmp/opencode/node_modules/oh-my-opencode-slim');
+    ).toHaveBeenCalledWith('/tmp/opencode/node_modules/mechanicus');
     expect(companionUpdaterMocks.ensureCompanionVersion).toHaveBeenCalledWith({
       config: { enabled: true },
       manifest: {
@@ -594,7 +594,7 @@ describe('auto-update-checker/index', () => {
     });
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nCompanion updated.\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -635,7 +635,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nCompanion update will retry on restart.\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -676,7 +676,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim Updated!',
+        title: 'Mechanicus Updated!',
         message:
           'v0.9.1 → v0.9.11\nRestart OpenCode to apply the plugin update.',
         variant: 'success',
@@ -713,7 +713,7 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim 0.9.11',
+        title: 'Mechanicus 0.9.11',
         message: 'v0.9.11 available. Auto-update is disabled.',
         variant: 'info',
         duration: 8000,
@@ -750,7 +750,7 @@ describe('auto-update-checker/index', () => {
     expect(skillSyncMocks.syncBundledSkillsFromPackage).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim 0.9.11',
+        title: 'Mechanicus 0.9.11',
         message:
           'v0.9.11 available. Auto-update could not prepare the active install.',
         variant: 'info',
@@ -796,7 +796,7 @@ describe('auto-update-checker/index', () => {
     expect(skillSyncMocks.syncBundledSkillsFromPackage).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim 0.9.11',
+        title: 'Mechanicus 0.9.11',
         message:
           'v0.9.11 available, but auto-update failed to install it. Check logs or retry manually.',
         variant: 'error',
@@ -880,9 +880,9 @@ describe('auto-update-checker/index', () => {
 
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'oh-my-opencode-slim v2.0.0 is available.',
+        title: 'mechanicus v2.0.0 is available.',
         message:
-          'It requires OpenCode background subagents.\nRun: bunx oh-my-opencode-slim@latest install',
+          'It requires OpenCode background subagents.\nRun: bunx mechanicus@latest install',
         variant: 'info',
         duration: 12000,
       },
@@ -916,7 +916,7 @@ describe('auto-update-checker/index', () => {
     expect(showToast).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith({
       body: expect.objectContaining({
-        title: 'oh-my-opencode-slim v2.0.0 is available.',
+        title: 'mechanicus v2.0.0 is available.',
       }),
     });
     expect(cacheMocks.preparePackageUpdate).not.toHaveBeenCalled();
@@ -949,7 +949,7 @@ describe('auto-update-checker/index', () => {
     expect(showToast).toHaveBeenCalledTimes(1);
     expect(showToast).toHaveBeenCalledWith({
       body: {
-        title: 'OMO-Slim 1.9.0',
+        title: 'Mechanicus 1.9.0',
         message:
           'v1.9.0 available. Auto-update skipped because the current version could not be compared safely.',
         variant: 'info',

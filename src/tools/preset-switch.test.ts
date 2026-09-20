@@ -21,7 +21,7 @@ beforeEach(() => {
   previousXdgDataHome = process.env.XDG_DATA_HOME;
   previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
   previousOpenCodeConfigDir = process.env.OPENCODE_CONFIG_DIR;
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-preset-switch-'));
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mechanicus-preset-switch-'));
   process.env.XDG_DATA_HOME = tempDir;
   process.env.XDG_CONFIG_HOME = path.join(tempDir, 'xdg-config');
   delete process.env.OPENCODE_CONFIG_DIR;
@@ -120,7 +120,7 @@ describe('switchPresetOnDisk', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
 
-    const configPath = path.join(configDir, 'oh-my-opencode-slim.jsonc');
+    const configPath = path.join(configDir, 'mechanicus.jsonc');
     fs.writeFileSync(
       configPath,
       `{
@@ -155,7 +155,7 @@ describe('switchPresetOnDisk', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
 
-    const configPath = path.join(configDir, 'oh-my-opencode-slim.json');
+    const configPath = path.join(configDir, 'mechanicus.json');
     fs.writeFileSync(
       configPath,
       `\uFEFF${JSON.stringify({
@@ -298,7 +298,7 @@ describe('writePreset', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       '{"preset":"old"}',
     );
 
@@ -308,10 +308,7 @@ describe('writePreset', () => {
 
     expect(ok).toBe(true);
     const persisted = JSON.parse(
-      fs.readFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
-        'utf-8',
-      ),
+      fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { presets?: Record<string, unknown> };
     expect(persisted.presets?.scout).toEqual({
       explorer: { model: 'openai/gpt-5.6-luna' },
@@ -324,7 +321,7 @@ describe('writePreset', () => {
     const configDir = path.join(tempDir, 'opencode-config');
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
-    const configPath = path.join(configDir, 'oh-my-opencode-slim.json');
+    const configPath = path.join(configDir, 'mechanicus.json');
     fs.writeFileSync(
       configPath,
       `\uFEFF${JSON.stringify({
@@ -355,7 +352,7 @@ describe('writePreset', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       JSON.stringify({
         presets: { scout: { orchestrator: { model: 'old' } } },
       }),
@@ -366,10 +363,7 @@ describe('writePreset', () => {
     });
 
     const persisted = JSON.parse(
-      fs.readFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
-        'utf-8',
-      ),
+      fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { presets?: Record<string, unknown> };
     expect(persisted.presets?.scout).toEqual({ oracle: { model: 'new' } });
   });
@@ -378,7 +372,7 @@ describe('writePreset', () => {
     const configDir = path.join(tempDir, 'opencode-config');
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
-    fs.writeFileSync(path.join(configDir, 'oh-my-opencode-slim.json'), '{}');
+    fs.writeFileSync(path.join(configDir, 'mechanicus.json'), '{}');
 
     const ok = writePreset(tempDir, 'solo', {
       orchestrator: { model: 'x' },
@@ -386,10 +380,7 @@ describe('writePreset', () => {
 
     expect(ok).toBe(true);
     const persisted = JSON.parse(
-      fs.readFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
-        'utf-8',
-      ),
+      fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { presets?: Record<string, unknown> };
     expect(persisted.presets?.solo).toEqual({ orchestrator: { model: 'x' } });
   });
@@ -401,7 +392,7 @@ describe('deletePreset', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       JSON.stringify({
         presets: {
           scout: { orchestrator: { model: 'a' } },
@@ -414,10 +405,7 @@ describe('deletePreset', () => {
 
     expect(ok).toBe(true);
     const persisted = JSON.parse(
-      fs.readFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
-        'utf-8',
-      ),
+      fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { presets?: Record<string, unknown> };
     expect(persisted.presets).toEqual({ keep: { oracle: { model: 'b' } } });
   });
@@ -427,7 +415,7 @@ describe('deletePreset', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       JSON.stringify({
         preset: 'scout',
         presets: { scout: { orchestrator: { model: 'a' } } },
@@ -437,10 +425,7 @@ describe('deletePreset', () => {
     deletePreset(tempDir, 'scout');
 
     const persisted = JSON.parse(
-      fs.readFileSync(
-        path.join(configDir, 'oh-my-opencode-slim.json'),
-        'utf-8',
-      ),
+      fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { preset?: string; presets?: Record<string, unknown> };
     expect(persisted.preset).toBeUndefined();
     expect(persisted.presets).toEqual({});
@@ -451,7 +436,7 @@ describe('deletePreset', () => {
     fs.mkdirSync(configDir, { recursive: true });
     process.env.OPENCODE_CONFIG_DIR = configDir;
     fs.writeFileSync(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       JSON.stringify({ presets: { keep: { orchestrator: { model: 'a' } } } }),
     );
 

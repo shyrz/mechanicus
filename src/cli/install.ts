@@ -47,14 +47,12 @@ const SYMBOLS = {
   star: `${YELLOW}★${RESET}`,
 };
 
-const GITHUB_REPO = 'alvinunreal/oh-my-opencode-slim';
+const GITHUB_REPO = 'shyrz/mechanicus';
 const GITHUB_URL = `https://github.com/${GITHUB_REPO}`;
 
 function printHeader(isUpdate: boolean): void {
   console.log();
-  console.log(
-    `${BOLD}oh-my-opencode-slim ${isUpdate ? 'Update' : 'Install'}${RESET}`,
-  );
+  console.log(`${BOLD}mechanicus ${isUpdate ? 'Update' : 'Install'}${RESET}`);
   console.log('='.repeat(30));
   console.log();
 }
@@ -340,7 +338,7 @@ async function runInstall(config: InstallConfig): Promise<number> {
     const { ok } = await checkOpenCodeInstalled();
     if (!ok) return 1;
   }
-  printStep(step++, totalSteps, 'Adding oh-my-opencode-slim plugin...');
+  printStep(step++, totalSteps, 'Adding mechanicus plugin...');
   if (config.dryRun) {
     printInfo('Dry run mode - skipping plugin installation');
   } else {
@@ -400,7 +398,7 @@ async function runInstall(config: InstallConfig): Promise<number> {
     if (!companionResult.success) config.companion = 'no';
   }
 
-  printStep(step++, totalSteps, 'Writing oh-my-opencode-slim configuration...');
+  printStep(step++, totalSteps, 'Writing mechanicus configuration...');
   if (config.dryRun) {
     const liteConfig = generateLiteConfig(config);
     printInfo('Dry run mode - configuration that would be written:');
@@ -555,7 +553,7 @@ async function runInstall(config: InstallConfig): Promise<number> {
   const altProviders = 'For the full configuration reference, see:';
   console.log(altProviders);
   const docsUrl =
-    'https://github.com/alvinunreal/oh-my-opencode-slim/' +
+    'https://github.com/shyrz/mechanicus/' +
     'blob/master/docs/configuration.md';
   console.log(`  ${BLUE}${docsUrl}${RESET}`);
   console.log();

@@ -23,7 +23,7 @@ type UserWaitStore = {
   messageObjectIdentity: WeakMap<object, symbol>;
 };
 
-const STORE_KEY = 'oh-my-opencode-slim.user-wait-gate';
+const STORE_KEY = 'mechanicus.user-wait-gate';
 
 function getStore(): UserWaitStore {
   return getGlobalStore<UserWaitStore>(STORE_KEY, () => ({

@@ -115,7 +115,7 @@ function sharedStyles(): string {
 // ─── Dashboard brand image ─────────────────────────────────────────
 
 function brandImage(size: number): string {
-  return `<img class="brand-mark" src="${BRAND_LOGO_URL}" alt="Oh My Opencode Slim" width="${size}" height="${size}" />`;
+  return `<img class="brand-mark" src="${BRAND_LOGO_URL}" alt="Mechanicus" width="${size}" height="${size}" />`;
 }
 
 export function renderDashboardPage(
@@ -394,7 +394,7 @@ export function renderDashboardPage(
       ${emptyState}
       ${activeSection}
       ${fileSection}
-      <div class="footer">OH MY OPENCODE SLIM</div>
+      <div class="footer">MECHANICUS</div>
     </div>
     <div class="update-banner" id="updateBanner">Dashboard updated - tap to refresh</div>
     <script>
@@ -1037,7 +1037,7 @@ export function renderInterviewPage(
 
       <div class="meta">
         <span id="status">INITIALIZING</span>
-        <span>OH MY OPENCODE SLIM</span>
+        <span>MECHANICUS</span>
       </div>
 
       <div id="filePathContainer" class="file-path-container" style="display: none;">

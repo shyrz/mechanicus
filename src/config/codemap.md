@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Centralizes configuration loading, validation, schema definitions, and runtime state management for the oh-my-opencode-slim plugin. This folder implements the configuration pipeline that merges user preferences, project overrides, and preset-based agent configurations, providing validated runtime configuration objects to the rest of the plugin.
+Centralizes configuration loading, validation, schema definitions, and runtime state management for the mechanicus plugin. This folder implements the configuration pipeline that merges user preferences, project overrides, and preset-based agent configurations, providing validated runtime configuration objects to the rest of the plugin.
 
 ## Design
 
@@ -37,9 +37,9 @@ The config system follows a layered architecture:
 
 ```
 1. Discovery Phase
-   ├─ User config: $OPENCODE_CONFIG_DIR/oh-my-opencode-slim.{jsonc,json}
-   ├─ Project config: <directory>/.opencode/oh-my-opencode-slim.{jsonc,json}
-   └─ Environment variable: OH_MY_OPENCODE_SLIM_PRESET (overrides preset field)
+   ├─ User config: $OPENCODE_CONFIG_DIR/mechanicus.{jsonc,json}
+   ├─ Project config: <directory>/.opencode/mechanicus.{jsonc,json}
+   └─ Environment variable: MECHANICUS_PRESET (overrides preset field)
 
 2. Parsing Phase
    ├─ JSONC support (comments, trailing commas) via stripJsonComments
@@ -195,7 +195,7 @@ This allows consumers to import directly from `src/config` rather than individua
 ## Environment Variable Support
 
 - `{env:VAR_NAME}`: Interpolated in config files during parsing
-- `OH_MY_OPENCODE_SLIM_PRESET`: Overrides config.preset at runtime
+- `MECHANICUS_PRESET`: Overrides config.preset at runtime
 
 ## Backward Compatibility
 

@@ -44,7 +44,7 @@ v2 registrations. v1 behavior is unchanged.
      the built-in MCPs; capability-probed — hosts without the domain log
      "MCPs stay config-only")
    - `command` → `ctx.command.transform` (add-only draft; `execute` submits a
-     `<omos-cmd-command>` marker as a user prompt via the shared session
+     `<mechanicus-cmd-command>` marker as a user prompt via the shared session
      submit)
    - `/interview` command via the interview bridge's own registration
    - a single `ctx.session.hook("context")` handles the system/messages
@@ -122,7 +122,7 @@ expanding the global v2 client surface.
   current trailing command message; prior messages remain unchanged for
   provider prompt-cache prefix reuse.
 - **Commands via marker round-trip.** v2 command drafts are add-only, so
-  `execute` submits a whole-text-anchored `<omos-cmd-command>` marker as a
+  `execute` submits a whole-text-anchored `<mechanicus-cmd-command>` marker as a
   user prompt and the session context hook dispatches it to the v1
   `command.execute.before` hook, mutating only the trailing message (same
   cache-preserving rule as the interview bridge).

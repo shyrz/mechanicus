@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "oh-my-opencode-slim",
+      "name": "mechanicus",
       "dependencies": {
         "@ast-grep/cli": "^0.44.1",
         "@mozilla/readability": "^0.6.0",

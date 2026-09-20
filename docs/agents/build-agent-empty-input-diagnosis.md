@@ -27,7 +27,7 @@ always targets the orchestrator. Smartfetch remains a separate call site.
    const agentName = input.agent
    const ag = agentName ? yield* agents.get(agentName) : yield* agents.defaultInfo()
    ```
-   When `input.agent` is omitted, opencode uses `agents.defaultInfo()` (`packages/opencode/src/agent/agent.ts:328-340`), which returns the first visible `mode: "primary"` agent — **`build`** (declared first in the agent registry, `agent.ts:141-155`). omos attempts to set `default_agent = "orchestrator"` via its `config` hook (`src/index.ts:546-551`), but only when `default_agent` is absent. `build` is selected whenever:
+   When `input.agent` is omitted, opencode uses `agents.defaultInfo()` (`packages/opencode/src/agent/agent.ts:328-340`), which returns the first visible `mode: "primary"` agent — **`build`** (declared first in the agent registry, `agent.ts:141-155`). mechanicus attempts to set `default_agent = "orchestrator"` via its `config` hook (`src/index.ts:546-551`), but only when `default_agent` is absent. `build` is selected whenever:
    - `config.setDefaultAgent === false` (plugin config disables it)
    - The user's `opencode.json` already sets a different `default_agent`
    - The `config` hook didn't run or didn't apply (SDK/runtime version skew: plugin built against `@opencode-ai/sdk` v1.4.3, installed runtime v1.18.3)
@@ -56,7 +56,7 @@ const promptBody = {
   ...(agentName ? { agent: agentName } : {}),
 };
 ```
-This is the pattern every `promptAsync` caller in omos should follow.
+This is the pattern every `promptAsync` caller in mechanicus should follow.
 
 ## Why the `hasInputWait` gate in task-session-manager is not sufficient
 
@@ -108,11 +108,11 @@ the v2 session methods without expanding the global client shim.
 
 ## Evidence index
 
-### omos source
+### mechanicus source
 - **Continuation nudge (fixed agent + opt-in beta + one-attempt gate):** `src/hooks/task-session-manager/continuation-evaluator.ts`, `continuation-attempt-gate.ts`, `backgroundJobs.continueOnIdle` in `src/config/schema.ts`
 - **Missing `agent` field (skill flow):** `src/interview/service.ts:622, 871, 933, 1007`
 - **Correct pattern for comparison:** `src/hooks/foreground-fallback/index.ts:635-639`
-- **omos sets `default_agent` only when absent:** `src/index.ts:546-551`
+- **mechanicus sets `default_agent` only when absent:** `src/index.ts:546-551`
 - **`createInternalAgentTextPart` produces `synthetic: true`:** `src/utils/internal-initiator.ts:9-21`
 - **`CONTINUATION_NUDGE` is non-empty:** `src/hooks/task-session-manager/continuation-evaluator.ts`
 - **`hasInputWait` / continuation gates:** `continuation-evaluator.ts`, `input-wait-tracker.ts`

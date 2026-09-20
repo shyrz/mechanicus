@@ -28,7 +28,7 @@ export function getTmuxPaneRegistrationPath(sessionId: string): string {
     dataDir(),
     'opencode',
     'storage',
-    'oh-my-opencode-slim',
+    'mechanicus',
     'tmux-panes',
     `${sessionScope(sessionId)}.json`,
   );

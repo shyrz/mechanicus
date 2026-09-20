@@ -111,7 +111,7 @@ describe('companion updater', () => {
       manifest: {
         version: '0.1.2',
         tag: 'companion-v0.1.2',
-        repo: 'alvinunreal/oh-my-opencode-slim',
+        repo: 'shyrz/mechanicus',
       },
     });
 
@@ -323,5 +323,5 @@ describe('companion updater', () => {
 
 function archiveName(version: string, target: string): string {
   const ext = process.platform === 'win32' ? 'zip' : 'tar.gz';
-  return `oh-my-opencode-slim-companion-v${version}-${target}.${ext}`;
+  return `mechanicus-companion-v${version}-${target}.${ext}`;
 }

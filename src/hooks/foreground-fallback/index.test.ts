@@ -3507,7 +3507,7 @@ describe('ForegroundFallbackManager resolveChain cross-agent isolation', () => {
     expect(call[0].body.model.modelID).toBe('gpt-4o');
   });
 
-  test('does NOT bleed into other agent chains for non-omos agents without a chain', async () => {
+  test('does NOT bleed into other agent chains for non-mechanicus agents without a chain', async () => {
     // A user-defined agent (e.g. Build) shares its model with the orchestrator
     // chain but has no chain of its own. It must NOT inherit the orchestrator
     // chain — that would switch the session from Build to Orchestrator.

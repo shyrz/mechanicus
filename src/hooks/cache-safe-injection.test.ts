@@ -12,7 +12,7 @@ import {
 } from './cache-safe-injection';
 import type { MessageWithParts } from './types';
 
-const KEY = 'oh-my-opencode-slim.testTag';
+const KEY = 'mechanicus.testTag';
 
 function userMessage(text: string): MessageWithParts {
   return {

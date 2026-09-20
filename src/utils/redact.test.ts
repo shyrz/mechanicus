@@ -132,8 +132,7 @@ describe('redactSecretsForLog', () => {
     // Honest assertion: a >32-char unbroken run inside a URL is masked.
     // Documented false-positive acceptance — the generic rule cannot
     // tell a long path from a secret.
-    const long =
-      'https://github.com/alvinunreal/oh-my-opencode-slim/pull/1174/files';
+    const long = 'https://github.com/shyrz/mechanicus/pull/1174/files';
     const out = redactSecretsForLog(`see ${long} for review`);
     expect(out).not.toContain(long);
     expect(out).toContain('…');
@@ -168,7 +167,7 @@ describe('redactSecretsForLog', () => {
   test('accepted false positives: long paths, UUIDs, and hashes are masked', () => {
     // Documented as intended: the generic 32+ run rule masks long opaque
     // non-secrets too. Redaction errs toward masking.
-    const filePath = '/mnt/d/GitRepos/oh-my-opencode-slim/dist/server/index.js';
+    const filePath = '/mnt/d/GitRepos/mechanicus/dist/server/index.js';
     expect(redactSecretsForLog(filePath)).not.toContain(filePath);
     const uuid = '550e8400-e29b-41d4-a716-446655440000';
     expect(redactSecretsForLog(`id ${uuid}`)).not.toContain(uuid);

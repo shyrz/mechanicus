@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Centralized utilities and shared abstractions used across the oh-my-opencode-slim plugin. This folder provides:
+Centralized utilities and shared abstractions used across the mechanicus plugin. This folder provides:
 - Background job lifecycle management (board + store + coordinator + supervisor)
 - Live session-status reads and session metadata tracking
 - In-process opencode client access and client call-shape contracts
@@ -35,7 +35,7 @@ Centralized utilities and shared abstractions used across the oh-my-opencode-sli
 
 - **Session Calls Contract** (`session-calls.contract.ts`): Type-only compile-time contract pinning the nested `{ path, query, body }` client call shapes and asserting the v2-flat shapes are rejected; compiled by `bun run typecheck`.
 
-- **Logger** (`logger.ts`): File-based logging with 7-day retention, automatic directory creation, and write queuing. Logs are written to `~/.local/share/opencode/log/oh-my-opencode-slim.<sessionId>.log` and cleaned up on initialization.
+- **Logger** (`logger.ts`): File-based logging with 7-day retention, automatic directory creation, and write queuing. Logs are written to `~/.local/share/opencode/log/mechanicus.<sessionId>.log` and cleaned up on initialization.
 
 - **Session Utilities** (`session.ts`): Timeout handling, session abort coordination, model reference parsing, and session content extraction. Provides `promptWithTimeout` and `extractSessionResult` for safe session operations.
 
@@ -80,7 +80,7 @@ Centralized utilities and shared abstractions used across the oh-my-opencode-sli
 
 ### Logging Flow
 1. Plugin initializes logger with session ID via initLogger(sessionId)
-2. Logs are appended to `~/.local/share/opencode/log/oh-my-opencode-slim.<sessionId>.log`
+2. Logs are appended to `~/.local/share/opencode/log/mechanicus.<sessionId>.log`
 3. Old logs (>7 days) are automatically cleaned up on initialization
 4. Log writes are queued to avoid blocking. File logging falls back to stderr after initialization failure or a write failure in the active generation; stale queued writes cannot replace a newer sink
 

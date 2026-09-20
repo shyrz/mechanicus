@@ -1388,7 +1388,7 @@ describe('orchestrator wake scheduler', () => {
           {
             type: 'text',
             text: 'board snapshot',
-            metadata: { 'oh-my-opencode-slim.backgroundJobBoard': true },
+            metadata: { 'mechanicus.backgroundJobBoard': true },
           },
         ],
       },

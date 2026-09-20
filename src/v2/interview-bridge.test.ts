@@ -25,10 +25,10 @@ function createContext(overrides?: {
 describe('markerText', () => {
   test('renders args byte-exact', () => {
     expect(markerText('build a notes app')).toBe(
-      '<omos-interview-command>build a notes app</omos-interview-command>',
+      '<mechanicus-interview-command>build a notes app</mechanicus-interview-command>',
     );
     expect(markerText('')).toBe(
-      '<omos-interview-command></omos-interview-command>',
+      '<mechanicus-interview-command></mechanicus-interview-command>',
     );
   });
 
@@ -36,13 +36,13 @@ describe('markerText', () => {
     // A string replacer would turn $$ into $, $& into the whole match, and
     // $` into the preceding text. Function replacer keeps them byte-exact.
     expect(markerText('pay $$ now')).toBe(
-      '<omos-interview-command>pay $$ now</omos-interview-command>',
+      '<mechanicus-interview-command>pay $$ now</mechanicus-interview-command>',
     );
     expect(markerText('a $& b')).toBe(
-      '<omos-interview-command>a $& b</omos-interview-command>',
+      '<mechanicus-interview-command>a $& b</mechanicus-interview-command>',
     );
     expect(markerText('a $` b')).toBe(
-      '<omos-interview-command>a $` b</omos-interview-command>',
+      '<mechanicus-interview-command>a $` b</mechanicus-interview-command>',
     );
   });
 });

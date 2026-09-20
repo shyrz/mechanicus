@@ -94,14 +94,14 @@ type V1CommandPart = {
  * drafts are add-only (no `template`), so `execute` submits this marker as a
  * plain user prompt and the session context hook recovers it below. */
 export function wrapCommandMarker(name: string, args: string): string {
-  return `<omos-cmd-command data-name="${name}">${args}</omos-cmd-command>`;
+  return `<mechanicus-cmd-command data-name="${name}">${args}</mechanicus-cmd-command>`;
 }
 
 // Whole-text anchored: v2 writes the marker as the entire submitted prompt,
 // so whole-text anchoring is the contract. A user-typed embedded marker must
 // not hijack dispatch in the merged session context hook.
 const COMMAND_MARKER_PATTERN =
-  /^\s*<omos-cmd-command\s+data-name="([\w.-]+)">([\s\S]*?)<\/omos-cmd-command>\s*$/;
+  /^\s*<mechanicus-cmd-command\s+data-name="([\w.-]+)">([\s\S]*?)<\/mechanicus-cmd-command>\s*$/;
 
 export interface ParsedCommandMarker {
   name: string;
@@ -1421,7 +1421,7 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
       });
     } catch (err) {
       log('[v2] FATAL: v1 factory init failed', String(err));
-      console.error('[oh-my-opencode-slim][v2] factory init failed:', err);
+      console.error('[mechanicus][v2] factory init failed:', err);
       // Don't hard-fail the whole plugin; register nothing and stay loaded.
       return async () => {};
     }
@@ -1829,7 +1829,7 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
       // would look like a successful load with an empty session.
       if (disposers.length === 0) {
         console.error(
-          '[oh-my-opencode-slim][v2] WARNING: no bridges registered — ' +
+          '[mechanicus][v2] WARNING: no bridges registered — ' +
             'the plugin loaded but registered nothing. Check the plugin log.',
         );
         log('[v2] health check: zero bridges registered');

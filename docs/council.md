@@ -63,7 +63,7 @@ synthesizes their results into a single report.
 
 Add a council model and at least one council preset to your plugin config:
 
-`~/.config/opencode/oh-my-opencode-slim.json`
+`~/.config/opencode/mechanicus.json`
 
 ```jsonc
 {

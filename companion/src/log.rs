@@ -13,13 +13,13 @@ fn log_path() -> PathBuf {
                 .join("share")
         });
     base.join("opencode").join("log").join(format!(
-        "oh-my-opencode-slim-companion.{}.log",
+        "mechanicus-companion.{}.log",
         std::process::id()
     ))
 }
 
 pub fn debug(message: impl AsRef<str>) {
-    if std::env::var("OH_MY_OPENCODE_SLIM_COMPANION_DEBUG")
+    if std::env::var("MECHANICUS_COMPANION_DEBUG")
         .ok()
         .as_deref()
         != Some("1")

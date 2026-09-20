@@ -1200,9 +1200,7 @@ describe('MultiplexerSessionManager', () => {
     });
 
     test('backfills permanentlyClosedSessions for an older shared state shape', () => {
-      const key = Symbol.for(
-        'oh-my-opencode-slim.multiplexer-session-manager.state',
-      );
+      const key = Symbol.for('mechanicus.multiplexer-session-manager.state');
       (globalThis as Record<PropertyKey, unknown>)[key] = {
         sessions: new Map(),
         knownSessions: new Map(),

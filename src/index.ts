@@ -133,14 +133,14 @@ async function appLog(
 ): Promise<void> {
   try {
     await ctx.client.app.log({
-      body: { service: 'oh-my-opencode-slim', level, message },
+      body: { service: 'mechanicus', level, message },
     });
   } catch {
     // client.app.log may deadlock or be unavailable; stderr is the
     // fallback
     const prefix =
       level === 'error' ? 'ERROR' : level === 'warn' ? 'WARN' : 'INFO';
-    console.error(`[oh-my-opencode-slim] ${prefix}: ${message}`);
+    console.error(`[mechanicus] ${prefix}: ${message}`);
   }
 }
 
@@ -198,7 +198,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
   initLogger(sessionId);
 
   if (isPluginDisabledByEnv()) {
-    log('[plugin] disabled by OH_MY_OPENCODE_SLIM_DISABLE');
+    log('[plugin] disabled by MECHANICUS_DISABLE');
     return {};
   }
 
@@ -958,7 +958,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     await appLog(
       ctx,
       'error',
-      `INIT FAILED: ${String(err)}. Report at github.com/alvinunreal/oh-my-opencode-slim/issues/310`,
+      `INIT FAILED: ${String(err)}. Report at github.com/shyrz/mechanicus/issues/310`,
     );
     throw err;
   }
@@ -985,7 +985,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       `  mcps:   ${mcpCount} (expected >=${mcpThreshold})`,
       'This usually means a dependency failed to resolve (jsdom, etc).',
       'If you recently updated opencode, see:',
-      '  github.com/alvinunreal/oh-my-opencode-slim/issues/310',
+      '  github.com/shyrz/mechanicus/issues/310',
     ].join('\n');
     log(`[plugin] WARN: ${msg}`);
     await appLog(ctx, 'warn', msg);
@@ -1058,7 +1058,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
   }
 
   return {
-    name: 'oh-my-opencode-slim',
+    name: 'mechanicus',
 
     agent: agents,
 
@@ -1073,7 +1073,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       RuntimeConfig.get(ctx.directory).captureHostConfig(opencodeConfig);
 
       // Force default_agent to the orchestrator's visible entry when unset,
-      // and also when the user pointed it at an omos subagent name (opencode
+      // and also when the user pointed it at an mechanicus subagent name (opencode
       // rejects subagent names as default_agent with "default agent must be a
       // primary agent"). With a display name, the canonical 'orchestrator'
       // registration is a hidden alias, so default to its visible entry.
@@ -2053,7 +2053,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
 };
 
 export default {
-  id: 'oh-my-opencode-slim',
+  id: 'mechanicus',
   // NOTE: do not add a `tui` key here. OpenCode v1.18.23+ (and v2's
   // byte-identical readV1Plugin) validate the default export of a server
   // plugin module: `tui`, when present, must be a function and must not

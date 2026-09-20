@@ -93,7 +93,7 @@ The system supports runtime configuration overrides:
 
 
 ```typescript
-// In user configuration (e.g., ~/.config/opencode/oh-my-opencode-slim.json)
+// In user configuration (e.g., ~/.config/opencode/mechanicus.json)
 {
   "mcp": {
     "disabled": ["gh_grep"]

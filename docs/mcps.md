@@ -1,6 +1,6 @@
 # MCP Servers
 
-Built-in Model Context Protocol (MCP) servers ship with oh-my-opencode-slim and give agents access to external tools - library documentation and code search.
+Built-in Model Context Protocol (MCP) servers ship with mechanicus and give agents access to external tools - library documentation and code search.
 
 ---
 
@@ -14,7 +14,7 @@ Enable the built-in tool by setting these environment variables in your shell pr
 env OPENCODE_ENABLE_EXA=true OPENCODE_ENABLE_PARALLEL=true opencode
 ```
 
-The oh-my-opencode-slim installer sets `OPENCODE_ENABLE_EXA=1` alongside its
+The mechanicus installer sets `OPENCODE_ENABLE_EXA=1` alongside its
 background-subagents export when you accept the environment setup. Parallel
 search remains opt-in.
 
@@ -47,7 +47,7 @@ The built-in tool is Exa-backed (optionally Parallel), needs no API key, and is 
 
 ## Configuring MCP Access
 
-Control which MCPs each agent can use via the `mcps` array in your preset config (`~/.config/opencode/oh-my-opencode-slim.json` or `.jsonc`):
+Control which MCPs each agent can use via the `mcps` array in your preset config (`~/.config/opencode/mechanicus.json` or `.jsonc`):
 
 | Syntax | Meaning |
 |--------|---------|

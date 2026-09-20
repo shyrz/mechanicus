@@ -51,7 +51,7 @@ export function switchPresetOnDisk(
     const hint =
       available.length > 0
         ? `Available presets: ${available.join(', ')}`
-        : 'No presets configured. Define presets in oh-my-opencode-slim.jsonc.';
+        : 'No presets configured. Define presets in mechanicus.jsonc.';
     return {
       ok: false,
       presetName,

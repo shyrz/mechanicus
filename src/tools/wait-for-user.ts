@@ -67,7 +67,7 @@ Use this only as the final tool action after you have already given the user con
       options.beginUserWait(sessionID);
       return [
         'state: waiting_for_user',
-        'protocol: oh-my-opencode-slim.wait_for_user.v1',
+        'protocol: mechanicus.wait_for_user.v1',
         `reason: ${reason}`,
         '',
         'End this turn now. Do not call more tools until the user responds.',

@@ -49,7 +49,7 @@ export interface LoadPluginConfigOptions {
   silent?: boolean;
 }
 
-const PROMPTS_DIR_NAME = 'oh-my-opencode-slim';
+const PROMPTS_DIR_NAME = 'mechanicus';
 const INTERVIEW_CONFIG_KEYS = [
   'maxQuestions',
   'outputFolder',
@@ -295,10 +295,7 @@ function loadConfigFromPath(
         message,
       });
       if (!options?.silent) {
-        console.warn(
-          `[oh-my-opencode-slim] Invalid JSON in ${configPath}:`,
-          message,
-        );
+        console.warn(`[mechanicus] Invalid JSON in ${configPath}:`, message);
       }
       return null;
     }
@@ -316,7 +313,7 @@ function loadConfigFromPath(
         message: tmuxMsg,
       });
       if (!options?.silent) {
-        console.warn(`[oh-my-opencode-slim] ${tmuxMsg}`);
+        console.warn(`[mechanicus] ${tmuxMsg}`);
       }
     }
 
@@ -340,7 +337,7 @@ function loadConfigFromPath(
         message: masterMsg,
       });
       if (!options?.silent) {
-        console.warn(`[oh-my-opencode-slim] ${masterMsg}`);
+        console.warn(`[mechanicus] ${masterMsg}`);
       }
     }
 
@@ -370,7 +367,7 @@ function loadConfigFromPath(
           message: backgroundJobsMsg,
         });
         if (!options?.silent) {
-          console.warn(`[oh-my-opencode-slim] ${backgroundJobsMsg}`);
+          console.warn(`[mechanicus] ${backgroundJobsMsg}`);
         }
       }
     }
@@ -396,7 +393,7 @@ function loadConfigFromPath(
           message: fallbackMsg,
         });
         if (!options?.silent) {
-          console.warn(`[oh-my-opencode-slim] ${fallbackMsg}`);
+          console.warn(`[mechanicus] ${fallbackMsg}`);
         }
       }
     }
@@ -412,7 +409,7 @@ function loadConfigFromPath(
         message,
       });
       if (!options?.silent) {
-        console.warn(`[oh-my-opencode-slim] ${message}`);
+        console.warn(`[mechanicus] ${message}`);
       }
     });
 
@@ -426,7 +423,7 @@ function loadConfigFromPath(
         formatted: result.error.format(),
       });
       if (!options?.silent) {
-        console.warn(`[oh-my-opencode-slim] Invalid config at ${configPath}:`);
+        console.warn(`[mechanicus] Invalid config at ${configPath}:`);
         console.warn(result.error.format());
       }
       return null;
@@ -473,7 +470,7 @@ function loadConfigFromPath(
       });
       if (!options?.silent) {
         console.warn(
-          `[oh-my-opencode-slim] Error reading config from ${configPath}:`,
+          `[mechanicus] Error reading config from ${configPath}:`,
           error.message,
         );
       }
@@ -486,7 +483,7 @@ function loadConfigFromPath(
  * Find existing config file path, preferring .jsonc over .json.
  * Checks for .jsonc first, then falls back to .json.
  *
- * @param basePath - Base path without extension (e.g., /path/to/oh-my-opencode-slim)
+ * @param basePath - Base path without extension (e.g., /path/to/mechanicus)
  * @returns Path to existing config file, or null if neither exists
  */
 function findConfigPath(basePath: string): string | null {
@@ -549,7 +546,7 @@ function validateFinalImageRouting(
     message,
   });
   if (!options?.silent) {
-    console.warn(`[oh-my-opencode-slim] Invalid config: ${message}`);
+    console.warn(`[mechanicus] Invalid config: ${message}`);
   }
   return false;
 }
@@ -557,7 +554,7 @@ function validateFinalImageRouting(
 /**
  * Find plugin config paths (user and project) for a given directory.
  * User config uses getConfigSearchDirs() for lookup.
- * Project config uses <directory>/.opencode/oh-my-opencode-slim.
+ * Project config uses <directory>/.opencode/mechanicus.
  *
  * @param directory - Project directory to search for .opencode config
  * @returns Object with userConfigPath and projectConfigPath (null if not found)
@@ -568,14 +565,10 @@ export function findPluginConfigPaths(directory: string): {
 } {
   const userConfigPath = findConfigPathInDirs(
     getConfigSearchDirs(),
-    'oh-my-opencode-slim',
+    'mechanicus',
   );
 
-  const projectConfigBasePath = path.join(
-    directory,
-    '.opencode',
-    'oh-my-opencode-slim',
-  );
+  const projectConfigBasePath = path.join(directory, '.opencode', 'mechanicus');
 
   const projectConfigPath = findConfigPath(projectConfigBasePath);
 
@@ -655,9 +648,9 @@ export function deepMerge<T extends Record<string, unknown>>(
  * Load plugin configuration from user and project config files, merging them appropriately.
  *
  * Configuration is loaded from two locations:
- * 1. User config: $OPENCODE_CONFIG_DIR/oh-my-opencode-slim.jsonc or .json,
- *    or ~/.config/opencode/oh-my-opencode-slim.jsonc or .json (or $XDG_CONFIG_HOME)
- * 2. Project config: <directory>/.opencode/oh-my-opencode-slim.jsonc or .json
+ * 1. User config: $OPENCODE_CONFIG_DIR/mechanicus.jsonc or .json,
+ *    or ~/.config/opencode/mechanicus.jsonc or .json (or $XDG_CONFIG_HOME)
+ * 2. Project config: <directory>/.opencode/mechanicus.jsonc or .json
  *
  * JSONC format is preferred over JSON (allows comments and trailing commas).
  * Project config takes precedence over user config. Nested objects (agents, multiplexer) are
@@ -698,7 +691,7 @@ export function loadPluginConfig(
   }
 
   // Override preset from environment variable if set
-  const envPreset = process.env.OH_MY_OPENCODE_SLIM_PRESET;
+  const envPreset = process.env.MECHANICUS_PRESET;
   if (envPreset) {
     config.preset = envPreset;
   }
@@ -723,7 +716,7 @@ export function loadPluginConfig(
         message,
       });
       if (!options?.silent) {
-        console.warn(`[oh-my-opencode-slim] ${message}`);
+        console.warn(`[mechanicus] ${message}`);
       }
     }
   }
@@ -830,7 +823,7 @@ export function loadAgentPrompt(
         return fs.readFileSync(promptPath, 'utf-8');
       } catch (error) {
         console.warn(
-          `[oh-my-opencode-slim] ${errorPrefix} ${promptPath}:`,
+          `[mechanicus] ${errorPrefix} ${promptPath}:`,
           error instanceof Error ? error.message : String(error),
         );
       }

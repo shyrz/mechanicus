@@ -28,7 +28,7 @@ import {
 } from './tui-state';
 import { isPluginDisabledByEnv } from './utils/env';
 
-const PLUGIN_NAME = 'oh-my-opencode-slim';
+const PLUGIN_NAME = 'mechanicus';
 const CONFIG_WARNING_COLOR = 'orange';
 const FALLBACK_SIDEBAR_AGENTS = SUBAGENT_NAMES.filter(
   (agent) =>
@@ -1199,7 +1199,7 @@ function renderSidebar(
                     theme.background,
                   ),
                 },
-                ['OMO-Slim'],
+                ['Mechanicus'],
               ),
             ],
           ),

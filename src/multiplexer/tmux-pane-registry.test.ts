@@ -15,7 +15,9 @@ describe('tmux pane registry', () => {
   let stateDirectory: string;
 
   beforeEach(() => {
-    stateDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'omos-tmux-state-'));
+    stateDirectory = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-tmux-state-'),
+    );
     process.env.XDG_DATA_HOME = stateDirectory;
   });
 

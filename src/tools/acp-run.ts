@@ -39,7 +39,7 @@ export function createAcpInitializeParams() {
     protocolVersion: 1,
     clientCapabilities: {},
     clientInfo: {
-      name: 'oh-my-opencode-slim',
+      name: 'mechanicus',
       version: packageJson.version,
     },
   };

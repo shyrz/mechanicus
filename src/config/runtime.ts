@@ -1,5 +1,5 @@
 /**
- * Runtime configuration interface for oh-my-opencode-slim.
+ * Runtime configuration interface for mechanicus.
  *
  * Single typed access point for everything the plugin reads from config at
  * runtime: the plugin file layer (loadPluginConfig result), the host config

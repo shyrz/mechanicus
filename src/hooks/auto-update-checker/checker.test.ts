@@ -85,12 +85,12 @@ describe('auto-update-checker/checker', () => {
         (p: string) => {
           if (p.includes('opencode.json')) {
             return JSON.stringify({
-              plugin: ['file:///dev/oh-my-opencode-slim'],
+              plugin: ['file:///dev/mechanicus'],
             });
           }
           if (p.includes('package.json')) {
             return JSON.stringify({
-              name: 'oh-my-opencode-slim',
+              name: 'mechanicus',
               version: '1.2.3-dev',
             });
           }
@@ -128,12 +128,12 @@ describe('auto-update-checker/checker', () => {
           if (p.includes('opencode.json')) {
             // A UTF-8 BOM (RFC 8259 permits one) must not break JSON.parse.
             return `\uFEFF${JSON.stringify({
-              plugin: ['file:///dev/oh-my-opencode-slim'],
+              plugin: ['file:///dev/mechanicus'],
             })}`;
           }
           if (p.includes('package.json')) {
             return JSON.stringify({
-              name: 'oh-my-opencode-slim',
+              name: 'mechanicus',
               version: '1.2.3-dev',
             });
           }
@@ -160,7 +160,7 @@ describe('auto-update-checker/checker', () => {
       );
       const readSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
-          plugin: ['oh-my-opencode-slim'],
+          plugin: ['mechanicus'],
         }),
       );
 
@@ -170,7 +170,7 @@ describe('auto-update-checker/checker', () => {
 
       const entry = findPluginEntry('/test');
       expect(entry).not.toBeNull();
-      expect(entry?.entry).toBe('oh-my-opencode-slim');
+      expect(entry?.entry).toBe('mechanicus');
       expect(entry?.isPinned).toBe(false);
       expect(entry?.pinnedVersion).toBeNull();
 
@@ -184,7 +184,7 @@ describe('auto-update-checker/checker', () => {
       );
       const readSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         `\uFEFF${JSON.stringify({
-          plugin: ['oh-my-opencode-slim'],
+          plugin: ['mechanicus'],
         })}`,
       );
 
@@ -194,7 +194,7 @@ describe('auto-update-checker/checker', () => {
 
       const entry = findPluginEntry('/test');
       expect(entry).not.toBeNull();
-      expect(entry?.entry).toBe('oh-my-opencode-slim');
+      expect(entry?.entry).toBe('mechanicus');
 
       existsSpy.mockRestore();
       readSpy.mockRestore();
@@ -206,7 +206,7 @@ describe('auto-update-checker/checker', () => {
       );
       const readSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
-          plugin: ['oh-my-opencode-slim@1.0.0'],
+          plugin: ['mechanicus@1.0.0'],
         }),
       );
 
@@ -230,11 +230,8 @@ describe('auto-update-checker/checker', () => {
       const readSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
           plugin: [
-            'oh-my-opencode-slim@1.2.3',
-            [
-              'oh-my-opencode-slim@1.2.3',
-              { __ohMyOpencodeSlimManagedByInstaller: true },
-            ],
+            'mechanicus@1.2.3',
+            ['mechanicus@1.2.3', { __mechanicusManagedByInstaller: true }],
           ],
         }),
       );
@@ -249,10 +246,7 @@ describe('auto-update-checker/checker', () => {
       const managedReadSpy = spyOn(fs, 'readFileSync').mockReturnValue(
         JSON.stringify({
           plugin: [
-            [
-              'oh-my-opencode-slim@1.2.3',
-              { __ohMyOpencodeSlimManagedByInstaller: true },
-            ],
+            ['mechanicus@1.2.3', { __mechanicusManagedByInstaller: true }],
           ],
         }),
       );
@@ -274,15 +268,15 @@ describe('auto-update-checker/checker', () => {
           `{
   // preserve this comment
   "note": "{ [ ] }",
-  "other": { "plugin": [["oh-my-opencode-slim@0.1.0", { "__ohMyOpencodeSlimManagedByInstaller": true }]] },
-  "plugin": [["oh-my-opencode-slim@0.2.0", { "__ohMyOpencodeSlimManagedByInstaller": true }]],
+  "other": { "plugin": [["mechanicus@0.1.0", { "__mechanicusManagedByInstaller": true }]] },
+  "plugin": [["mechanicus@0.2.0", { "__mechanicusManagedByInstaller": true }]],
   "plugin": [
-    [ /* tuple comment */ "oh-my-opencode-slim@1.2.3", { "__ohMyOpencodeSlimManagedByInstaller": true, "keep": "[{}]" } ],
-    ["oh-my-opencode-slim@1.2.3", { "__ohMyOpencodeSlimManagedByInstaller": false, "__ohMyOpencodeSlimManagedByInstaller": true }],
-    ["oh-my-opencode-slim@1.2.3", { "__ohMyOpencodeSlimManagedByInstaller": "true" }],
-    ["oh-my-opencode-slim\\u00401.2.3", { "__ohMyOpencodeSlimManagedByInstall\\u0065r": true }],
-    "oh-my-opencode-slim@1.2.3",
-    ["oh-my-opencode-slim@1.2.3", { "nested": { "__ohMyOpencodeSlimManagedByInstaller": true } }]
+    [ /* tuple comment */ "mechanicus@1.2.3", { "__mechanicusManagedByInstaller": true, "keep": "[{}]" } ],
+    ["mechanicus@1.2.3", { "__mechanicusManagedByInstaller": false, "__mechanicusManagedByInstaller": true }],
+    ["mechanicus@1.2.3", { "__mechanicusManagedByInstaller": "true" }],
+    ["mechanicus\\u00401.2.3", { "__mechanicusManagedByInstall\\u0065r": true }],
+    "mechanicus@1.2.3",
+    ["mechanicus@1.2.3", { "nested": { "__mechanicusManagedByInstaller": true } }]
   ]
 }`,
         ],
@@ -290,10 +284,7 @@ describe('auto-update-checker/checker', () => {
           '/mock/config/tui.json',
           JSON.stringify({
             plugin: [
-              [
-                'oh-my-opencode-slim@1.2.3',
-                { __ohMyOpencodeSlimManagedByInstaller: true },
-              ],
+              ['mechanicus@1.2.3', { __mechanicusManagedByInstaller: true }],
             ],
           }),
         ],
@@ -320,19 +311,19 @@ describe('auto-update-checker/checker', () => {
       process.env.OPENCODE_TUI_CONFIG = '/mock/config/tui.json';
       expect(updateInstallerManagedVersions('/project', '1.2.4')).toBe(true);
       expect(files.get('/mock/config/opencode.json')).toContain(
-        'oh-my-opencode-slim@1.2.4',
+        'mechanicus@1.2.4',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        '"oh-my-opencode-slim@1.2.4", { "__ohMyOpencodeSlimManagedByInstall\\u0065r": true }',
+        '"mechanicus@1.2.4", { "__mechanicusManagedByInstall\\u0065r": true }',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        '"oh-my-opencode-slim@0.1.0", { "__ohMyOpencodeSlimManagedByInstaller": true }',
+        '"mechanicus@0.1.0", { "__mechanicusManagedByInstaller": true }',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        '"oh-my-opencode-slim@0.2.0", { "__ohMyOpencodeSlimManagedByInstaller": true }',
+        '"mechanicus@0.2.0", { "__mechanicusManagedByInstaller": true }',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        '"oh-my-opencode-slim@1.2.3", { "__ohMyOpencodeSlimManagedByInstaller": "true" }',
+        '"mechanicus@1.2.3", { "__mechanicusManagedByInstaller": "true" }',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
         '"keep": "[{}]"',
@@ -341,17 +332,15 @@ describe('auto-update-checker/checker', () => {
         '"note": "{ [ ] }"',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        'oh-my-opencode-slim@1.2.3',
+        'mechanicus@1.2.3',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
-        '"nested": { "__ohMyOpencodeSlimManagedByInstaller": true }',
+        '"nested": { "__mechanicusManagedByInstaller": true }',
       );
       expect(files.get('/mock/config/opencode.json')).toContain(
         '// preserve this comment',
       );
-      expect(files.get('/mock/config/tui.json')).toContain(
-        'oh-my-opencode-slim@1.2.4',
-      );
+      expect(files.get('/mock/config/tui.json')).toContain('mechanicus@1.2.4');
       if (previousTuiConfig === undefined) {
         delete process.env.OPENCODE_TUI_CONFIG;
       } else {

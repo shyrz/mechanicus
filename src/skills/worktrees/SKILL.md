@@ -1,12 +1,12 @@
 ---
 name: worktrees
-description: Manage Git worktrees as OMO safe isolated coding lanes for complex, risky, or parallel work.
+description: Manage Git worktrees as Mechanicus safe isolated coding lanes for complex, risky, or parallel work.
 ---
 
 # Worktrees Orchestration Protocol
 
 The `worktrees` skill provides an opinionated, safe orchestration protocol for
-managing Git worktrees as isolated coding lanes. Its value is giving the Orchestrator a consistent OMO workflow for parallel agents, risky experiments, integration review, and cleanup.
+managing Git worktrees as isolated coding lanes. Its value is giving the Orchestrator a consistent Mechanicus workflow for parallel agents, risky experiments, integration review, and cleanup.
 
 ## Core Contract
 
@@ -35,7 +35,7 @@ structural tracking:
   "lanes": [
     {
       "slug": "feature-auth-v2",
-      "branch": "omos/feature-auth-v2",
+      "branch": "mechanicus/feature-auth-v2",
       "path": ".slim/worktrees/feature-auth-v2",
       "base": "main",
       "purpose": "refactor authentication flow to use OAuth2",
@@ -64,7 +64,7 @@ following guards:
 - Confirm the current directory is inside a Git repository.
 - Check the current branch, base branch, and dirty/uncommitted state.
 - Inspect the output of `git worktree list` to avoid path or branch conflicts.
-- Ensure the branch name (e.g. `omos/<slug>` or custom project convention) does not already exist locally or on remote.
+- Ensure the branch name (e.g. `mechanicus/<slug>` or custom project convention) does not already exist locally or on remote.
 - Ensure `.slim/worktrees/` is ignored by Git before creating nested worktrees.
 
 ### 2. Mandatory User Confirmation
@@ -90,21 +90,21 @@ keeps them readable to OpenCode.
 `.gitignore`:
 
 ```gitignore
-# BEGIN oh-my-opencode-slim worktrees
+# BEGIN mechanicus worktrees
 .slim/worktrees/
 .slim/worktrees.json
-# END oh-my-opencode-slim worktrees
+# END mechanicus worktrees
 ```
 
 `.ignore`:
 
 ```ignore
-# BEGIN oh-my-opencode-slim worktrees
+# BEGIN mechanicus worktrees
 !.slim/
 !.slim/worktrees.json
 !.slim/worktrees/
 !.slim/worktrees/**
-# END oh-my-opencode-slim worktrees
+# END mechanicus worktrees
 ```
 
 ---
@@ -113,7 +113,7 @@ keeps them readable to OpenCode.
 
 ### Phase 1: Planning & Setup
 1. Identify the task scope and determine a short `<slug>` for the worktree.
-2. Formulate a branch name. Default to `omos/<slug>` unless project/user conventions dictate otherwise.
+2. Formulate a branch name. Default to `mechanicus/<slug>` unless project/user conventions dictate otherwise.
 3. Validate repository safety. Ask the user for confirmation to initialize the lane.
 4. Before creating the lane, ensure the managed ignore blocks are present using
    the Ignore File Setup rules above.

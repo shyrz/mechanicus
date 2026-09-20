@@ -56,7 +56,7 @@ describe('v2 generation warning latches', () => {
     await flushLoggerForTesting();
     let joined = '';
     for (const entry of readdirSync(logDir)) {
-      if (entry.startsWith('oh-my-opencode-slim.') && entry.endsWith('.log')) {
+      if (entry.startsWith('mechanicus.') && entry.endsWith('.log')) {
         joined += readFileSync(path.join(logDir, entry), 'utf8');
       }
     }
@@ -65,7 +65,7 @@ describe('v2 generation warning latches', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    fixtureRoot = await mkdtemp('/tmp/omo-v2-gen-reset-');
+    fixtureRoot = await mkdtemp('/tmp/mechanicus-v2-gen-reset-');
     logDir = path.join(fixtureRoot, 'logs');
     process.env = {
       ...originalEnv,
@@ -75,7 +75,7 @@ describe('v2 generation warning latches', () => {
       XDG_CACHE_HOME: path.join(fixtureRoot, 'xdg-cache'),
       OPENCODE_LOG_DIR: logDir,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
     initLogger('gen-reset-test');
   });
 
@@ -147,10 +147,7 @@ describe('v2 generation warning latches', () => {
 
     const projectDir = path.join(fixtureRoot, 'project');
     await Bun.write(
-      path.join(
-        process.env.OPENCODE_CONFIG_DIR as string,
-        'oh-my-opencode-slim.json',
-      ),
+      path.join(process.env.OPENCODE_CONFIG_DIR as string, 'mechanicus.json'),
       JSON.stringify({ companion: { enabled: false } }),
     );
 

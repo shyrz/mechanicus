@@ -466,7 +466,9 @@ async function main() {
   }
   const opencode = requireOpenCodeBinary();
   const localPlugin = requireLocalPluginTree();
-  const tempRoot = mkdtempSync(path.join(tmpdir(), 'omos-cache-stability-'));
+  const tempRoot = mkdtempSync(
+    path.join(tmpdir(), 'mechanicus-cache-stability-'),
+  );
   let host: ReturnType<typeof spawn> | undefined;
   let capture: Awaited<ReturnType<typeof createCaptureServer>> | undefined;
   try {
@@ -485,20 +487,17 @@ async function main() {
     mkdirSync(plugins, { recursive: true });
     const configNodeModules = path.join(config, 'node_modules');
     mkdirSync(configNodeModules, { recursive: true });
-    symlinkSync(
-      localPlugin.plugin,
-      path.join(configNodeModules, 'oh-my-opencode-slim'),
-    );
+    symlinkSync(localPlugin.plugin, path.join(configNodeModules, 'mechanicus'));
     writeFileSync(
       path.join(config, 'package.json'),
       JSON.stringify({
         type: 'module',
-        dependencies: { 'oh-my-opencode-slim': `file:${localPlugin.plugin}` },
+        dependencies: { mechanicus: `file:${localPlugin.plugin}` },
       }),
     );
     writeFileSync(
       path.join(plugins, 'load-plugin.js'),
-      "export { default } from 'oh-my-opencode-slim';\n",
+      "export { default } from 'mechanicus';\n",
     );
     capture = await createCaptureServer(readPath);
     writeFileSync(

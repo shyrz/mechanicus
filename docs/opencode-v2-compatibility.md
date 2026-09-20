@@ -1,6 +1,6 @@
 # OpenCode v2 (`opencode2`) Compatibility
 
-oh-my-opencode-slim installs and runs on **both** OpenCode v1 (`opencode`)
+mechanicus installs and runs on **both** OpenCode v1 (`opencode`)
 and OpenCode v2 (`opencode2`) from a single published package. This document
 describes how each host loads the plugin, what is supported where, and how to
 register it.
@@ -18,7 +18,7 @@ The package's default export is an object:
 
 ```ts
 export default {
-  id: 'oh-my-opencode-slim',
+  id: 'mechanicus',
   server: OhMyOpenCodeLite, // v1 plugin function (PluginInput) => Promise<Hooks>
   setup: createV2Setup(),   // v2 promise-plugin setup (ctx) => Promise<cleanup>
 };
@@ -152,7 +152,7 @@ its probe only ever matters on non-stable host builds.
      the built-in MCPs)
    - `command` → `ctx.command.transform` — v2 command drafts are add-only:
      `draft.add({name, description, execute})`. `execute` submits a
-     `<omos-cmd-command data-name="...">` marker as a user prompt; the
+     `<mechanicus-cmd-command data-name="...">` marker as a user prompt; the
      session context hook recovers it and dispatches to the v1
      `command.execute.before` hook (deepwork/reflect/loop)
     - a single `ctx.session.hook("context")` handles the system/messages
@@ -527,7 +527,7 @@ is not read for plugin config):
 
 ```json
 {
-  "plugin": ["oh-my-opencode-slim@2.2.17"]
+  "plugin": ["mechanicus@2.2.17"]
 }
 ```
 
@@ -536,7 +536,7 @@ For local development, point the config at the built `dist/server`
 
 ```json
 {
-  "plugin": ["/path/to/oh-my-opencode-slim/dist/server"]
+  "plugin": ["/path/to/mechanicus/dist/server"]
 }
 ```
 
@@ -568,7 +568,7 @@ orchestrator should name explorer, librarian, oracle, designer, fixer.
 ## Configuring models on v2
 
 Agent models are resolved the same way as v1 (per-agent `model` in
-`oh-my-opencode-slim.json`, or inherited from the session/host default). On
+`mechanicus.json`, or inherited from the session/host default). On
 v2, set a working provider+model in your config or the plugin's config file
 so delegated subagents can run.
 

@@ -244,7 +244,7 @@ describe('v2 client shim delegation', () => {
       i: {
         sessionID: 'ses_1',
         delivery: 'queue',
-        metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+        metadata: { 'mechanicus.internalInitiator': true },
       },
     });
     expect((seq[0].i as { text: string }).text).toContain(
@@ -298,7 +298,7 @@ describe('v2 client shim delegation', () => {
       sessionID: 'ses_1',
       delivery: 'queue',
       resume: true,
-      metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+      metadata: { 'mechanicus.internalInitiator': true },
     });
     expect(typeof (seq[0].i as { description?: unknown }).description).toBe(
       'string',
@@ -443,7 +443,7 @@ describe('v2 client shim delegation', () => {
     expect(seq[0].i).toMatchObject({
       sessionID: 'ses_1',
       delivery: 'steer',
-      metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+      metadata: { 'mechanicus.internalInitiator': true },
     });
     expect((seq[0].i as { text: string }).text).toContain(
       'analyze this screenshot',
@@ -1388,7 +1388,7 @@ describe('v2 client shim degradation notices (one-time per process)', () => {
     // shim's module-level one-time guards a fresh process — exactly the
     // "per plugin process" contract under test.
     const logDir = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'omos-client-shim-log-'),
+      path.join(os.tmpdir(), 'mechanicus-client-shim-log-'),
     );
     const workerSource = `
       const { buildPluginInput } = await import(
@@ -1433,7 +1433,7 @@ describe('v2 client shim degradation notices (one-time per process)', () => {
         ).href,
         LOG_FILE_PATH: path.join(
           logDir,
-          'oh-my-opencode-slim.client-shim-degradation.log',
+          'mechanicus.client-shim-degradation.log',
         ),
       },
       stdout: 'pipe',

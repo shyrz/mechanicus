@@ -68,11 +68,11 @@ export function getConfigJsonc(): string {
 }
 
 export function getLiteConfig(): string {
-  return join(getConfigDir(), 'oh-my-opencode-slim.json');
+  return join(getConfigDir(), 'mechanicus.json');
 }
 
 export function getLiteConfigJsonc(): string {
-  return join(getConfigDir(), 'oh-my-opencode-slim.jsonc');
+  return join(getConfigDir(), 'mechanicus.jsonc');
 }
 
 export function getTuiConfig(): string {

@@ -521,7 +521,7 @@ export function buildPluginInput(
             sessionID: sessionIDOf(args),
             id: internalMessageID,
             text: textFromBody(args),
-            description: 'oh-my-opencode-slim internal initiator',
+            description: 'mechanicus internal initiator',
             ...(metadata ? { metadata } : {}),
             delivery,
             resume: true,

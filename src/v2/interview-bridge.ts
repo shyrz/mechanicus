@@ -18,13 +18,13 @@ import type {
 } from './types';
 
 export const INTERVIEW_COMMAND_MARKER =
-  '<omos-interview-command>$ARGUMENTS</omos-interview-command>';
+  '<mechanicus-interview-command>$ARGUMENTS</mechanicus-interview-command>';
 
 // Whole-text anchored: v2 writes the marker as the entire submitted prompt,
 // so whole-text anchoring is the contract. A user-typed embedded marker must
 // not hijack dispatch in the merged session context hook.
 const MARKER_PATTERN =
-  /^\s*<omos-interview-command>\s*([\s\S]*?)\s*<\/omos-interview-command>\s*$/;
+  /^\s*<mechanicus-interview-command>\s*([\s\S]*?)\s*<\/mechanicus-interview-command>\s*$/;
 
 /** Render the `/interview` command marker with the given arguments. */
 export function markerText(args: string): string {

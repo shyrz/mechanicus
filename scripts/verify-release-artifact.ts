@@ -17,8 +17,8 @@ const repoRoot = path.resolve(__dirname, '..');
 const distDir = path.join(repoRoot, 'dist');
 
 const suspiciousPathPatterns = [
-  /\/Users\/[^\s'"`]+(?:node_modules|oh-my-opencode-slim)[^\s'"`]*/,
-  /\/home\/[^\s'"`]+(?:node_modules|oh-my-opencode-slim)[^\s'"`]*/,
+  /\/Users\/[^\s'"`]+(?:node_modules|mechanicus)[^\s'"`]*/,
+  /\/home\/[^\s'"`]+(?:node_modules|mechanicus)[^\s'"`]*/,
 ];
 const suspiciousImportPatterns = [/from\s+["']vscode-jsonrpc\/node["']/];
 
@@ -32,7 +32,7 @@ const packagedRequiredFiles = [
   'dist/tui.js',
   'dist/tui.d.ts',
   'dist/cli/index.js',
-  'oh-my-opencode-slim.schema.json',
+  'mechanicus.schema.json',
   'src/companion/companion-manifest.json',
   'src/skills/simplify/SKILL.md',
   'src/skills/codemap/SKILL.md',
@@ -40,7 +40,7 @@ const packagedRequiredFiles = [
   'src/skills/deepwork/SKILL.md',
   'src/skills/verification-planning/SKILL.md',
   'src/skills/reflect/SKILL.md',
-  'src/skills/oh-my-opencode-slim/SKILL.md',
+  'src/skills/mechanicus/SKILL.md',
   'src/skills/worktrees/SKILL.md',
 ];
 
@@ -157,7 +157,7 @@ function packArtifact() {
 }
 
 function verifyFreshInstall(tarballPath: string) {
-  const tempRoot = mkdtempSync(path.join(tmpdir(), 'omos-release-'));
+  const tempRoot = mkdtempSync(path.join(tmpdir(), 'mechanicus-release-'));
 
   try {
     console.log('Installing packed artifact into clean temp project...');
@@ -181,7 +181,7 @@ function verifyFreshInstall(tarballPath: string) {
     const installedEntry = path.join(
       installDir,
       'node_modules',
-      'oh-my-opencode-slim',
+      'mechanicus',
       'dist',
       'index.js',
     );
@@ -196,8 +196,8 @@ function verifyFreshInstall(tarballPath: string) {
     }
 
     const smokeScript = [
-      "import pkg from 'oh-my-opencode-slim';",
-      "if (pkg?.id !== 'oh-my-opencode-slim') throw new Error('default export has an unexpected plugin id');",
+      "import pkg from 'mechanicus';",
+      "if (pkg?.id !== 'mechanicus') throw new Error('default export has an unexpected plugin id');",
       "if (typeof pkg.server !== 'function') throw new Error('default export is missing a server plugin factory');",
       "if (typeof pkg.setup !== 'function') throw new Error('default export is missing a v2 setup factory');",
       'const asyncNoop = async () => ({});',
@@ -247,8 +247,8 @@ function verifyFreshInstall(tarballPath: string) {
     });
 
     const tuiSmokeScript = [
-      "import pkg from 'oh-my-opencode-slim/tui';",
-      "if (pkg?.id !== 'oh-my-opencode-slim:tui') throw new Error('TUI export has an unexpected plugin id');",
+      "import pkg from 'mechanicus/tui';",
+      "if (pkg?.id !== 'mechanicus:tui') throw new Error('TUI export has an unexpected plugin id');",
       "if (typeof pkg.tui !== 'function') throw new Error('TUI export is missing its v1 factory');",
       "if (typeof pkg.setup !== 'function') throw new Error('TUI export is missing its v2 setup factory');",
       "console.log('TUI package loads');",
@@ -260,8 +260,8 @@ function verifyFreshInstall(tarballPath: string) {
     // v2 hosts install this package with `subpaths: ["server", ""]`; the
     // exports map must resolve ./server to the self-contained bundle.
     const serverSmokeScript = [
-      "import pkg from 'oh-my-opencode-slim/server';",
-      "if (pkg?.id !== 'oh-my-opencode-slim') throw new Error('server export has an unexpected plugin id');",
+      "import pkg from 'mechanicus/server';",
+      "if (pkg?.id !== 'mechanicus') throw new Error('server export has an unexpected plugin id');",
       "if (typeof pkg.server !== 'function') throw new Error('server export is missing a v1 plugin factory');",
       "if (typeof pkg.setup !== 'function') throw new Error('server export is missing a v2 setup factory');",
       "console.log('server package loads');",

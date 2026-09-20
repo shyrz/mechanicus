@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We actively support and patch security issues in the following versions of `oh-my-opencode-slim`:
+We actively support and patch security issues in the following versions of `mechanicus`:
 
 | Version | Supported |
 | ------- | --------- |
@@ -11,7 +11,7 @@ We actively support and patch security issues in the following versions of `oh-m
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in this project, please do not open a public issue. Instead, use GitHub's private vulnerability reporting at https://github.com/alvinunreal/oh-my-opencode-slim/security/advisories/new, or reach out to @alvinunreal directly.
+If you discover a security vulnerability in this project, please do not open a public issue. Instead, use GitHub's private vulnerability reporting at https://github.com/shyrz/mechanicus/security/advisories/new, or reach out to @alvinunreal directly.
 
 Please include:
 1. Detailed description of the vulnerability.

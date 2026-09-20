@@ -24,7 +24,7 @@
  *     `convertToModelMessages` forwards as `providerOptions`.
  *
  * `providerOptions` is validated as `Record<string, Record<string, JSONValue>>`.
- * A board part's metadata is `{ 'oh-my-opencode-slim.backgroundJobBoard': true }`
+ * A board part's metadata is `{ 'mechanicus.backgroundJobBoard': true }`
  * — a boolean where a nested record is required — so the request failed schema
  * validation before the HTTP call. This is why the failure only appeared in
  * sessions with assistant tails (a finishing background `task` turn), only

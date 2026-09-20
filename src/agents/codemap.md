@@ -25,7 +25,7 @@ Each agent is a **prompt-driven specialist** with a factory function that create
 ### Configuration System
 
 - **Default prompts**: Each agent factory has a base prompt defined in its file (e.g., `explorer.ts`, `oracle.ts`)
-- **User overrides**: From `~/.config/opencode/oh-my-opencode-slim.json` via `loadAgentPrompt()`
+- **User overrides**: From `~/.config/opencode/mechanicus.json` via `loadAgentPrompt()`
 - **Agent colors**: Optional per-agent hex or theme-color overrides; no defaults (colorless agents get the host TUI's distinct palette colors)
 - **Permission wildcards**: Applied via `applyDefaultPermissions()` in `index.ts`
 - **Model resolution**: Supports string models, explicit `inheritModelFrom` policies, and priority-ordered arrays (`_modelArray`) for runtime fallback
@@ -140,7 +140,7 @@ const agents = getAgentConfigs(config);
 
 // Register with OpenCode SDK
 return {
-  name: 'oh-my-opencode-slim',
+  name: 'mechanicus',
   agent: agents, // SDK agent configs
   tool: tools,  // Tools including council tools
   mcp: mcps,    // MCP servers

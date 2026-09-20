@@ -55,7 +55,7 @@ export interface TuiSnapshot {
   reusableByAgent: Record<string, Record<string, TuiReusableSession>>;
 }
 
-const STATE_DIR = 'oh-my-opencode-slim';
+const STATE_DIR = 'mechanicus';
 const STATE_FILE = 'tui-state.json';
 const STATE_LOCK_RETRY_MS = 5;
 const STATE_LOCK_TIMEOUT_MS = 1_000;

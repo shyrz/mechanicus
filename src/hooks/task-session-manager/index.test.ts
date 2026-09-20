@@ -3218,7 +3218,7 @@ describe('task-session-manager hook', () => {
     ]);
     await transformMessages(hook, replayedRequest);
     expect(boardSnapshotIDs(replayedRequest)).toEqual([
-      'oh-my-opencode-slim:background-job-board:parent-1:0',
+      'mechanicus:background-job-board:parent-1:0',
     ]);
 
     await hook.event({
@@ -3262,7 +3262,7 @@ describe('task-session-manager hook', () => {
     const firstBoardText = boardText(firstRequest);
     expect(firstBoardText).toContain('Result: same result');
     expect(boardSnapshotIDs(firstRequest)).toEqual([
-      'oh-my-opencode-slim:background-job-board:parent-1:0',
+      'mechanicus:background-job-board:parent-1:0',
     ]);
 
     await hook.event({
@@ -3312,8 +3312,8 @@ describe('task-session-manager hook', () => {
     };
     await transformMessages(hook, secondRequest);
     expect(boardSnapshotIDs(secondRequest)).toEqual([
-      'oh-my-opencode-slim:background-job-board:parent-1:0',
-      'oh-my-opencode-slim:background-job-board:parent-1:1',
+      'mechanicus:background-job-board:parent-1:0',
+      'mechanicus:background-job-board:parent-1:1',
     ]);
 
     await hook.event({
@@ -8461,7 +8461,7 @@ describe('task-session-manager hook', () => {
           {
             type: 'text',
             text: 'board snapshot',
-            metadata: { 'oh-my-opencode-slim.backgroundJobBoard': true },
+            metadata: { 'mechanicus.backgroundJobBoard': true },
           },
         ],
       },

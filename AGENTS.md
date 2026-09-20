@@ -4,7 +4,7 @@ This document provides guidelines for AI agents operating in this repository.
 
 ## Project Overview
 
-**oh-my-opencode-slim** - A lightweight agent orchestration plugin for OpenCode, a slimmed-down fork of oh-my-opencode. Built with TypeScript, Bun, and Biome.
+**mechanicus** - A lightweight agent orchestration plugin for OpenCode, a slimmed-down fork of oh-my-opencode. Built with TypeScript, Bun, and Biome.
 
 ## Commands
 
@@ -63,7 +63,7 @@ bun test -t "test-name-pattern"
 ## Project Structure
 
 ```
-oh-my-opencode-slim/
+mechanicus/
 ├── src/
 │   ├── agents/       # Agent factories (orchestrator, explorer, oracle, etc.)
 │   ├── cli/          # CLI entry point
@@ -173,7 +173,7 @@ Log files are named with timestamps (e.g., 2025-01-09T123456.log) and the most r
 You can set the log level with the --log-level command-line option to get more detailed debug information. For example, opencode --log-level DEBUG.
 
 ### Plugin
-~/.local/share/opencode/log/oh-my-opencode-slim.<timestamp>.log
+~/.local/share/opencode/log/mechanicus.<timestamp>.log
 
 ## Cloned Dependency Source
 
@@ -189,7 +189,7 @@ Read-only dependency source repositories are available under
 
 ### Issue tracker
 
-Issues and PRs are tracked on GitHub (`alvinunreal/oh-my-opencode-slim`); external PRs are a triage surface. See `docs/agents/issue-tracker.md`.
+Issues and PRs are tracked on GitHub (`shyrz/mechanicus`); external PRs are a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

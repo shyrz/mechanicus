@@ -31,7 +31,7 @@ import type {
   OpenCodeConfig,
 } from './types';
 
-const PACKAGE_NAME = 'oh-my-opencode-slim';
+const PACKAGE_NAME = 'mechanicus';
 const DEFAULT_OPENCODE_AGENTS_TO_DISABLE = ['explore', 'general'] as const;
 
 function isString(value: unknown): value is string {
@@ -478,7 +478,7 @@ export async function addPluginToOpenCodeConfig(): Promise<ConfigMergeResult> {
 
     const pluginEntry = getPluginEntry();
 
-    // Remove existing oh-my-opencode-slim entries
+    // Remove existing mechanicus entries
     const filteredPlugins = plugins.filter(
       (plugin) => !isMatchingPluginEntry(plugin),
     );

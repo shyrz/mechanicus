@@ -19,7 +19,7 @@ the built-in `/models`, so it triggers no LLM turn.
 
 ## How It Works
 
-1. Define named presets in `oh-my-opencode-slim.jsonc` under the `presets`
+1. Define named presets in `mechanicus.jsonc` under the `presets`
    field, or create them interactively from the manager
 2. The manager writes preset changes to the user config file
 3. **Apply** persists the preset name to the config file only — the
@@ -90,7 +90,7 @@ There are two ways to activate a preset:
 
 | Method | How | Persists? |
 |--------|-----|-----------|
-| Config file | Set `"preset": "cheap"` in `oh-my-opencode-slim.jsonc` | Yes, across restarts |
+| Config file | Set `"preset": "cheap"` in `mechanicus.jsonc` | Yes, across restarts |
 | `/preset` TUI command | Select a preset from the picker during a session | Yes — writes to config file |
 
 The `/preset` TUI command writes the selected preset name to the config file,

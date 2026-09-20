@@ -16,7 +16,7 @@ while OpenCode keeps running in your main session.
 
 ## Overview
 
-When OpenCode launches child agent sessions, oh-my-opencode-slim can open panes for those sessions automatically.
+When OpenCode launches child agent sessions, mechanicus can open panes for those sessions automatically.
 
 - **Real-time visibility** into agent activity
 - **Automatic pane management** while tasks run
@@ -48,7 +48,7 @@ This zsh helper preserves an explicit `--port` and exports the matching
 and starts OpenCode with that port explicitly:
 
 ```zsh
-omos() {
+mechanicus() {
   local port arg
 
   for arg in "$@"; do
@@ -85,7 +85,7 @@ omos() {
 
 ### 1. Enable the multiplexer
 
-Edit `~/.config/opencode/oh-my-opencode-slim.json` (or `.jsonc`):
+Edit `~/.config/opencode/mechanicus.json` (or `.jsonc`):
 
 **Auto-detect (recommended):**
 
@@ -142,7 +142,7 @@ For Marketplace discoverability, publish this repository with the required
 `herdr-plugin` repository topic, then install it with:
 
 ```bash
-herdr plugin install alvinunreal/oh-my-opencode-slim
+herdr plugin install shyrz/mechanicus
 ```
 
 The Marketplace entry describes this OpenCode plugin's Herdr adapter. It does
@@ -271,7 +271,7 @@ subtrees, so the adapter assumes its managed right-hand agent column is the
 only vertical subtree in the workspace that should be automatically
 equalized. `layout` and `main_pane_size` do not alter cmux's left/right width.
 
-cmux follows the OpenCode/OMO lifecycle rather than using a placeholder pane.
+cmux follows the OpenCode/Mechanicus lifecycle rather than using a placeholder pane.
 Attach commands require an existing absolute OpenCode executable, resolved in
 the order explicit setting, `OPENCODE_BIN`, `process.execPath`, and
 `process.argv[0]`. If none is valid, no surface is created and a bare

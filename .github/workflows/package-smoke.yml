@@ -10,7 +10,7 @@ on:
       - 'bun.lock'
       - 'bunfig.toml'
       - 'tsconfig.json'
-      - 'oh-my-opencode-slim.schema.json'
+      - 'mechanicus.schema.json'
       - 'LICENSE'
       - 'README*.md'
       - 'scripts/generate-schema.ts'

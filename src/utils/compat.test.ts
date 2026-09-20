@@ -147,7 +147,7 @@ describe('resolveWindowsCommand', () => {
   it('returns undefined when nothing on PATH matches', () => {
     const dir = fixtureDir('empty', []);
     const resolved = resolveWindowsCommand(
-      'definitely-missing-omos-cmd',
+      'definitely-missing-mechanicus-cmd',
       joinPathEnv([dir]),
       '.COM;.EXE;.BAT;.CMD',
     );
@@ -157,7 +157,7 @@ describe('resolveWindowsCommand', () => {
   it('treats an empty PATH component as the current directory', () => {
     // cmd.exe semantics: a PATH entry that is empty after splitting
     // points at the cwd, so `dir1;;dir2` searches cwd between them.
-    const marker = `omos-cwd-probe-${process.pid}.cmd`;
+    const marker = `mechanicus-cwd-probe-${process.pid}.cmd`;
     writeFileSync(marker, '');
     try {
       const resolved = resolveWindowsCommand(

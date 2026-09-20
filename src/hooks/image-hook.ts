@@ -21,8 +21,7 @@ const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 /** Exact bytes previously written by this plugin for `.opencode/.gitignore`. */
 const LEGACY_OPENCODE_GITIGNORE_BYTES = Buffer.from('*\n');
-const LEGACY_OPENCODE_GITIGNORE_BACKUP =
-  '.gitignore.oh-my-opencode-slim-legacy';
+const LEGACY_OPENCODE_GITIGNORE_BACKUP = '.gitignore.mechanicus-legacy';
 /** Correct scoped rule: ignore only the images directory under `.opencode/`. */
 const IMAGES_GITIGNORE_RULE = 'images/';
 const IMAGES_GITIGNORE_BYTES = Buffer.from(`${IMAGES_GITIGNORE_RULE}\n`);
@@ -521,7 +520,7 @@ export function processImageAttachments(args: {
 
   // Only the images directory is ignored. A bare '*' (legacy plugin output)
   // ignores all of `.opencode/` — including project config
-  // (.opencode/oh-my-opencode-slim.json) and prompt overrides.
+  // (.opencode/mechanicus.json) and prompt overrides.
   ensureImagesGitignore(workDir, log);
 
   cleanupAllSessions(saveDir);

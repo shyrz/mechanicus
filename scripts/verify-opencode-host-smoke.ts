@@ -179,7 +179,9 @@ function omitOpencodeEnv(env: NodeJS.ProcessEnv) {
 }
 
 async function verifyHostSmoke(tarballPath: string) {
-  const tempRoot = mkdtempSync(path.join(tmpdir(), 'omos-opencode-smoke-'));
+  const tempRoot = mkdtempSync(
+    path.join(tmpdir(), 'mechanicus-opencode-smoke-'),
+  );
   const homeDir = path.join(tempRoot, 'home');
   const configDir = path.join(tempRoot, 'config');
   const cacheDir = path.join(tempRoot, 'cache');
@@ -233,7 +235,7 @@ async function verifyHostSmoke(tarballPath: string) {
         {
           type: 'module',
           dependencies: {
-            'oh-my-opencode-slim': `file:${tarballTarget}`,
+            mechanicus: `file:${tarballTarget}`,
           },
         },
         null,
@@ -241,8 +243,8 @@ async function verifyHostSmoke(tarballPath: string) {
       ),
     );
     writeFileSync(
-      path.join(pluginDir, 'load-oh-my-opencode-slim.js'),
-      "export { default } from 'oh-my-opencode-slim';\n",
+      path.join(pluginDir, 'load-mechanicus.js'),
+      "export { default } from 'mechanicus';\n",
     );
 
     const config = JSON.stringify({

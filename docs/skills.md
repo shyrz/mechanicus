@@ -5,10 +5,10 @@ Unlike MCPs (which are running servers), skills are **prompt-based instructions*
 injected into an agent's system prompt to guide decisions, workflows, and, when
 relevant, tool use.
 
-Bundled skills are installed by the `oh-my-opencode-slim` installer and safely
+Bundled skills are installed by the `mechanicus` installer and safely
 reconciled on plugin startup/auto-update. Local customizations are preserved;
 new bundled versions for customized skills are staged under
-`~/.config/opencode/.oh-my-opencode-slim/skill-updates/` for manual review.
+`~/.config/opencode/.mechanicus/skill-updates/` for manual review.
 
 ---
 
@@ -33,7 +33,7 @@ broader evidence only when the change's risk or uncertainty warrants it.
 | [`verification-planning`](#verification-planning) | Design project-specific evidence before implementation | `orchestrator` |
 | [`reflect`](#reflect) | Review repeated work and suggest reusable workflow improvements | `orchestrator` |
 | [`worktrees`](#worktrees) | Safe Git worktree lane management | `orchestrator` |
-| [`oh-my-opencode-slim`](#oh-my-opencode-slim) | Plugin configuration and self-improvement guidance | `orchestrator` |
+| [`mechanicus`](#mechanicus) | Plugin configuration and self-improvement guidance | `orchestrator` |
 
 ---
 
@@ -227,7 +227,7 @@ Other agents can be delegated tasks inside the worktree lane, but the Orchestrat
 Safety defaults:
 - Pre-flight check on Git repo status and dirty worktrees.
 - Strict confirmation gates for all git modifications (`worktree add/remove`, `merge`, `rebase`, `cherry-pick`, `reset --hard`, branch operations).
-- Branch names default to `omo/<slug>` but respect custom user patterns.
+- Branch names default to `mechanicus/<slug>` but respect custom user patterns.
 - Use a proportionate final-state verification plan before final integration,
   including checks required by repository and release instructions.
 
@@ -235,11 +235,11 @@ See **[Worktrees](worktrees.md)** for the detailed safety protocol.
 
 ---
 
-## oh-my-opencode-slim
+## mechanicus
 
 **Configure, customize, and safely improve this plugin setup.**
 
-`oh-my-opencode-slim` is an orchestrator-only skill that teaches agents how to
+`mechanicus` is an orchestrator-only skill that teaches agents how to
 configure the plugin itself: model presets, custom agents, agent prompts,
 `orchestratorPrompt` delegation hints, skills, MCP permissions, optional agents,
 and related OpenCode config files.
@@ -256,7 +256,7 @@ changes to take effect.
 Typical requests:
 
 ```text
-Tune my oh-my-opencode-slim models for lower cost.
+Tune my mechanicus models for lower cost.
 Add a custom API reviewer agent.
 Make the Orchestrator more conservative about parallel writer agents.
 Help me configure MCP access for Librarian only.
@@ -272,7 +272,7 @@ This should apply on the next OpenCode run; restart OpenCode if you need it imme
 
 ## Skills Assignment
 
-Control which skills each agent can use in `~/.config/opencode/oh-my-opencode-slim.json` (or `.jsonc`):
+Control which skills each agent can use in `~/.config/opencode/mechanicus.json` (or `.jsonc`):
 
 | Syntax | Meaning |
 |--------|---------|

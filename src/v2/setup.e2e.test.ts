@@ -268,7 +268,7 @@ describe('createV2Setup e2e', () => {
 
   const readPluginLog = (): string => {
     const files = readDirSync(logDir).filter(
-      (f) => f.startsWith('oh-my-opencode-slim.') && f.endsWith('.log'),
+      (f) => f.startsWith('mechanicus.') && f.endsWith('.log'),
     );
     return files
       .map((f) => readFileSync(path.join(logDir, f), 'utf8'))
@@ -282,12 +282,12 @@ describe('createV2Setup e2e', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    fixtureRoot = await mkdtemp('/tmp/omo-v2-setup-e2e-');
+    fixtureRoot = await mkdtemp('/tmp/mechanicus-v2-setup-e2e-');
     projectDir = path.join(fixtureRoot, 'project');
     configDir = path.join(fixtureRoot, 'config');
     logDir = path.join(fixtureRoot, 'logs');
     await Bun.write(
-      path.join(configDir, 'oh-my-opencode-slim.json'),
+      path.join(configDir, 'mechanicus.json'),
       // Minimal fixture: empty plugin config with the companion disabled so
       // factory init stays hermetic (no user config, no side processes).
       JSON.stringify({ companion: { enabled: false } }),
@@ -300,7 +300,7 @@ describe('createV2Setup e2e', () => {
       XDG_CACHE_HOME: path.join(fixtureRoot, 'xdg-cache'),
       OPENCODE_LOG_DIR: logDir,
     };
-    delete process.env.OH_MY_OPENCODE_SLIM_DISABLE;
+    delete process.env.MECHANICUS_DISABLE;
   });
 
   afterEach(async () => {
@@ -530,7 +530,7 @@ describe('createV2Setup e2e', () => {
     // resets it instead of retaining the previous activation.
     const seeded = new Map<string, unknown>([
       [
-        'omo/bgj/tombstone/ses_seeded_before_setup',
+        'mechanicus/bgj/tombstone/ses_seeded_before_setup',
         { taskID: 'ses_seeded_before_setup', epoch: 1, recordedAt: 1 },
       ],
     ]);

@@ -3,14 +3,13 @@ import { isRecord } from './guards';
 export const SLIM_INTERNAL_INITIATOR_MARKER =
   '<!-- SLIM_INTERNAL_INITIATOR -->';
 
-export const INTERNAL_INITIATOR_METADATA_KEY =
-  'oh-my-opencode-slim.internalInitiator';
+export const INTERNAL_INITIATOR_METADATA_KEY = 'mechanicus.internalInitiator';
 
 export function createInternalAgentTextPart(text: string): {
   type: 'text';
   text: string;
   synthetic: true;
-  metadata: { 'oh-my-opencode-slim.internalInitiator': true };
+  metadata: { 'mechanicus.internalInitiator': true };
 } {
   return {
     type: 'text',

@@ -47,7 +47,7 @@ A glossary of the terms used in this project's domain. Definitions describe what
 
 ## Skills
 
-- **Skill** — A bundled, self-contained workflow or capability shipped with the plugin. Bundled skills: codemap, clonedeps, simplify, deepwork, reflect, worktrees, oh-my-opencode-slim. Note: `loop-engineering` exists on disk but is not registered as a bundled skill.
+- **Skill** — A bundled, self-contained workflow or capability shipped with the plugin. Bundled skills: codemap, clonedeps, simplify, deepwork, reflect, worktrees, mechanicus. Note: `loop-engineering` exists on disk but is not registered as a bundled skill.
 
 ## Hooks
 
@@ -74,7 +74,7 @@ A glossary of the terms used in this project's domain. Definitions describe what
 
 ## Config
 
-- **Plugin config** — The user-facing configuration loaded from `oh-my-opencode-slim.jsonc`.
+- **Plugin config** — The user-facing configuration loaded from `mechanicus.jsonc`.
 - **Preset** — A named set of per-agent overrides. The same word also names council councillor lineups (see Flagged).
 - **Model entry** — A normalized model reference with an optional variant, used in fallback chains.
 - **Model inheritance** — An explicit agent policy selecting the current `session` model or the configured `orchestrator` model when no agent model is set.

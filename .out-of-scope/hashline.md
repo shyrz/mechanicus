@@ -17,7 +17,7 @@ inject and validate anchors and track file snapshots for stale-anchor recovery.
 That is a deep, behavior-changing modification to the fundamental edit loop —
 fragile to bolt onto a slim plugin that intentionally avoids reimplementing tool
 plumbing. It belongs in OpenCode core itself or a dedicated standalone plugin,
-not in oh-my-opencode-slim.
+not in mechanicus.
 
 Token savings are real (reported ~61% fewer output tokens on Grok 4 Fast, ~8%
 better on Gemini), but the integration cost and architectural fit put it

@@ -88,7 +88,7 @@ function checkConfigFile(
     // validation, so a string value (e.g. "explorer") is not diagnosed as a
     // false invalid-schema error. Report each normalization to the user.
     normalizeDisabledArrayKeys(rawConfig, (message) => {
-      console.warn(`[oh-my-opencode-slim] ${message}`);
+      console.warn(`[mechanicus] ${message}`);
     });
     const parseResult = PluginConfigSchema.safeParse(rawConfig);
 
@@ -158,7 +158,7 @@ function checkConfigFile(
 function checkPreset(
   mergedConfig: PluginConfig,
 ): PresetCheckResult | undefined {
-  const envPreset = process.env.OH_MY_OPENCODE_SLIM_PRESET;
+  const envPreset = process.env.MECHANICUS_PRESET;
   const presetName = envPreset || mergedConfig.preset;
 
   if (presetName === undefined) {
@@ -268,7 +268,7 @@ export function formatJsonDoctorResult(result: DoctorResult): string {
 
 export async function doctor(args: DoctorArgs): Promise<number> {
   if (args.help) {
-    console.log(`Usage: oh-my-opencode-slim doctor [OPTIONS]
+    console.log(`Usage: mechanicus doctor [OPTIONS]
 
 Options:
   --json              Print diagnostics as JSON

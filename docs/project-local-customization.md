@@ -1,11 +1,11 @@
 # Project-local Customization
 
-This document describes how to configure and customize oh-my-opencode-slim on a per-project (repository-specific) basis. Project-local customization lets teams and repositories define custom agents, override systemic prompts, restrict skills, and set MCP configurations without affecting global user configurations.
+This document describes how to configure and customize mechanicus on a per-project (repository-specific) basis. Project-local customization lets teams and repositories define custom agents, override systemic prompts, restrict skills, and set MCP configurations without affecting global user configurations.
 
 ## Security & Trust Boundary Warning
 
 > ⚠️ **IMPORTANT SECURITY NOTICE**
-> Because project-local configuration files (`.opencode/oh-my-opencode-slim.jsonc`) and prompt templates (`.opencode/oh-my-opencode-slim/`) are loaded automatically when you open and work in a project directory, they can modify agent behaviors, enable/disable tools, and grant extra model access permissions.
+> Because project-local configuration files (`.opencode/mechanicus.jsonc`) and prompt templates (`.opencode/mechanicus/`) are loaded automatically when you open and work in a project directory, they can modify agent behaviors, enable/disable tools, and grant extra model access permissions.
 > **Only work in and run OpenCode within repositories you explicitly trust.**
 
 ---
@@ -14,10 +14,10 @@ This document describes how to configure and customize oh-my-opencode-slim on a 
 
 | Feature | Scope / Location | Description |
 |---|---|---|
-| **Configuration file** | `.opencode/oh-my-opencode-slim.json[c]` | Project-level configuration file that overrides global user settings, merging presets, agent profiles, and multiplexer integration. |
+| **Configuration file** | `.opencode/mechanicus.json[c]` | Project-level configuration file that overrides global user settings, merging presets, agent profiles, and multiplexer integration. |
 | **Custom agents** | `agents` configuration block | Define new specialized agents by keying them under `agents.<custom-name>` with required `model`, custom system `prompt`, and optional routing guidance. |
-| **Built-in prompt overrides** | `.opencode/oh-my-opencode-slim/<agent>.md` | Override the built-in system prompt for any agent (e.g. `oracle.md`, `explorer.md`, `orchestrator.md`, or custom agents). Acts as the default when no inline `prompt` is set in config. |
-| **Append prompts** | `.opencode/oh-my-opencode-slim/<agent>_append.md` | Append additional rules or guidelines to the existing base (inline, file, or default built-in) prompt without overriding it completely. |
+| **Built-in prompt overrides** | `.opencode/mechanicus/<agent>.md` | Override the built-in system prompt for any agent (e.g. `oracle.md`, `explorer.md`, `orchestrator.md`, or custom agents). Acts as the default when no inline `prompt` is set in config. |
+| **Append prompts** | `.opencode/mechanicus/<agent>_append.md` | Append additional rules or guidelines to the existing base (inline, file, or default built-in) prompt without overriding it completely. |
 | **Per-agent skills** | `agents.<agent>.skills` | Explicitly restrict or authorize specific local codebase skills/scripts that this agent is allowed to execute. |
 | **Automatic project-local skills** | `agents.<agent>.skills_include_local` | Add all valid skills discovered under this project's `.opencode/skills/**/SKILL.md` tree without listing every skill name. |
 | **Per-agent MCPs** | `agents.<agent>.mcps` | Assign, restrict, or authorize specific Model Context Protocol (MCP) servers (like `context7` or `gh_grep`) to specific agents. |
@@ -28,7 +28,7 @@ This document describes how to configure and customize oh-my-opencode-slim on a 
 
 ## Configuration Precedence
 
-When oh-my-opencode-slim loads, it resolves configuration properties and prompt templates across multiple layers. The inheritance precedence operates strictly as follows:
+When mechanicus loads, it resolves configuration properties and prompt templates across multiple layers. The inheritance precedence operates strictly as follows:
 
 ```
 [Built-in Defaults]
@@ -37,7 +37,7 @@ When oh-my-opencode-slim loads, it resolves configuration properties and prompt 
        ↓ (overridden by)
 [Project Config] (local repository)
        ↓ (overridden by)
-[Environment Preset Override] (via OH_MY_OPENCODE_SLIM_PRESET env var)
+[Environment Preset Override] (via MECHANICUS_PRESET env var)
        ↓ (merged into agents)
 [Active Preset] (merges preset-specific agent options)
        ↓ (overridden by)
@@ -54,7 +54,7 @@ The root `agents.*` configuration (defined at the top level of user or project c
 The `skills` array is replacement-based: when a project config defines `agents.<agent>.skills`, it replaces the inherited list wholesale. To add project-specific skills on top of an inherited list — or remove inherited skills — without duplicating that list, use the `skills_add` and `skills_remove` directives:
 
 ```jsonc
-// ~/.config/opencode/oh-my-opencode-slim.jsonc (global)
+// ~/.config/opencode/mechanicus.jsonc (global)
 {
   "agents": {
     "oracle": {
@@ -65,7 +65,7 @@ The `skills` array is replacement-based: when a project config defines `agents.<
 ```
 
 ```jsonc
-// <project>/.opencode/oh-my-opencode-slim.jsonc (project-local)
+// <project>/.opencode/mechanicus.jsonc (project-local)
 {
   "agents": {
     "oracle": {
@@ -93,7 +93,7 @@ When a repository carries several custom OpenCode skills under `.opencode/skills
 ```
 
 ```jsonc
-// <project>/.opencode/oh-my-opencode-slim.jsonc
+// <project>/.opencode/mechanicus.jsonc
 {
   "agents": {
     "oracle": {
@@ -124,16 +124,16 @@ It composes with the existing directives. For example, include all project-local
 
 ## Prompt Lookup Precedence
 
-When looking up markdown prompt template files (such as `<agent>.md` or `<agent>_append.md`), oh-my-opencode-slim searches directories in a strict hierarchical order. Precedence is evaluated for the replacement prompt file and the append prompt file **independently** in the following sequence:
+When looking up markdown prompt template files (such as `<agent>.md` or `<agent>_append.md`), mechanicus searches directories in a strict hierarchical order. Precedence is evaluated for the replacement prompt file and the append prompt file **independently** in the following sequence:
 
 1. **Project Preset Directory**
-   `<project>/.opencode/oh-my-opencode-slim/<preset>/<agent>.md` (if preset is active and safe)
+   `<project>/.opencode/mechanicus/<preset>/<agent>.md` (if preset is active and safe)
 2. **Project Root Directory**
-   `<project>/.opencode/oh-my-opencode-slim/<agent>.md`
+   `<project>/.opencode/mechanicus/<agent>.md`
 3. **User Preset Directory (Global)**
-   `<user-config-dir>/oh-my-opencode-slim/<preset>/<agent>.md`
+   `<user-config-dir>/mechanicus/<preset>/<agent>.md`
 4. **User Root Directory (Global)**
-   `<user-config-dir>/oh-my-opencode-slim/<agent>.md`
+   `<user-config-dir>/mechanicus/<agent>.md`
 
 ---
 
@@ -196,7 +196,7 @@ Every non-orchestrator agent (both built-in and custom) can define an `orchestra
 
 ### Overriding Oracle prompt in active preset
 
-Your project has the config `.opencode/oh-my-opencode-slim.jsonc`:
+Your project has the config `.opencode/mechanicus.jsonc`:
 
 ```json
 {
@@ -212,7 +212,7 @@ Your project has the config `.opencode/oh-my-opencode-slim.jsonc`:
 }
 ```
 
-If you also place a file under `.opencode/oh-my-opencode-slim/backend-preset/oracle.md` containing:
+If you also place a file under `.opencode/mechanicus/backend-preset/oracle.md` containing:
 ```
 Your primary focus is auditing backend security and performance.
 ```

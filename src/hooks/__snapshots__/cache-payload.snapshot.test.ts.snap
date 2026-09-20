@@ -253,7 +253,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
       },
       {
         "metadata": {
-          "oh-my-opencode-slim.phaseReminder": true,
+          "mechanicus.phaseReminder": true,
         },
         "synthetic": true,
         "text": 
@@ -305,7 +305,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
       },
       {
         "metadata": {
-          "oh-my-opencode-slim.phaseReminder": true,
+          "mechanicus.phaseReminder": true,
         },
         "synthetic": true,
         "text": 
@@ -367,7 +367,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
     "parts": [
       {
         "metadata": {
-          "oh-my-opencode-slim.internalInitiator": true,
+          "mechanicus.internalInitiator": true,
         },
         "synthetic": true,
         "text": 
@@ -400,7 +400,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
       },
       {
         "metadata": {
-          "oh-my-opencode-slim.phaseReminder": true,
+          "mechanicus.phaseReminder": true,
         },
         "synthetic": true,
         "text": 
@@ -452,7 +452,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
       },
       {
         "metadata": {
-          "oh-my-opencode-slim.phaseReminder": true,
+          "mechanicus.phaseReminder": true,
         },
         "synthetic": true,
         "text": 
@@ -464,7 +464,7 @@ exports[`cache-impact snapshots (update deliberately — see file header) transf
       },
       {
         "metadata": {
-          "oh-my-opencode-slim.backgroundJobBoard": true,
+          "mechanicus.backgroundJobBoard": true,
         },
         "synthetic": true,
         "text": 

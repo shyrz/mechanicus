@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { redactSecretsForLog } from './redact';
 
-const LOG_PREFIX = 'oh-my-opencode-slim.';
+const LOG_PREFIX = 'mechanicus.';
 const LOG_SUFFIX = '.log';
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -14,7 +14,7 @@ type LogSink =
   | { kind: 'stderr' };
 
 const FALLBACK_WARNING =
-  '[oh-my-opencode-slim] file logging unavailable, falling back to stderr';
+  '[mechanicus] file logging unavailable, falling back to stderr';
 
 let loggerGeneration = 0;
 let currentSink: LogSink = { kind: 'uninitialized' };

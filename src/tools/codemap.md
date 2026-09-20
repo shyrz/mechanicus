@@ -208,7 +208,7 @@ Tools Layer → Web Layer
 ### Configuration Integration
 
 - **ACP Agents**: Defined in `src/config/agents.ts`, consumed by `acp_run.ts`
-- **Presets**: Defined in plugin config (`oh-my-opencode-slim.jsonc`), persisted by `preset-switch.ts` for the TUI `/preset` manager
+- **Presets**: Defined in plugin config (`mechanicus.jsonc`), persisted by `preset-switch.ts` for the TUI `/preset` manager
 - **Task Status**: `task-status.ts` consumes `summarizeTaskStatus` from `task-policy.ts` and the live session-status snapshot
 
 

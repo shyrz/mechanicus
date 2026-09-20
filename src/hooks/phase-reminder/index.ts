@@ -19,7 +19,7 @@ import {
 
 export { PHASE_REMINDER };
 
-export const PHASE_REMINDER_METADATA_KEY = 'oh-my-opencode-slim.phaseReminder';
+export const PHASE_REMINDER_METADATA_KEY = 'mechanicus.phaseReminder';
 
 export function hasPhaseReminder(part: MessagePart): boolean {
   return isTaggedPart(part, PHASE_REMINDER_METADATA_KEY);

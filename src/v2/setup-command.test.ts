@@ -67,17 +67,17 @@ describe('command marker wrap/parse', () => {
 
   test('renders the exact marker shape', () => {
     expect(wrapCommandMarker('deepwork', 'focus')).toBe(
-      '<omos-cmd-command data-name="deepwork">focus</omos-cmd-command>',
+      '<mechanicus-cmd-command data-name="deepwork">focus</mechanicus-cmd-command>',
     );
     expect(wrapCommandMarker('loop', '')).toBe(
-      '<omos-cmd-command data-name="loop"></omos-cmd-command>',
+      '<mechanicus-cmd-command data-name="loop"></mechanicus-cmd-command>',
     );
   });
 
   test('whole-text anchored: embedded markers never match', () => {
     expect(
       parseCommandMarker(
-        'before <omos-cmd-command data-name="reflect">a b</omos-cmd-command> after',
+        'before <mechanicus-cmd-command data-name="reflect">a b</mechanicus-cmd-command> after',
       ),
     ).toBeUndefined();
   });
@@ -1539,7 +1539,7 @@ describe('createSessionPromptBridge (native session.prompt hook)', () => {
     await bridge.handlePrompt(
       makePromptEvent({
         prompt: { text: '<system-reminder>wake</system-reminder>' },
-        metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+        metadata: { 'mechanicus.internalInitiator': true },
       }),
     );
     expect(calls).toEqual([]); // deferred
@@ -1554,7 +1554,7 @@ describe('createSessionPromptBridge (native session.prompt hook)', () => {
         type: 'text',
         text: '<system-reminder>wake</system-reminder>',
         synthetic: true,
-        metadata: { 'oh-my-opencode-slim.internalInitiator': true },
+        metadata: { 'mechanicus.internalInitiator': true },
       },
     ]);
     expect(calls[0]?.agent).toBe('orchestrator');
@@ -1636,7 +1636,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
         if (!target) throw new Error('no message');
         appendTaggedSyntheticPart(target, {
           text: 'INJECTED REMINDER',
-          metadataKey: 'omos_test_tag',
+          metadataKey: 'mechanicus_test_tag',
         });
       },
       syntheticPartCacheHint: { type: 'ephemeral' },
@@ -1662,7 +1662,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
         if (!target) throw new Error('no message');
         appendTaggedSyntheticPart(target, {
           text: 'INJECTED REMINDER',
-          metadataKey: 'omos_test_tag',
+          metadataKey: 'mechanicus_test_tag',
         });
       },
     });
@@ -1675,7 +1675,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
       type: 'text',
       synthetic: true,
       text: 'INJECTED REMINDER',
-      metadata: { omos_test_tag: true },
+      metadata: { mechanicus_test_tag: true },
     });
   });
 
@@ -1690,7 +1690,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
         if (!target) throw new Error('no message');
         appendTaggedSyntheticPart(target, {
           text: 'inside',
-          metadataKey: 'omos_test_tag',
+          metadataKey: 'mechanicus_test_tag',
         });
       },
       syntheticPartCacheHint: { type: 'ephemeral' },
@@ -1706,7 +1706,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
           probe.push(...(value as Array<Record<string, unknown>>));
         },
       } as never,
-      { text: 'outside', metadataKey: 'omos_test_tag' },
+      { text: 'outside', metadataKey: 'mechanicus_test_tag' },
     );
     const outside = { ...probe.at(-1) } as Record<string, unknown>;
     expect(outside.cache).toBeUndefined();
@@ -1737,7 +1737,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
         });
         appendTaggedSyntheticPart(target, {
           text: `INJECTED ${session}`,
-          metadataKey: 'omos_test_tag',
+          metadataKey: 'mechanicus_test_tag',
         });
       };
     };

@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Core plugin implementation for **oh-my-opencode-slim**, providing:
+Core plugin implementation for **mechanicus**, providing:
 - Main plugin initialization and OpenCode integration (`index.ts`)
 - Dual v1/v2 host export: `default.server` (v1) + `default.setup` (v2 adapter via `src/v2/`)
 - Terminal User Interface (TUI) sidebar plugin for agent status display (`tui.ts`)
@@ -81,7 +81,7 @@ OpenCode Core → Plugin Initialization (index.ts)
 6. **Tmux registration**: Refreshes the active session-to-`TMUX_PANE`
    registration for parent-aware child-pane routing
 7. **Sidebar Rendering**: Renders sidebar with:
-   - Plugin header (OMO-Slim + version)
+   - Plugin header (Mechanicus + version)
    - Config status warning (if invalid)
    - Agent list with model/variant details and Braille activity indicators
 8. **Lifecycle Management**: Cleans up refresh/animation timers and owned tmux
@@ -89,7 +89,7 @@ OpenCode Core → Plugin Initialization (index.ts)
 
 ### State Persistence Flow (tui-state.ts)
 
-1. **State Path Resolution**: Determines XDG-compliant state directory (`~/.local/share/opencode/storage/oh-my-opencode-slim/tui-state.json`)
+1. **State Path Resolution**: Determines XDG-compliant state directory (`~/.local/share/opencode/storage/mechanicus/tui-state.json`)
 2. **Snapshot Operations**:
    - `readTuiSnapshot()`: Reads and parses state file (returns empty snapshot on error)
    - `readTuiSnapshotAsync()`: Async variant for TUI rendering
@@ -165,9 +165,9 @@ Key event flows:
 ### Configuration Integration
 
 - Plugin config loaded via `loadPluginConfig()` with support for:
-  - User overrides from `~/.config/opencode/oh-my-opencode-slim.json`
+  - User overrides from `~/.config/opencode/mechanicus.json`
   - Preset switching via the TUI `/preset` manager (persisted to the config file, applied on next reload)
-  - Environment-based disablement via `OH_MY_OPENCODE_SLIM_DISABLE`
+  - Environment-based disablement via `MECHANICUS_DISABLE`
 - Agent configurations merged with user settings from OpenCode config
 - Model resolution supports both string models and array-based fallback chains
 

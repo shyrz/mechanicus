@@ -9,7 +9,7 @@
  * value would be pushed into the hooks array as if it were a `Hooks`
  * object. Keeping this module internal (imported by, but not
  * re-exported from, `src/index.ts`) avoids that class of bug entirely;
- * see https://github.com/alvinunreal/oh-my-opencode-slim/issues/894.
+ * see https://github.com/shyrz/mechanicus/issues/894.
  */
 
 /** Minimum expected registrations for a healthy plugin load. */
