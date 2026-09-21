@@ -82,7 +82,7 @@ export function switchPresetOnDisk(
 
 /**
  * Build the SDK-shaped agent overrides from a preset, resolving legacy alias
- * keys (e.g. "explore" → "explorer").
+ * keys (e.g. "explore" → "magos").
  */
 export function buildAgentUpdates(preset: Preset): Record<string, AgentUpdate> {
   const agentUpdates: Record<string, AgentUpdate> = {};

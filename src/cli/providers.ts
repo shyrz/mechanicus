@@ -1,4 +1,5 @@
 import { DEFAULT_AGENT_MCPS } from '../config/agent-mcps';
+import { PRIMARY_AGENT_NAME } from '../config/constants';
 import { CUSTOM_SKILLS } from './custom-skills';
 import type { InstallConfig } from './types';
 
@@ -10,47 +11,47 @@ export const GENERATED_PRESETS = ['openai', 'opencode-go'] as const;
 // Model mappings by provider/preset.
 export const MODEL_MAPPINGS = {
   openai: {
-    orchestrator: { model: 'openai/gpt-5.6-terra', variant: 'high' },
-    oracle: { model: 'openai/gpt-5.6-sol', variant: 'high' },
-    librarian: { model: 'openai/gpt-5.6-luna', variant: 'low' },
-    explorer: { model: 'openai/gpt-5.6-luna', variant: 'low' },
-    designer: { model: 'openai/gpt-5.6-luna', variant: 'medium' },
-    fixer: { model: 'openai/gpt-5.6-luna', variant: 'high' },
+    omnissiah: { model: 'openai/gpt-5.6-terra', variant: 'high' },
+    dominus: { model: 'openai/gpt-5.6-sol', variant: 'high' },
+    logis: { model: 'openai/gpt-5.6-luna', variant: 'low' },
+    magos: { model: 'openai/gpt-5.6-luna', variant: 'low' },
+    artisan: { model: 'openai/gpt-5.6-luna', variant: 'medium' },
+    genetor: { model: 'openai/gpt-5.6-luna', variant: 'high' },
   },
   kimi: {
-    orchestrator: { model: 'kimi-for-coding/k2p5', variant: 'max' },
-    oracle: { model: 'kimi-for-coding/k2p5', variant: 'high' },
-    librarian: { model: 'kimi-for-coding/k2p5', variant: 'low' },
-    explorer: { model: 'kimi-for-coding/k2p5', variant: 'low' },
-    designer: { model: 'kimi-for-coding/k2p5', variant: 'medium' },
-    fixer: { model: 'kimi-for-coding/k2p5', variant: 'low' },
+    omnissiah: { model: 'kimi-for-coding/k2p5', variant: 'max' },
+    dominus: { model: 'kimi-for-coding/k2p5', variant: 'high' },
+    logis: { model: 'kimi-for-coding/k2p5', variant: 'low' },
+    magos: { model: 'kimi-for-coding/k2p5', variant: 'low' },
+    artisan: { model: 'kimi-for-coding/k2p5', variant: 'medium' },
+    genetor: { model: 'kimi-for-coding/k2p5', variant: 'low' },
   },
   copilot: {
-    orchestrator: { model: 'github-copilot/claude-opus-4.6', variant: 'max' },
-    oracle: { model: 'github-copilot/claude-opus-4.6', variant: 'high' },
-    librarian: { model: 'github-copilot/grok-code-fast-1', variant: 'low' },
-    explorer: { model: 'github-copilot/grok-code-fast-1', variant: 'low' },
-    designer: {
+    omnissiah: { model: 'github-copilot/claude-opus-4.6', variant: 'max' },
+    dominus: { model: 'github-copilot/claude-opus-4.6', variant: 'high' },
+    logis: { model: 'github-copilot/grok-code-fast-1', variant: 'low' },
+    magos: { model: 'github-copilot/grok-code-fast-1', variant: 'low' },
+    artisan: {
       model: 'github-copilot/gemini-3.1-pro-preview',
       variant: 'medium',
     },
-    fixer: { model: 'github-copilot/claude-sonnet-4.6', variant: 'low' },
+    genetor: { model: 'github-copilot/claude-sonnet-4.6', variant: 'low' },
   },
   'zai-plan': {
-    orchestrator: { model: 'zai-coding-plan/glm-5', variant: 'max' },
-    oracle: { model: 'zai-coding-plan/glm-5', variant: 'high' },
-    librarian: { model: 'zai-coding-plan/glm-5', variant: 'low' },
-    explorer: { model: 'zai-coding-plan/glm-5', variant: 'low' },
-    designer: { model: 'zai-coding-plan/glm-5', variant: 'medium' },
-    fixer: { model: 'zai-coding-plan/glm-5', variant: 'low' },
+    omnissiah: { model: 'zai-coding-plan/glm-5', variant: 'max' },
+    dominus: { model: 'zai-coding-plan/glm-5', variant: 'high' },
+    logis: { model: 'zai-coding-plan/glm-5', variant: 'low' },
+    magos: { model: 'zai-coding-plan/glm-5', variant: 'low' },
+    artisan: { model: 'zai-coding-plan/glm-5', variant: 'medium' },
+    genetor: { model: 'zai-coding-plan/glm-5', variant: 'low' },
   },
   'opencode-go': {
-    orchestrator: { model: 'opencode-go/minimax-m3', variant: 'thinking' },
-    oracle: { model: 'opencode-go/qwen3.7-max', variant: 'max' },
-    explorer: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
-    librarian: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
-    designer: { model: 'opencode-go/kimi-k2.7-code' },
-    fixer: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
+    omnissiah: { model: 'opencode-go/minimax-m3', variant: 'thinking' },
+    dominus: { model: 'opencode-go/qwen3.7-max', variant: 'max' },
+    magos: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
+    logis: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
+    artisan: { model: 'opencode-go/kimi-k2.7-code' },
+    genetor: { model: 'opencode-go/deepseek-v4-flash', variant: 'high' },
     observer: { model: 'opencode-go/mimo-v2.5' },
   },
 } as const;
@@ -92,7 +93,7 @@ export function generateLiteConfig(
     agentName: string,
     modelInfo: { model: string; variant?: string },
   ) => {
-    const isOrchestrator = agentName === 'orchestrator';
+    const isOrchestrator = agentName === PRIMARY_AGENT_NAME;
 
     const skills = isOrchestrator
       ? ['*']

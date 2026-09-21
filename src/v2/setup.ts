@@ -14,6 +14,7 @@
  * (agent/tool/mcp/command) stay independently try/catch-guarded.
  */
 
+import { AGENT_ALIASES } from '../config/constants';
 import { loadPluginConfig } from '../config/loader';
 import { InterviewConfigSchema } from '../config/schema';
 import {
@@ -862,10 +863,20 @@ export function createPermissionRulesBridge(
         // touched.
         if (typeof parentID !== 'string' || !parentID) return;
         if (applied.has(sessionID)) return;
-        if (typeof agent !== 'string' || !options.pluginAgents.has(agent)) {
+        // Events may carry a legacy agent alias; resolve it before the
+        // membership check so historical/renamed agents still match.
+        const resolvedAgent =
+          typeof agent === 'string' ? (AGENT_ALIASES[agent] ?? agent) : agent;
+        if (typeof resolvedAgent !== 'string') return;
+        // The registry may be keyed by the canonical name while the caller
+        // supplied legacy aliases (or vice versa); compare canonically.
+        const isPluginAgent = [...options.pluginAgents].some(
+          (name) => (AGENT_ALIASES[name] ?? name) === resolvedAgent,
+        );
+        if (!isPluginAgent) {
           return;
         }
-        await applyChildSessionRules(sessionID, agent);
+        await applyChildSessionRules(sessionID, resolvedAgent);
       } catch (err) {
         // Fail-soft: the event pump must keep flowing.
         log('[v2][permission-rules] bridge failed', String(err));
@@ -1488,10 +1499,10 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
               log('[v2] agent adapt failed', { name, err: String(err) });
             }
           }
-          // Make orchestrator the default primary agent.
-          if (resolvedAgents?.orchestrator) {
+          // Make the Omnissiah the default primary agent.
+          if (resolvedAgents?.omnissiah) {
             try {
-              draft.default('orchestrator');
+              draft.default('omnissiah');
             } catch {
               /* default() optional */
             }
@@ -1768,8 +1779,11 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
           const permissionRulesBridge = createPermissionRulesBridge(
             ctx.session,
             {
+              // Events may carry a legacy agent alias (historical sessions or
+              // config written before the rename); resolve it to the
+              // canonical key the agent registry is built from.
               permissionForAgent: (agent) =>
-                resolvedAgents?.[agent]?.permission,
+                resolvedAgents?.[AGENT_ALIASES[agent] ?? agent]?.permission,
               pluginAgents: new Set(Object.keys(resolvedAgents ?? {})),
             },
           );

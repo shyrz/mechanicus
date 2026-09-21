@@ -1,5 +1,5 @@
 import { resolveEffectiveSkills } from '../cli/skills';
-import { AGENT_ALIASES, ALL_AGENT_NAMES } from './constants';
+import { AGENT_ALIASES, ALL_AGENT_NAMES, lookupAgentEntry } from './constants';
 import type { AgentOverrideConfig, PluginConfig } from './schema';
 
 /**
@@ -14,13 +14,7 @@ export function getAgentOverride(
   config: PluginConfig | undefined,
   name: string,
 ): AgentOverrideConfig | undefined {
-  const overrides = config?.agents ?? {};
-  return (
-    overrides[name] ??
-    overrides[
-      Object.keys(AGENT_ALIASES).find((k) => AGENT_ALIASES[k] === name) ?? ''
-    ]
-  );
+  return lookupAgentEntry(config?.agents, name);
 }
 
 /**
@@ -59,7 +53,7 @@ const SKILL_DIRECTIVE_KEYS = [
  * authoritative when both records explicitly provide the same field.
  *
  * Layered runtime config can legitimately produce both records (for example,
- * a preset using `explore` over root config using `explorer`). Downstream
+ * a preset using `explore` over root config using `magos`). Downstream
  * lookup is canonical-first, so without this reconciliation the alias's skill
  * directives would otherwise be silently dropped.
  */

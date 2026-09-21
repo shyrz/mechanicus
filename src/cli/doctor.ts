@@ -85,7 +85,7 @@ function checkConfigFile(
     const content = fs.readFileSync(configPath, 'utf-8').replace(/^\uFEFF/, '');
     const rawConfig = JSON.parse(stripJsonComments(content));
     // Normalize disabled_* keys exactly like the loader does before schema
-    // validation, so a string value (e.g. "explorer") is not diagnosed as a
+    // validation, so a string value (e.g. "magos") is not diagnosed as a
     // false invalid-schema error. Report each normalization to the user.
     normalizeDisabledArrayKeys(rawConfig, (message) => {
       console.warn(`[mechanicus] ${message}`);

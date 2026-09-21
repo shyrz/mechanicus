@@ -11,6 +11,7 @@
  * - `applyAgentToDraft`: mutate a v2 agent draft entry from a v1 agent config.
  */
 
+import { PRIMARY_AGENT_NAME } from '../config/constants';
 import { log } from '../utils/logger';
 import type { ModelRef, V2AgentDraft, V2ToolDefinition } from './types';
 
@@ -169,7 +170,7 @@ export function adaptTool(
       const v1Ctx = {
         sessionID: ctx?.sessionID ?? '',
         messageID: ctx?.messageID ?? '',
-        agent: ctx?.agent ?? 'orchestrator',
+        agent: ctx?.agent ?? PRIMARY_AGENT_NAME,
         directory,
         worktree: directory,
         abort: new AbortController().signal,
@@ -215,7 +216,8 @@ export function applyAgentToDraft(
     agent.id = name;
     agent.name = name;
     agent.mode =
-      (v1.mode as string) ?? (name === 'orchestrator' ? 'primary' : 'subagent');
+      (v1.mode as string) ??
+      (name === PRIMARY_AGENT_NAME ? 'primary' : 'subagent');
     agent.hidden = v1.hidden === true;
     if (typeof v1.description === 'string') agent.description = v1.description;
     if (typeof v1.prompt === 'string')

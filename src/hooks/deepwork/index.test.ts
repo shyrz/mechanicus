@@ -70,7 +70,7 @@ describe('deepwork command hook', () => {
     expect(output.parts[0].text).toContain('git-local yet OpenCode-readable');
     expect(output.parts[0].text).toContain('.slim/deepwork/');
     expect(output.parts[0].text).toContain('save code/doc deliverables');
-    expect(output.parts[0].text).toContain('@oracle');
+    expect(output.parts[0].text).toContain('@dominus');
     expect(output.parts[0].text).toContain('simplify/readability');
     expect(output.parts[0].text).toContain('refactor scheduler state');
     expect(output.parts[0].text).not.toContain(SLIM_INTERNAL_INITIATOR_MARKER);

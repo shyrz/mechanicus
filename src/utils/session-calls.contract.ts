@@ -92,7 +92,7 @@ client.session.prompt({
 client.session.promptAsync({
   path: { id: 'ses_x' },
   body: {
-    agent: 'orchestrator',
+    agent: 'omnissiah',
     parts: [{ type: 'text', text: 'nudge' }],
   },
 });
@@ -102,7 +102,7 @@ client.session.promptAsync({
   path: { id: 'ses_x' },
   query: { directory: '/d' },
   body: {
-    agent: 'orchestrator',
+    agent: 'omnissiah',
     model: { providerID: 'p', modelID: 'm' },
     parts: [{ type: 'text', text: 'wake' }],
   },

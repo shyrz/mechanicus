@@ -54,24 +54,31 @@ describe('wait_for_user tool', () => {
     }).wait_for_user;
 
     await expect(
-      managed.execute({ reason: 'wait' }, { agent: 'orchestrator' } as never),
+      managed.execute({ reason: 'wait' }, { agent: 'omnissiah' } as never),
     ).rejects.toThrow('requires sessionID');
     await expect(
       managed.execute({ reason: 'wait' }, {
         sessionID: 'child-1',
         agent: 'fixer',
       } as never),
-    ).rejects.toThrow('orchestrator');
+    ).rejects.toThrow('Omnissiah');
+    await expect(
+      unmanaged.execute({ reason: 'wait' }, {
+        sessionID: 'parent-1',
+        agent: 'omnissiah',
+      } as never),
+    ).rejects.toThrow('Omnissiah sessions');
+    // Legacy alias still resolves to the primary agent.
     await expect(
       unmanaged.execute({ reason: 'wait' }, {
         sessionID: 'parent-1',
         agent: 'orchestrator',
       } as never),
-    ).rejects.toThrow('orchestrator sessions');
+    ).rejects.toThrow('Omnissiah sessions');
     await expect(
       managed.execute({ reason: '   ' }, {
         sessionID: 'parent-1',
-        agent: 'orchestrator',
+        agent: 'omnissiah',
       } as never),
     ).rejects.toThrow('non-empty reason');
 

@@ -48,7 +48,7 @@ function orchestratorPromptFor(hostFlavor?: string): string {
     }),
     { hostFlavor },
   );
-  const orchestrator = agents.find((a) => a.name === 'orchestrator');
+  const orchestrator = agents.find((a) => a.name === 'omnissiah');
   return orchestrator?.config.prompt as string;
 }
 

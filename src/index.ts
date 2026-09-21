@@ -18,7 +18,10 @@ import { deepMerge, loadPluginConfig, type MultiplexerConfig } from './config';
 import { parseList } from './config/agent-mcps';
 import {
   AGENT_ALIASES,
+  aliasesForAgent,
   DEFAULT_MAX_SESSION_METADATA_ENTRIES,
+  isPrimaryAgentName,
+  PRIMARY_AGENT_NAME,
   TOAST_DURATION_MS,
 } from './config/constants';
 import { RuntimeConfig } from './config/runtime';
@@ -430,11 +433,19 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       return resolvePrimaryModelValue((entry as Record<string, unknown>).model);
     };
 
-    const directModel = readModel(finalHostAgentConfig?.[agentType]);
-    if (directModel) return directModel;
-
+    // The final host config may key the agent by its canonical name or by any
+    // legacy alias (whichever spelling the host wrote). The host's own entry
+    // takes precedence over the plugin-written canonical one, so probe the
+    // legacy aliases first, then the canonical name and the caller's spelling.
     const resolvedName = resolveRuntimeAgentName(runtime, agentType);
-    return readModel(finalHostAgentConfig?.[resolvedName]);
+    for (const alias of aliasesForAgent(resolvedName)) {
+      const model = readModel(finalHostAgentConfig?.[alias]);
+      if (model) return model;
+    }
+    return (
+      readModel(finalHostAgentConfig?.[agentType]) ??
+      readModel(finalHostAgentConfig?.[resolvedName])
+    );
   };
 
   try {
@@ -525,8 +536,8 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     webfetch = createWebfetchTool(ctx, {
       binaryDir: undefined,
       webfetchModels,
-      explorerModel: pickAgentModelRef(runtime.agent('explorer')?.model),
-      librarianModel: pickAgentModelRef(runtime.agent('librarian')?.model),
+      explorerModel: pickAgentModelRef(runtime.agent('magos')?.model),
+      librarianModel: pickAgentModelRef(runtime.agent('logis')?.model),
       smallModelRef: () => runtime.smallModel(),
     });
     backgroundJobBoard = new BackgroundJobBoard({
@@ -742,7 +753,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       sameProviderPolicy: runtime.backgroundJobs.sameProviderPolicy,
       getSessionModel: (sessionID) => sessionMetadata.getModel(sessionID),
       shouldManageSession: (sessionID) =>
-        sessionMetadata.getAgent(sessionID) === 'orchestrator' ||
+        isPrimaryAgentName(sessionMetadata.getAgent(sessionID)) ||
         sessionMetadata.isTaskManaged(sessionID),
       registerSessionAsOrchestrator: (sessionID) => {
         // Membership in task management, not a selection rewrite (#1079).
@@ -763,7 +774,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     orchestratorWakeScheduler = createOrchestratorWakeScheduler(ctx, {
       config: runtime.backgroundJobs.orchestratorWake,
       shouldManageSession: (sessionID) =>
-        sessionMetadata.getAgent(sessionID) === 'orchestrator',
+        isPrimaryAgentName(sessionMetadata.getAgent(sessionID)),
       hasInputWait: (sessionID) =>
         taskSessionManagerHook.hasInputWait(sessionID),
       isFallbackInProgress: (sessionID) =>
@@ -840,7 +851,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     // Both message transforms share this gate so a rejected nudge cannot be
     // followed by a phase reminder in the same outgoing turn.
     const shouldInjectOrchestratorReminder = (sessionID: string) =>
-      sessionMetadata.getAgent(sessionID) === 'orchestrator';
+      isPrimaryAgentName(sessionMetadata.getAgent(sessionID));
 
     phaseReminder = createPhaseReminderHook({
       shouldInject: shouldInjectOrchestratorReminder,
@@ -883,7 +894,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       backgroundJobBoard: backgroundJobCoordinator,
       terminalGate,
       shouldManageSession: (sessionID) =>
-        sessionMetadata.getAgent(sessionID) === 'orchestrator' ||
+        isPrimaryAgentName(sessionMetadata.getAgent(sessionID)) ||
         sessionMetadata.isTaskManaged(sessionID),
     });
     taskMessageTools = createTaskMessageTool({
@@ -900,7 +911,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       input: ctx,
       backgroundJobBoard: backgroundJobCoordinator,
       shouldManageSession: (sessionID) =>
-        sessionMetadata.getAgent(sessionID) === 'orchestrator' ||
+        isPrimaryAgentName(sessionMetadata.getAgent(sessionID)) ||
         sessionMetadata.isTaskManaged(sessionID),
       backgroundJobSupervisor,
       revivedRunTracker,
@@ -912,7 +923,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     });
     waitForUserTools = createWaitForUserTool({
       shouldManageSession: (sessionID) =>
-        sessionMetadata.getAgent(sessionID) === 'orchestrator' ||
+        isPrimaryAgentName(sessionMetadata.getAgent(sessionID)) ||
         sessionMetadata.isTaskManaged(sessionID),
       resolveAgentName: (agent) => resolveRuntimeAgentName(runtime, agent),
       registerSessionAsOrchestrator: (sessionID) => {
@@ -1072,29 +1083,29 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       // ones (host override > runtime override > plugin file).
       RuntimeConfig.get(ctx.directory).captureHostConfig(opencodeConfig);
 
-      // Force default_agent to the orchestrator's visible entry when unset,
+      // Force default_agent to the primary agent's visible entry when unset,
       // and also when the user pointed it at an mechanicus subagent name (opencode
       // rejects subagent names as default_agent with "default agent must be a
-      // primary agent"). With a display name, the canonical 'orchestrator'
+      // primary agent"). With a display name, the canonical 'omnissiah'
       // registration is a hidden alias, so default to its visible entry.
       // Other values (opencode's built-in 'build'/'plan', or a user-defined
       // primary agent) are respected. This guards against promptAsync calls
       // that omit the `agent` field from falling back to 'build' when the
-      // orchestrator agent is temporarily unresolved.
+      // primary agent is temporarily unresolved.
       if (runtime.setDefaultAgent) {
         const existing = (opencodeConfig as { default_agent?: string })
           .default_agent;
         if (!existing || isSubagent(existing)) {
-          const orchestratorAlias = agents.orchestrator as
+          const primaryEntry = agents.omnissiah as
             | {
                 displayName?: string;
                 hidden?: boolean;
               }
             | undefined;
           (opencodeConfig as { default_agent?: string }).default_agent =
-            orchestratorAlias?.hidden && orchestratorAlias.displayName
-              ? normalizeAgentName(orchestratorAlias.displayName)
-              : 'orchestrator';
+            primaryEntry?.hidden && primaryEntry.displayName
+              ? normalizeAgentName(primaryEntry.displayName)
+              : PRIMARY_AGENT_NAME;
         }
       }
 
@@ -1437,7 +1448,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
             : undefined;
       if (
         eventSessionID &&
-        sessionMetadata.getAgent(eventSessionID) === 'orchestrator' &&
+        isPrimaryAgentName(sessionMetadata.getAgent(eventSessionID)) &&
         (event.type === 'session.idle' ||
           (event.type === 'session.status' && statusType === 'idle'))
       ) {
@@ -1917,12 +1928,12 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
         : undefined;
       const isOrchestratorRequest =
         requestAgent !== undefined
-          ? requestAgent === 'orchestrator'
-          : sessionAgent === 'orchestrator' &&
+          ? isPrimaryAgentName(requestAgent)
+          : isPrimaryAgentName(sessionAgent) &&
             looksLikeMainChatRequest(output.system);
       if (isOrchestratorRequest) {
         const orchestratorDef = agentDefs.find(
-          (a) => a.name === 'orchestrator',
+          (a) => a.name === PRIMARY_AGENT_NAME,
         );
         const orchestratorPrompt =
           typeof orchestratorDef?.config?.prompt === 'string'

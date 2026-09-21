@@ -115,7 +115,7 @@ describe('skills_include_local', () => {
     RuntimeConfig.init(projectDir, config);
     const runtime = RuntimeConfig.get(projectDir);
     const oracle = createAgents(runtime, { projectDirectory: projectDir }).find(
-      (agent) => agent.name === 'oracle',
+      (agent) => agent.name === 'dominus',
     );
     const skillPermissions = oracle?.config.permission?.skill as
       | Record<string, string>
@@ -141,7 +141,7 @@ describe('skills_include_local', () => {
     });
 
     RuntimeConfig.init(projectDir, config);
-    const effective = RuntimeConfig.get(projectDir).agents().oracle?.skills;
+    const effective = RuntimeConfig.get(projectDir).agents().dominus?.skills;
 
     expect(effective).toContain('project-architecture');
     expect(effective).not.toContain('project-testing');

@@ -429,7 +429,7 @@ export interface SidebarAgentTargets {
  * getActiveSidebarAgentNames (#1147) with two refinements:
  * - Only sessions with a known parent link are offered as destinations:
  *   a root session running an agent directly (e.g. a top-level chat with
- *   agent=oracle) is not a subagent of this conversation.
+ *   agent=dominus) is not a subagent of this conversation.
  * - Without a visible route session there is no conversation to scope to;
  *   return no targets rather than exposing cross-conversation navigation.
  * Stable ordering: by alias (numeric suffix aware, ora-2 < ora-10), then

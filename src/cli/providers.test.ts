@@ -33,10 +33,10 @@ describe('providers', () => {
     );
     const agents = (config.presets as any).openai;
     expect(agents).toBeDefined();
-    expect(agents.orchestrator.model).toBe('openai/gpt-5.6-terra');
-    expect(agents.orchestrator.variant).toBe('high');
-    expect(agents.fixer.model).toBe('openai/gpt-5.6-luna');
-    expect(agents.fixer.variant).toBe('high');
+    expect(agents.omnissiah.model).toBe('openai/gpt-5.6-terra');
+    expect(agents.omnissiah.variant).toBe('high');
+    expect(agents.genetor.model).toBe('openai/gpt-5.6-luna');
+    expect(agents.genetor.variant).toBe('high');
   });
 
   test('preserves exact OpenAI model and variant mappings', () => {
@@ -48,12 +48,12 @@ describe('providers', () => {
 
     const agents = (config.presets as any).openai;
     const expected = {
-      orchestrator: { model: 'openai/gpt-5.6-terra', variant: 'high' },
-      oracle: { model: 'openai/gpt-5.6-sol', variant: 'high' },
-      librarian: { model: 'openai/gpt-5.6-luna', variant: 'low' },
-      explorer: { model: 'openai/gpt-5.6-luna', variant: 'low' },
-      designer: { model: 'openai/gpt-5.6-luna', variant: 'medium' },
-      fixer: { model: 'openai/gpt-5.6-luna', variant: 'high' },
+      omnissiah: { model: 'openai/gpt-5.6-terra', variant: 'high' },
+      dominus: { model: 'openai/gpt-5.6-sol', variant: 'high' },
+      logis: { model: 'openai/gpt-5.6-luna', variant: 'low' },
+      magos: { model: 'openai/gpt-5.6-luna', variant: 'low' },
+      artisan: { model: 'openai/gpt-5.6-luna', variant: 'medium' },
+      genetor: { model: 'openai/gpt-5.6-luna', variant: 'high' },
     } as const;
 
     expect(MODEL_MAPPINGS.openai).toEqual(expected);
@@ -73,20 +73,20 @@ describe('providers', () => {
     expect((config.presets as any).openai).toBeDefined();
     const agents = (config.presets as any)['opencode-go'];
     expect(agents).toBeDefined();
-    expect(agents.orchestrator.model).toBe('opencode-go/minimax-m3');
-    expect(agents.orchestrator.variant).toBe('thinking');
-    expect(agents.oracle.model).toBe('opencode-go/qwen3.7-max');
-    expect(agents.oracle.variant).toBe('max');
+    expect(agents.omnissiah.model).toBe('opencode-go/minimax-m3');
+    expect(agents.omnissiah.variant).toBe('thinking');
+    expect(agents.dominus.model).toBe('opencode-go/qwen3.7-max');
+    expect(agents.dominus.variant).toBe('max');
     expect(agents.council).toBeUndefined();
-    expect(agents.librarian.model).toBe('opencode-go/deepseek-v4-flash');
-    expect(agents.librarian.variant).toBe('high');
-    expect(agents.librarian.mcps).toEqual(['context7', 'gh_grep']);
-    expect(agents.explorer.model).toBe('opencode-go/deepseek-v4-flash');
-    expect(agents.explorer.variant).toBe('high');
-    expect(agents.designer.model).toBe('opencode-go/kimi-k2.7-code');
-    expect(agents.designer.variant).toBeUndefined();
-    expect(agents.fixer.model).toBe('opencode-go/deepseek-v4-flash');
-    expect(agents.fixer.variant).toBe('high');
+    expect(agents.logis.model).toBe('opencode-go/deepseek-v4-flash');
+    expect(agents.logis.variant).toBe('high');
+    expect(agents.logis.mcps).toEqual(['context7', 'gh_grep']);
+    expect(agents.magos.model).toBe('opencode-go/deepseek-v4-flash');
+    expect(agents.magos.variant).toBe('high');
+    expect(agents.artisan.model).toBe('opencode-go/kimi-k2.7-code');
+    expect(agents.artisan.variant).toBeUndefined();
+    expect(agents.genetor.model).toBe('opencode-go/deepseek-v4-flash');
+    expect(agents.genetor.variant).toBe('high');
     expect(agents.observer.model).toBe('opencode-go/mimo-v2.5');
     expect(agents.observer.variant).toBeUndefined();
   });
@@ -164,22 +164,22 @@ describe('providers', () => {
 
     const agents = (config.presets as any).openai;
     // Orchestrator should always have '*'
-    expect(agents.orchestrator.skills).toEqual(['*']);
+    expect(agents.omnissiah.skills).toEqual(['*']);
 
     // Oracle should have bundled simplify
-    expect(agents.oracle.skills).toContain('simplify');
+    expect(agents.dominus.skills).toContain('simplify');
 
     // Orchestrator should implicitly cover bundled codemap via '*'
-    expect(agents.orchestrator.skills).toContain('*');
+    expect(agents.omnissiah.skills).toContain('*');
 
     // Designer should have no bundled skills by default
-    expect(agents.designer.skills).toEqual([]);
+    expect(agents.artisan.skills).toEqual([]);
 
     // Explorer should have no bundled skills by default
-    expect(agents.explorer.skills).toEqual([]);
+    expect(agents.magos.skills).toEqual([]);
 
     // Fixer should have no bundled skills by default
-    expect(agents.fixer.skills).toEqual([]);
+    expect(agents.genetor.skills).toEqual([]);
   });
 
   test('generateLiteConfig includes mcps field', () => {
@@ -190,10 +190,10 @@ describe('providers', () => {
     });
 
     const agents = (config.presets as any).openai;
-    expect(agents.orchestrator.mcps).toBeDefined();
-    expect(Array.isArray(agents.orchestrator.mcps)).toBe(true);
-    expect(agents.librarian.mcps).toBeDefined();
-    expect(Array.isArray(agents.librarian.mcps)).toBe(true);
+    expect(agents.omnissiah.mcps).toBeDefined();
+    expect(Array.isArray(agents.omnissiah.mcps)).toBe(true);
+    expect(agents.logis.mcps).toBeDefined();
+    expect(Array.isArray(agents.logis.mcps)).toBe(true);
   });
 
   test('generateLiteConfig openai includes correct mcps', () => {
@@ -204,9 +204,9 @@ describe('providers', () => {
     });
 
     const agents = (config.presets as any).openai;
-    expect(agents.orchestrator.mcps).toEqual(['*', '!context7']);
-    expect(agents.librarian.mcps).toContain('context7');
-    expect(agents.librarian.mcps).toContain('gh_grep');
-    expect(agents.designer.mcps).toEqual([]);
+    expect(agents.omnissiah.mcps).toEqual(['*', '!context7']);
+    expect(agents.logis.mcps).toContain('context7');
+    expect(agents.logis.mcps).toContain('gh_grep');
+    expect(agents.artisan.mcps).toEqual([]);
   });
 });

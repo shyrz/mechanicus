@@ -5,7 +5,7 @@
  * mutating the cached system prompt or prepending request-local content ahead
  * of the user's actual turn.
  */
-import { PHASE_REMINDER } from '../../config/constants';
+import { isPrimaryAgentName, PHASE_REMINDER } from '../../config/constants';
 import { isInternalInitiatorPart } from '../../utils';
 import {
   appendTaggedSyntheticPart,
@@ -49,7 +49,7 @@ export function createPhaseReminderHook(options: PhaseReminderOptions = {}) {
 
       const { agent, sessionID } = lastUserMessage.info;
       if (
-        agent !== 'orchestrator' ||
+        !isPrimaryAgentName(agent) ||
         !sessionID ||
         (options.shouldInject && !options.shouldInject(sessionID))
       ) {

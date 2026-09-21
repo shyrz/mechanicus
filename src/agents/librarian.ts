@@ -38,7 +38,7 @@ export function createLibrarianAgent(
   }
 
   return {
-    name: 'librarian',
+    name: 'logis',
     description:
       'External documentation and library research. Use for official docs lookup, GitHub examples, and understanding library internals.',
     config: {

@@ -506,10 +506,10 @@ describe('config-io', () => {
     expect(saved.preset).toBe('opencode-go');
     expect(saved.disabled_agents).toEqual([]);
     expect(saved.presets.openai).toBeDefined();
-    expect(saved.presets['opencode-go'].orchestrator.model).toBe(
+    expect(saved.presets['opencode-go'].omnissiah.model).toBe(
       'opencode-go/minimax-m3',
     );
-    expect(saved.presets['opencode-go'].orchestrator.variant).toBe('thinking');
+    expect(saved.presets['opencode-go'].omnissiah.variant).toBe('thinking');
     expect(saved.presets['opencode-go'].observer.model).toBe(
       'opencode-go/mimo-v2.5',
     );

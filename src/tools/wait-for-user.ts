@@ -1,4 +1,5 @@
 import { type ToolDefinition, tool } from '@opencode-ai/plugin';
+import { isPrimaryAgentName } from '../config/constants';
 
 const z = tool.schema;
 
@@ -35,18 +36,16 @@ Use this only as the final tool action after you have already given the user con
         typeof rawAgent === 'string'
           ? (options.resolveAgentName?.(rawAgent) ?? rawAgent)
           : undefined;
-      if (agent && agent !== 'orchestrator') {
-        throw new Error('wait_for_user can only be used by orchestrator');
+      if (agent && !isPrimaryAgentName(agent)) {
+        throw new Error('wait_for_user can only be used by the Omnissiah');
       }
       if (!options.shouldManageSession(sessionID)) {
-        if (agent === 'orchestrator') {
+        if (isPrimaryAgentName(agent)) {
           options.registerSessionAsOrchestrator?.(sessionID);
         }
       }
       if (!options.shouldManageSession(sessionID)) {
-        throw new Error(
-          'wait_for_user can only be used in orchestrator sessions',
-        );
+        throw new Error('wait_for_user can only be used in Omnissiah sessions');
       }
 
       const reason = args.reason.replace(/\s+/g, ' ').trim();

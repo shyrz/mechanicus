@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AGENT_THEME_COLORS,
   DEFAULT_MAX_RETAINED_SNAPSHOTS,
+  isPrimaryAgentName,
 } from './constants';
 import { CouncilConfigSchema } from './council-schema';
 import { ProviderModelIdSchema } from './model-id-schema';
@@ -56,7 +57,11 @@ export const AgentColorSchema = z.union([
 ]);
 
 // Agent override configuration (distinct from SDK's AgentConfig)
-export const ModelInheritanceSourceSchema = z.enum(['session', 'orchestrator']);
+// 'omnissiah' is accepted as the canonical primary-agent name and normalized
+// to the internal 'orchestrator' value so runtime comparisons stay stable.
+export const ModelInheritanceSourceSchema = z
+  .enum(['session', 'orchestrator', 'omnissiah'])
+  .transform((value) => (value === 'omnissiah' ? 'orchestrator' : value));
 
 export const AgentOverrideConfigSchema = z
   .object({
@@ -419,7 +424,7 @@ export const WebfetchConfigSchema = z
     model: AgentOverrideConfigSchema.shape.model.describe(
       'Dedicated model(s) for smartfetch secondary-model summarization. ' +
         'Same shape as agent model config (string, array of strings/objects with id+variant). ' +
-        'Takes priority over small_model, agents.explorer.model, and agents.librarian.model.',
+        'Takes priority over small_model, agents.magos.model, and agents.logis.model.',
     ),
   })
   .strict();
@@ -464,12 +469,12 @@ function rejectOrchestratorPromptOnOrchestrator(
   pathPrefix: Array<string | number>,
 ): void {
   for (const [name, override] of Object.entries(overrides)) {
-    if (name === 'orchestrator' && override.orchestratorPrompt !== undefined) {
+    if (isPrimaryAgentName(name) && override.orchestratorPrompt !== undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: [...pathPrefix, name, 'orchestratorPrompt'],
         message:
-          'orchestratorPrompt is not supported for the orchestrator agent',
+          'orchestratorPrompt is not supported for the primary (omnissiah) agent',
       });
     }
   }

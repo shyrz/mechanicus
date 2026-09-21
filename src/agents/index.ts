@@ -4,9 +4,12 @@ import {
   AGENT_ALIASES,
   type AgentOverrideConfig,
   ALL_AGENT_NAMES,
+  aliasesForAgent,
   DEFAULT_MODELS,
   loadAgentPrompt,
+  lookupAgentEntry,
   type PluginConfig,
+  PRIMARY_AGENT_NAME,
   SUBAGENT_NAMES,
 } from '../config';
 import { getAgentMcpList } from '../config/agent-mcps';
@@ -79,13 +82,7 @@ function getOverrideFromAgents(
   agents: Record<string, AgentOverrideConfig>,
   name: string,
 ): AgentOverrideConfig | undefined {
-  return (
-    agents[name] ??
-    agents[
-      Object.keys(AGENT_ALIASES).find((key) => AGENT_ALIASES[key] === name) ??
-        ''
-    ]
-  );
+  return lookupAgentEntry(agents, name);
 }
 
 function buildAcpAgentDefinition(
@@ -111,7 +108,7 @@ function buildAcpAgentDefinition(
     name,
     description,
     config: {
-      model: config.wrapperModel ?? fallbackModel ?? DEFAULT_MODELS.oracle,
+      model: config.wrapperModel ?? fallbackModel ?? DEFAULT_MODELS.dominus,
       prompt,
       permission: {
         read: 'deny',
@@ -170,12 +167,12 @@ function applyOverrides(
       // added by #639). Leaving it undefined for the orchestrator lets
       // that later, precedence-aware guard be the sole source of truth.
       agent.config.model =
-        agent.name === 'orchestrator' ? undefined : primaryModel.id;
+        agent.name === PRIMARY_AGENT_NAME ? undefined : primaryModel.id;
       // Subagents launch with the primary model, so carry its inline variant
       // into the OpenCode config too. An explicit agent-level variant below
       // intentionally takes precedence.
       if (
-        agent.name !== 'orchestrator' &&
+        agent.name !== PRIMARY_AGENT_NAME &&
         override.variant === undefined &&
         primaryModel.variant !== undefined
       ) {
@@ -238,10 +235,14 @@ export function applyModelInheritanceToConfig(
 ): void {
   const mergedAgents = runtime.agents();
   const orchestratorModel = getPrimaryModelFromOverride(
-    runtime.agent('orchestrator'),
+    runtime.agent(PRIMARY_AGENT_NAME),
   );
 
   for (const agentName of Object.keys(configAgent)) {
+    // Judge intent from the PLUGIN layer only. runtime.agent() merges the
+    // host layer, whose model value is exactly the stale value this function
+    // is meant to clear — reading it here would make every inherited agent
+    // look explicitly configured and skip the cleanup.
     const override = getOverrideFromAgents(mergedAgents, agentName);
     if (!override) continue;
     if (
@@ -251,8 +252,11 @@ export function applyModelInheritanceToConfig(
       continue;
     }
 
-    const resolvedName = AGENT_ALIASES[agentName] ?? agentName;
-    const entry = configAgent[resolvedName];
+    // Mutate the entry under THIS key. An alias-aware lookup would jump to
+    // the canonical key when the config carries both spellings (the plugin
+    // writes the canonical name; the host may still hold the legacy one),
+    // leaving the stale host entry untouched.
+    const entry = configAgent[agentName];
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       continue;
     }
@@ -309,7 +313,7 @@ function buildCustomAgentDefinition(
     name,
     description,
     config: {
-      model: primaryModel ?? fallbackModel ?? DEFAULT_MODELS.oracle,
+      model: primaryModel ?? fallbackModel ?? DEFAULT_MODELS.dominus,
       prompt: resolvePrompt(
         name,
         override.prompt,
@@ -376,11 +380,12 @@ function applyDefaultPermissions(
   const taskControlPermissions = Object.fromEntries(
     TASK_CONTROL_TOOL_NAMES.map((toolName) => [
       toolName,
-      existing[toolName] ?? (agent.name === 'orchestrator' ? 'allow' : 'deny'),
+      existing[toolName] ??
+        (agent.name === PRIMARY_AGENT_NAME ? 'allow' : 'deny'),
     ]),
   );
   const waitForUserPerm =
-    agent.name === 'orchestrator'
+    agent.name === PRIMARY_AGENT_NAME
       ? (existing.wait_for_user ?? 'allow')
       : 'deny';
 
@@ -408,11 +413,11 @@ export function isSubagent(name: string): name is SubagentName {
 // Agent Factories
 
 const SUBAGENT_FACTORIES: Record<SubagentName, AgentFactory> = {
-  explorer: createExplorerAgent,
-  librarian: createLibrarianAgent,
-  oracle: createOracleAgent,
-  designer: createDesignerAgent,
-  fixer: createFixerAgent,
+  magos: createExplorerAgent,
+  logis: createLibrarianAgent,
+  dominus: createOracleAgent,
+  artisan: createDesignerAgent,
+  genetor: createFixerAgent,
   observer: createObserverAgent,
   council: createCouncilAgent,
   councillor: createCouncillorAgent,
@@ -446,13 +451,13 @@ export function createAgents(
   const primaryModel = runtime.primaryModel;
   const orchestratorOverride = getOverrideFromAgents(
     mergedAgents,
-    'orchestrator',
+    PRIMARY_AGENT_NAME,
   );
   const configuredOrchestratorModel =
     getPrimaryModelFromOverride(orchestratorOverride);
 
-  // Preserve the historical fixer → librarian fallback unless an explicit
-  // inheritance policy opts the fixer into a different source.
+  // Preserve the historical genetor → logis fallback unless an explicit
+  // inheritance policy opts the genetor into a different source.
   const getModelForAgent = (name: SubagentName): string => {
     const override = getOverrideFromAgents(mergedAgents, name);
     if (override?.model === undefined) {
@@ -464,21 +469,16 @@ export function createAgents(
       }
     }
 
-    if (name === 'fixer' && override?.model === undefined) {
-      const librarianOverride = getOverrideFromAgents(
-        mergedAgents,
-        'librarian',
-      )?.model;
-      let librarianModel: string | undefined;
-      if (Array.isArray(librarianOverride)) {
-        const first = librarianOverride[0];
-        librarianModel = typeof first === 'string' ? first : first?.id;
+    if (name === 'genetor' && override?.model === undefined) {
+      const logisOverride = getOverrideFromAgents(mergedAgents, 'logis')?.model;
+      let logisModel: string | undefined;
+      if (Array.isArray(logisOverride)) {
+        const first = logisOverride[0];
+        logisModel = typeof first === 'string' ? first : first?.id;
       } else {
-        librarianModel = librarianOverride;
+        logisModel = logisOverride;
       }
-      return (
-        librarianModel ?? primaryModel ?? (DEFAULT_MODELS.librarian as string)
-      );
+      return logisModel ?? primaryModel ?? (DEFAULT_MODELS.logis as string);
     }
     return primaryModel ?? (DEFAULT_MODELS[name] as string);
   };
@@ -540,7 +540,7 @@ export function createAgents(
       override?.inheritModelFrom === undefined
     ) {
       console.warn(
-        `[oh-my-opencode] Custom agent '${name}' skipped: 'model' is required`,
+        `[mechanicus] Custom agent '${name}' skipped: 'model' is required`,
       );
       return [];
     }
@@ -647,12 +647,12 @@ export function createAgents(
     );
   }
 
-  // 3. Create Orchestrator (with its own overrides and custom prompts)
-  // DEFAULT_MODELS.orchestrator is undefined; model is resolved via override or
+  // 3. Create the primary Omnissiah agent (with its own overrides and custom prompts)
+  // DEFAULT_MODELS.omnissiah is undefined; model is resolved via override or
   // left unset so the runtime chat.message hook can pick it from _modelArray.
   const orchestratorModel =
-    orchestratorOverride?.model ?? DEFAULT_MODELS.orchestrator;
-  const orchestratorPrompts = loadAgentPrompt('orchestrator', {
+    orchestratorOverride?.model ?? DEFAULT_MODELS.omnissiah;
+  const orchestratorPrompts = loadAgentPrompt(PRIMARY_AGENT_NAME, {
     preset: runtime.preset,
     projectDirectory: options?.projectDirectory,
   });
@@ -671,7 +671,7 @@ export function createAgents(
   const defaultOrchestratorPrompt = orchestrator.config.prompt ?? '';
 
   orchestrator.config.prompt = resolvePrompt(
-    'orchestrator',
+    PRIMARY_AGENT_NAME,
     inlineOrchestratorPrompt,
     orchestratorPrompts.prompt,
     defaultOrchestratorPrompt,
@@ -692,10 +692,10 @@ export function createAgents(
     runtime.disabledSkills,
   );
 
-  // Collect all display names from orchestrator and all subagents
+  // Collect all display names from the primary agent and all subagents
   const displayNameMap = new Map<string, string>();
   if (orchestrator.displayName) {
-    displayNameMap.set('orchestrator', orchestrator.displayName);
+    displayNameMap.set(PRIMARY_AGENT_NAME, orchestrator.displayName);
   }
   for (const agent of allSubAgents) {
     if (agent.displayName) {
@@ -745,6 +745,10 @@ export function createAgents(
   for (const displayName of usedDisplayNames) {
     if (
       (ALL_AGENT_NAMES as readonly string[]).includes(displayName) ||
+      // Legacy aliases must also be rejected: a displayName matching an old
+      // agent name would be ambiguous against @-mentions written for it and
+      // would shadow alias resolution.
+      AGENT_ALIASES[displayName] !== undefined ||
       customAgentNames.includes(displayName) ||
       acpAgentNames.includes(displayName)
     ) {
@@ -760,10 +764,15 @@ export function createAgents(
   const rewritePrompt = (promptText: string) => {
     let text = promptText;
     for (const [internalName, displayName] of displayNameMap) {
-      text = text.replace(
-        new RegExp(`@${escapeRegExp(internalName)}\\b`, 'g'),
-        `@${normalizeAgentName(displayName)}`,
-      );
+      // Rewrite the canonical name and every legacy alias, so user-authored
+      // orchestratorPrompt text written before the rename (e.g. "@explorer")
+      // still resolves to the configured display name.
+      for (const name of [internalName, ...aliasesForAgent(internalName)]) {
+        text = text.replace(
+          new RegExp(`@${escapeRegExp(name)}\\b`, 'g'),
+          `@${normalizeAgentName(displayName)}`,
+        );
+      }
     }
     return text;
   };
@@ -836,7 +845,7 @@ export function getAgentConfigs(
       sdkConfig.hidden = true;
     } else if (isSubagent(name)) {
       sdkConfig.mode = 'subagent';
-    } else if (name === 'orchestrator') {
+    } else if (name === PRIMARY_AGENT_NAME) {
       sdkConfig.mode = 'primary';
     } else {
       sdkConfig.mode = 'subagent';

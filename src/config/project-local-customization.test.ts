@@ -105,7 +105,7 @@ describe('Project-local customization - 15 core cases', () => {
     const agents = createAgents(runtimeFor(undefined), {
       projectDirectory: projectDir,
     });
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.prompt).toBe('replacement prompt\n\nappend prompt');
   });
 
@@ -121,7 +121,7 @@ describe('Project-local customization - 15 core cases', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.prompt).toBe(
       'You are the inline oracle prompt override.',
     );
@@ -147,7 +147,7 @@ describe('Project-local customization - 15 core cases', () => {
     );
 
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.prompt).toBe(
       'You are the inline oracle prompt override.',
     );
@@ -170,7 +170,7 @@ describe('Project-local customization - 15 core cases', () => {
     fs.writeFileSync(path.join(userDir, 'oracle_append.md'), 'append content');
 
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.prompt).toBe(
       'You are the inline oracle prompt override.\n\nappend content',
     );
@@ -189,7 +189,7 @@ describe('Project-local customization - 15 core cases', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?.config.prompt).toContain(
       '# Project-specific routing guidance',
     );
@@ -212,7 +212,7 @@ describe('Project-local customization - 15 core cases', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?.config.prompt).not.toContain(
       'Please routing to @oracle',
     );

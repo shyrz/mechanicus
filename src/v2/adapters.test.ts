@@ -195,9 +195,9 @@ describe('applyAgentToDraft', () => {
     });
   });
 
-  test('defaults orchestrator to primary mode', () => {
+  test('defaults the primary agent to primary mode', () => {
     const { draft, calls } = recorder();
-    applyAgentToDraft(draft, 'orchestrator', {});
+    applyAgentToDraft(draft, 'omnissiah', {});
     expect(calls[0].agent.mode).toBe('primary');
   });
 

@@ -207,8 +207,8 @@ describe('RuntimeConfig', () => {
       },
     });
     expect(runtime.runtimeChains).toEqual({
-      explorer: ['provider/a', 'provider/b'],
-      fixer: ['provider/x', 'provider/y'],
+      magos: ['provider/a', 'provider/b'],
+      genetor: ['provider/x', 'provider/y'],
     });
   });
 
@@ -297,7 +297,8 @@ describe('RuntimeConfig', () => {
     const runtime = RuntimeConfig.init(DIRECTORY, {
       agents: { explore: { model: 'alias-model' } },
     });
-    expect(runtime.agent('explorer')?.model).toBe('alias-model');
+    // 'explore' is the oldest alias; querying by canonical name must find it.
+    expect(runtime.agent('magos')?.model).toBe('alias-model');
   });
 
   test('customAgentNames lists unknown agents keys only', () => {
@@ -314,7 +315,7 @@ describe('RuntimeConfig', () => {
   test('modelArrays preserves variants, alias-aware, excludes disabled', () => {
     resetRegistry();
     const runtime = RuntimeConfig.init(DIRECTORY, {
-      disabled_agents: ['fixer'],
+      disabled_agents: ['genetor'],
       agents: {
         // legacy alias key resolves to explorer
         explore: {
@@ -325,11 +326,11 @@ describe('RuntimeConfig', () => {
       },
     });
     expect(runtime.modelArrays).toEqual({
-      explorer: [{ id: 'provider/a', variant: 'high' }, { id: 'provider/b' }],
+      magos: [{ id: 'provider/a', variant: 'high' }, { id: 'provider/b' }],
       custom: [{ id: 'provider/c1' }, { id: 'provider/c2', variant: 'v' }],
     });
     // disabled agent chain is excluded
-    expect(runtime.modelArrays.fixer).toBeUndefined();
+    expect(runtime.modelArrays.genetor).toBeUndefined();
   });
 
   test('modelArrays includes multi-model councillor chains from council config', () => {
@@ -393,7 +394,7 @@ describe('RuntimeConfig', () => {
       },
     });
 
-    expect(runtime.modelArrays.explorer).toEqual([
+    expect(runtime.modelArrays.magos).toEqual([
       {
         id: 'opencode-omniroute-live/of/MiniMax M3',
         variant: 'fast',
@@ -401,7 +402,7 @@ describe('RuntimeConfig', () => {
       { id: 'of/Kimi K2.6', variant: 'balanced' },
       { id: 'opencode-omniroute-live/of/Qwen3.8 27b' },
     ]);
-    expect(runtime.runtimeChains.explorer).toEqual([
+    expect(runtime.runtimeChains.magos).toEqual([
       'opencode-omniroute-live/of/MiniMax M3',
       'of/Kimi K2.6',
       'opencode-omniroute-live/of/Qwen3.8 27b',

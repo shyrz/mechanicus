@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stripJsonComments } from '../cli/config-io';
 import { getConfigSearchDirs } from '../cli/paths';
-import { DEFAULT_DISABLED_AGENTS } from './constants';
+import { AGENT_ALIASES, DEFAULT_DISABLED_AGENTS } from './constants';
 import {
   BackgroundJobsConfigSchema,
   InterviewConfigSchema,
@@ -834,17 +834,32 @@ export function loadAgentPrompt(
 
   const result: { prompt?: string; appendPrompt?: string } = {};
 
+  // Prompt files are looked up by agent name. Try the canonical name first,
+  // then any legacy aliases that resolve to it (e.g. orchestrator.md for the
+  // renamed omnissiah agent), so existing user files keep working.
+  const nameCandidates = [
+    agentName,
+    ...Object.entries(AGENT_ALIASES)
+      .filter(([, canonical]) => canonical === agentName)
+      .map(([alias]) => alias),
+  ];
+
+  const readFirstExisting = (fileFor: (name: string) => string) => {
+    for (const candidate of nameCandidates) {
+      const content = readFirstPrompt(
+        fileFor(candidate),
+        'Error reading prompt file',
+      );
+      if (content !== undefined) return content;
+    }
+    return undefined;
+  };
+
   // Check for replacement prompt
-  result.prompt = readFirstPrompt(
-    `${agentName}.md`,
-    'Error reading prompt file',
-  );
+  result.prompt = readFirstExisting((name) => `${name}.md`);
 
   // Check for append prompt
-  result.appendPrompt = readFirstPrompt(
-    `${agentName}_append.md`,
-    'Error reading append prompt file',
-  );
+  result.appendPrompt = readFirstExisting((name) => `${name}_append.md`);
 
   return result;
 }

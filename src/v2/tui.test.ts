@@ -71,11 +71,11 @@ describe('v2 tui preset plugin', () => {
         value: 'balanced',
       });
       expect(options[0]?.description).toContain(
-        'orchestrator → model: anthropic/claude-sonnet-4-5',
+        'omnissiah → model: anthropic/claude-sonnet-4-5',
       );
       expect(options[1]).toMatchObject({ title: 'cheap', value: 'cheap' });
       expect(options[1]?.description).toContain(
-        'orchestrator → model: openai/gpt-5-mini → temp: 0.4',
+        'omnissiah → model: openai/gpt-5-mini → temp: 0.4',
       );
     });
 

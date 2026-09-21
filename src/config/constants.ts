@@ -1,21 +1,104 @@
 // Agent names
 export const AGENT_ALIASES: Record<string, string> = {
-  explore: 'explorer',
-  'frontend-ui-ux-engineer': 'designer',
+  // Legacy aliases: agents renamed to their current canonical names. User
+  // config, prompt files, and historical sessions written against the old
+  // names keep working through these mappings.
+  explore: 'magos',
+  'frontend-ui-ux-engineer': 'artisan',
+  orchestrator: 'omnissiah',
+  explorer: 'magos',
+  librarian: 'logis',
+  oracle: 'dominus',
+  designer: 'artisan',
+  fixer: 'genetor',
 };
 
-export const SUBAGENT_NAMES = [
+/**
+ * Legacy aliases ordered by recency, most recent first. When several aliases
+ * resolve to the same canonical name (e.g. both `explore` and `explorer` map
+ * to `magos`), reverse lookups must prefer the most recent one, because that
+ * is the name users most likely wrote in their current config.
+ */
+export const AGENT_ALIAS_PRIORITY: readonly string[] = [
   'explorer',
   'librarian',
   'oracle',
   'designer',
   'fixer',
+  'orchestrator',
+  'explore',
+  'frontend-ui-ux-engineer',
+];
+
+/**
+ * All legacy aliases resolving to `name`, ordered most recent first.
+ * Empty when `name` is not a canonical agent name (or has no aliases).
+ */
+export function aliasesForAgent(name: string): string[] {
+  return AGENT_ALIAS_PRIORITY.filter((alias) => AGENT_ALIASES[alias] === name);
+}
+
+/**
+ * Alias-aware lookup in a record keyed by agent name. Prefers the canonical
+ * key, then each legacy alias in recency order. This is the single source of
+ * truth for the "canonical first, then newest alias" rule that every
+ * override-lookup site must follow.
+ *
+ * `name` may itself be a legacy alias: it is normalized to the canonical name
+ * first, so callers that iterate a record's own keys (which may be written in
+ * any historical spelling) resolve correctly in both directions.
+ */
+export function lookupAgentEntry<T>(
+  record: Record<string, T> | undefined,
+  name: string,
+): T | undefined {
+  if (!record) return undefined;
+  // Normalize an incoming alias to its canonical name before probing, so a
+  // record keyed by 'genetor' is found when the caller asks for 'fixer' too.
+  const canonicalName = AGENT_ALIASES[name] ?? name;
+  // Canonical first: when a record carries both spellings, the current name
+  // is authoritative over any historical one.
+  const canonical = record[canonicalName];
+  if (canonical !== undefined) return canonical;
+  // Then the exact key the caller asked for (differs from canonicalName only
+  // when `name` was an alias), so records keyed by a legacy name still hit.
+  const direct = record[name];
+  if (direct !== undefined) return direct;
+  for (const alias of aliasesForAgent(canonicalName)) {
+    const hit = record[alias];
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
+export const SUBAGENT_NAMES = [
+  'magos',
+  'logis',
+  'dominus',
+  'artisan',
+  'genetor',
   'observer',
   'council',
   'councillor',
 ] as const;
 
-export const ALL_AGENT_NAMES = ['orchestrator', ...SUBAGENT_NAMES] as const;
+/** Canonical name of the primary (orchestrating) agent. */
+export const PRIMARY_AGENT_NAME = 'omnissiah' as const;
+
+/** Legacy alias for the primary agent, still accepted in user config. */
+export const PRIMARY_AGENT_ALIAS = 'orchestrator' as const;
+
+/**
+ * True when the given agent name is the primary agent, accepting both the
+ * canonical name and its legacy alias. Use this when matching agent names
+ * that may originate from historical sessions or user config; use a strict
+ * `=== PRIMARY_AGENT_NAME` comparison when constructing agent definitions.
+ */
+export function isPrimaryAgentName(name: string | undefined): boolean {
+  return name === PRIMARY_AGENT_NAME || name === PRIMARY_AGENT_ALIAS;
+}
+
+export const ALL_AGENT_NAMES = ['omnissiah', ...SUBAGENT_NAMES] as const;
 
 // Agent name type (for use in DEFAULT_MODELS)
 export type AgentName = (typeof ALL_AGENT_NAMES)[number];
@@ -30,8 +113,15 @@ export const AGENT_THEME_COLORS = [
   'info',
 ] as const;
 
-/** Agents that cannot be disabled even if listed in disabled_agents config. */
-export const PROTECTED_AGENTS = new Set(['orchestrator', 'councillor']);
+/**
+ * Agents that cannot be disabled even if listed in disabled_agents config.
+ * Accepts both the canonical primary name and its legacy alias.
+ */
+export const PROTECTED_AGENTS = new Set([
+  PRIMARY_AGENT_NAME,
+  PRIMARY_AGENT_ALIAS,
+  'councillor',
+]);
 
 /**
  * Default models for each agent.
@@ -39,12 +129,12 @@ export const PROTECTED_AGENTS = new Set(['orchestrator', 'councillor']);
  * Users can override per-agent via mechanicus.json agents.<name>.model.
  */
 export const DEFAULT_MODELS: Record<AgentName, string | undefined> = {
-  orchestrator: undefined,
-  oracle: undefined,
-  librarian: undefined,
-  explorer: undefined,
-  designer: undefined,
-  fixer: undefined,
+  omnissiah: undefined,
+  dominus: undefined,
+  logis: undefined,
+  magos: undefined,
+  artisan: undefined,
+  genetor: undefined,
   observer: undefined,
   council: undefined,
   councillor: undefined,

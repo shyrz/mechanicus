@@ -1,15 +1,15 @@
-import { AGENT_ALIASES, type AgentName } from './constants';
+import { type AgentName, lookupAgentEntry } from './constants';
 import type { RuntimeConfig } from './runtime';
 
 /** Default MCPs per agent - "*" means all MCPs, "!item" excludes specific MCPs */
 
 export const DEFAULT_AGENT_MCPS: Record<AgentName, string[]> = {
-  orchestrator: ['*', '!context7'],
-  designer: [],
-  oracle: [],
-  librarian: ['context7', 'gh_grep'],
-  explorer: [],
-  fixer: [],
+  omnissiah: ['*', '!context7'],
+  artisan: [],
+  dominus: [],
+  logis: ['context7', 'gh_grep'],
+  magos: [],
+  genetor: [],
   observer: [],
   council: [],
   councillor: [],
@@ -47,14 +47,7 @@ export function getAgentMcpList(
   agentName: string,
   runtime: RuntimeConfig,
 ): string[] {
-  const agents = runtime.agents();
-  const agentConfig =
-    agents[agentName] ??
-    agents[
-      Object.keys(AGENT_ALIASES).find(
-        (key) => AGENT_ALIASES[key] === agentName,
-      ) ?? ''
-    ];
+  const agentConfig = lookupAgentEntry(runtime.agents(), agentName);
   if (agentConfig?.mcps !== undefined) {
     return agentConfig.mcps;
   }

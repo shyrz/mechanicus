@@ -20,53 +20,53 @@ export const CUSTOM_SKILLS: CustomSkill[] = [
   {
     name: 'simplify',
     description: 'Code simplification and readability-focused refactoring',
-    allowedAgents: ['oracle'],
+    allowedAgents: ['dominus'],
     sourcePath: 'src/skills/simplify',
   },
   {
     name: 'codemap',
     description: 'Repository understanding and hierarchical codemap generation',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/codemap',
   },
   {
     name: 'clonedeps',
     description: 'Clone important dependency source for local inspection',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/clonedeps',
   },
   {
     name: 'deepwork',
     description:
       'Heavy/complex coding sessions and large modifications workflow',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/deepwork',
   },
   {
     name: 'verification-planning',
     description:
       'Plan credible, proportionate evidence before non-trivial implementation',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/verification-planning',
   },
   {
     name: 'reflect',
     description:
       'Review repeated work and suggest reusable workflow improvements',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/reflect',
   },
   {
     name: 'mechanicus',
     description: 'Configure, customize, and safely improve mechanicus setups',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/mechanicus',
   },
   {
     name: 'worktrees',
     description:
       'Manage Git worktrees as Mechanicus safe isolated coding lanes for complex/risky/parallel work',
-    allowedAgents: ['orchestrator'],
+    allowedAgents: ['omnissiah'],
     sourcePath: 'src/skills/worktrees',
   },
 ];

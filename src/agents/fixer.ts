@@ -18,7 +18,7 @@ ${WRITABLE_FILE_OPERATIONS_RULES}
 - If context is insufficient: use grep/glob/read directly - do not delegate
 - Only ask for missing inputs you truly cannot retrieve yourself
 - Do not act as the primary reviewer; implement requested changes and surface obvious issues briefly
-- No design work — layout, styling, visual hierarchy, responsive behavior, animation, component feel. Refuse and tell the caller to use @designer.
+- No design work — layout, styling, visual hierarchy, responsive behavior, animation, component feel. Refuse and tell the caller to use @artisan.
 
 **Verification**:
 - Run only validation assigned by the Orchestrator; do not broaden it
@@ -54,7 +54,7 @@ export function createFixerAgent(
   }
 
   return {
-    name: 'fixer',
+    name: 'genetor',
     description:
       'Fast implementation specialist. Receives complete context and task spec, executes code changes efficiently.',
     config: {

@@ -1,5 +1,7 @@
 type SessionMetadataEviction = (sessionID: string) => void;
 
+import { isPrimaryAgentName } from '../config/constants';
+
 export class SessionMetadataStore {
   readonly #agents = new Map<string, string>();
   readonly #models = new Map<string, string>();
@@ -41,7 +43,7 @@ export class SessionMetadataStore {
   setAgent(sessionID: string, agent: string): void {
     this.#agents.set(sessionID, agent);
 
-    if (agent === 'orchestrator') {
+    if (isPrimaryAgentName(agent)) {
       this.#activeOrchestratorSessionIDs.add(sessionID);
     } else {
       this.#activeOrchestratorSessionIDs.delete(sessionID);
@@ -56,7 +58,7 @@ export class SessionMetadataStore {
   }
 
   markOrchestratorActive(sessionID: string): void {
-    if (this.#agents.get(sessionID) === 'orchestrator') {
+    if (isPrimaryAgentName(this.#agents.get(sessionID))) {
       this.#activeOrchestratorSessionIDs.add(sessionID);
     }
   }

@@ -1,4 +1,4 @@
-import { AGENT_ALIASES } from '../config/constants';
+import { AGENT_ALIASES, isPrimaryAgentName } from '../config/constants';
 import { CUSTOM_SKILLS } from './custom-skills';
 
 /**
@@ -21,7 +21,7 @@ export interface PermissionOnlySkill {
 export const PERMISSION_ONLY_SKILLS: PermissionOnlySkill[] = [
   {
     name: 'requesting-code-review',
-    allowedAgents: ['oracle'],
+    allowedAgents: ['dominus'],
     description:
       'Code review template for reviewer subagents in multi-step workflows',
   },
@@ -65,7 +65,7 @@ export function getSkillPermissionsForAgent(
 
   // Orchestrator gets all skills by default, others are restricted
   const permissions: Record<string, 'allow' | 'ask' | 'deny'> = {
-    '*': agentName === 'orchestrator' ? 'allow' : 'deny',
+    '*': isPrimaryAgentName(agentName) ? 'allow' : 'deny',
   };
 
   // If the user provided an explicit skill list (even empty), honor it
@@ -138,11 +138,11 @@ export function resolveEffectiveSkills(
   }
 
   // Without a base list the working base is the agent's default grants
-  // (orchestrator defaults to allow-all), so additions build on top of
+  // (the primary agent defaults to allow-all), so additions build on top of
   // what the agent already gets and removals prune from it.
   const workingBase =
     base ??
-    (agentName === 'orchestrator'
+    (isPrimaryAgentName(agentName)
       ? ['*']
       : getDefaultGrantedSkillNames(agentName));
 

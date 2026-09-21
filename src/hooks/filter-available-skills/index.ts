@@ -5,8 +5,9 @@
  */
 import type { PluginInput } from '@opencode-ai/plugin';
 import { getSkillPermissionsForAgent } from '../../cli/skills';
-import { AGENT_ALIASES, type AgentOverrideConfig } from '../../config';
+import { lookupAgentEntry, PRIMARY_AGENT_NAME } from '../../config/constants';
 import type { RuntimeConfig } from '../../config/runtime';
+import type { AgentOverrideConfig } from '../../config/schema';
 import {
   isMessageWithParts,
   isUserMessageWithParts,
@@ -28,11 +29,11 @@ function getCurrentAgent(messages: MessageWithParts[]): string {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (isUserMessageWithParts(message)) {
-      return message.info.agent ?? 'orchestrator';
+      return message.info.agent ?? PRIMARY_AGENT_NAME;
     }
   }
 
-  return 'orchestrator';
+  return PRIMARY_AGENT_NAME;
 }
 
 function extractSkillEntries(blockContent: string): SkillEntry[] {
@@ -106,13 +107,10 @@ export function createFilterAvailableSkillsHook(
     }
 
     const agents = runtime.agents();
-    const agentConfig: AgentOverrideConfig | undefined =
-      agents[agentName] ??
-      agents[
-        Object.keys(AGENT_ALIASES).find(
-          (key) => AGENT_ALIASES[key] === agentName,
-        ) ?? ''
-      ];
+    const agentConfig: AgentOverrideConfig | undefined = lookupAgentEntry(
+      agents,
+      agentName,
+    );
     const permissionRules = getSkillPermissionsForAgent(
       agentName,
       agentConfig?.skills,

@@ -40,7 +40,7 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer).toBeDefined();
     expect(explorer?.config.model).toBe('test/old-explore-model');
   });
@@ -52,7 +52,7 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const designer = agents.find((a) => a.name === 'designer');
+    const designer = agents.find((a) => a.name === 'artisan');
     expect(designer).toBeDefined();
     expect(designer?.config.model).toBe('test/old-frontend-model');
   });
@@ -65,7 +65,7 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer?.config.model).toBe('new-model');
   });
 
@@ -77,10 +77,10 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    expect(agents.find((a) => a.name === 'explorer')?.config.model).toBe(
+    expect(agents.find((a) => a.name === 'magos')?.config.model).toBe(
       'direct-explorer',
     );
-    expect(agents.find((a) => a.name === 'designer')?.config.model).toBe(
+    expect(agents.find((a) => a.name === 'artisan')?.config.model).toBe(
       'direct-designer',
     );
   });
@@ -92,7 +92,7 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer?.config.temperature).toBe(0.5);
   });
 
@@ -103,7 +103,7 @@ describe('agent alias backward compatibility', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer?.config.variant).toBe('low');
   });
 });
@@ -135,7 +135,7 @@ describe('built-in subagent preset fallback', () => {
       preset: 'minimal',
       presets: {
         minimal: {
-          oracle: { model: 'anthropic/claude-sonnet-4-6' },
+          dominus: { model: 'anthropic/claude-sonnet-4-6' },
         },
       },
       agents: {
@@ -158,8 +158,8 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
-    const librarian = agents.find((a) => a.name === 'librarian');
+    const fixer = agents.find((a) => a.name === 'genetor');
+    const librarian = agents.find((a) => a.name === 'logis');
     expect(fixer?.config.model).toBe(librarian?.config.model);
   });
 
@@ -177,8 +177,8 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
-    const librarian = agents.find((a) => a.name === 'librarian');
+    const fixer = agents.find((a) => a.name === 'genetor');
+    const librarian = agents.find((a) => a.name === 'logis');
 
     expect(librarian?.config.model).toBe('librarian-local-model');
     expect(fixer?.config.model).toBeUndefined();
@@ -198,8 +198,8 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const librarian = agents.find((a) => a.name === 'librarian');
-    const fixer = agents.find((a) => a.name === 'fixer');
+    const librarian = agents.find((a) => a.name === 'logis');
+    const fixer = agents.find((a) => a.name === 'genetor');
 
     expect(librarian?.config.model).toBe('orchestrator-model');
     expect(fixer?.config.model).toBe('fixer-local-model');
@@ -217,8 +217,8 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
-    const librarian = agents.find((a) => a.name === 'librarian');
+    const fixer = agents.find((a) => a.name === 'genetor');
+    const librarian = agents.find((a) => a.name === 'logis');
 
     expect(librarian?.config.model).toBe('librarian-local-model');
     expect(fixer?.config.model).toBeUndefined();
@@ -238,7 +238,7 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
+    const fixer = agents.find((a) => a.name === 'genetor');
 
     expect(fixer?.config.model).toBeUndefined();
   });
@@ -256,7 +256,7 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
 
     expect(explorer?.config.model).toBeUndefined();
   });
@@ -269,7 +269,7 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
+    const fixer = agents.find((a) => a.name === 'genetor');
     expect(fixer?.config.model).toBe('fixer-specific-model');
   });
 
@@ -284,7 +284,7 @@ describe('fixer agent fallback', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const fixer = agents.find((a) => a.name === 'fixer');
+    const fixer = agents.find((a) => a.name === 'genetor');
 
     expect(fixer?.config.model).toBe('fixer-specific-model');
   });
@@ -356,12 +356,12 @@ describe('fixer agent fallback', () => {
 describe('orchestrator agent', () => {
   test('orchestrator is first in agents array', () => {
     const agents = createAgents(runtimeFor());
-    expect(agents[0].name).toBe('orchestrator');
+    expect(agents[0].name).toBe('omnissiah');
   });
 
   test('orchestrator has question permission set to allow', () => {
     const agents = createAgents(runtimeFor());
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?.config.permission).toBeDefined();
     expect(
       (orchestrator as { config: { permission: Record<string, unknown> } })
@@ -371,7 +371,7 @@ describe('orchestrator agent', () => {
 
   test('orchestrator is allowed to invoke task-control tools', () => {
     const agents = createAgents(runtimeFor());
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const permission = (
       orchestrator as { config: { permission: Record<string, unknown> } }
     ).config.permission;
@@ -389,7 +389,7 @@ describe('orchestrator agent', () => {
 
   test('orchestrator is allowed to invoke wait_for_user', () => {
     const agents = createAgents(runtimeFor());
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(
       (orchestrator as { config: { permission: Record<string, unknown> } })
         .config.permission.wait_for_user,
@@ -403,7 +403,7 @@ describe('orchestrator agent', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?.config.model).toBe('custom-orchestrator-model');
     expect(orchestrator?.config.temperature).toBe(0.3);
   });
@@ -415,7 +415,7 @@ describe('orchestrator agent', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?.config.variant).toBe('high');
   });
 
@@ -432,7 +432,7 @@ describe('orchestrator agent', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator?._modelArray).toEqual([
       { id: 'google/gemini-3-pro', variant: 'high' },
       { id: 'github-copilot/claude-3.5-haiku' },
@@ -466,10 +466,10 @@ describe('per-model variant in array config', () => {
     };
     const configs = getAgentConfigs(runtimeFor(config));
 
-    expect(configs.explorer.model).toBe('google/gemini-3-flash');
-    expect(configs.explorer.variant).toBe('low');
-    expect(configs.librarian.model).toBe('anthropic/claude-haiku-4-5');
-    expect(configs.librarian.variant).toBe('fast');
+    expect(configs.magos.model).toBe('google/gemini-3-flash');
+    expect(configs.magos.variant).toBe('low');
+    expect(configs.logis.model).toBe('anthropic/claude-haiku-4-5');
+    expect(configs.logis.variant).toBe('fast');
   });
 
   test('subagent stores model array with per-model variants', () => {
@@ -484,7 +484,7 @@ describe('per-model variant in array config', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer?._modelArray).toEqual([
       { id: 'google/gemini-3-flash', variant: 'low' },
       { id: 'openai/gpt-4o-mini' },
@@ -507,7 +507,7 @@ describe('per-model variant in array config', () => {
       }),
     );
 
-    expect(configs.librarian.variant).toBe('high');
+    expect(configs.logis.variant).toBe('high');
   });
 
   test('top-level variant preserved alongside per-model variants', () => {
@@ -523,7 +523,7 @@ describe('per-model variant in array config', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     // top-level variant still set as default
     expect(orchestrator?.config.variant).toBe('low');
     // per-model variants stored in _modelArray
@@ -578,24 +578,24 @@ describe('spaced model ID registrations', () => {
       variant: 'direct',
     });
 
-    expect(
-      agents.find((agent) => agent.name === 'explorer')?._modelArray,
-    ).toEqual([
-      { id: primary, variant: 'fast' },
-      { id: secondary, variant: 'balanced' },
-    ]);
+    expect(agents.find((agent) => agent.name === 'magos')?._modelArray).toEqual(
+      [
+        { id: primary, variant: 'fast' },
+        { id: secondary, variant: 'balanced' },
+      ],
+    );
     expect(
       agents.find((agent) => agent.name === 'reviewer')?._modelArray,
     ).toEqual([
       { id: secondary, variant: 'precise' },
       { id: fallback, variant: 'economy' },
     ]);
-    expect(configs.explorer).toMatchObject({
+    expect(configs.magos).toMatchObject({
       model: primary,
       variant: 'fast',
       mode: 'subagent',
     });
-    expect(configs.librarian).toMatchObject({
+    expect(configs.logis).toMatchObject({
       model: primary,
       variant: 'direct',
       mode: 'subagent',
@@ -655,7 +655,7 @@ describe('spaced model ID registrations', () => {
 describe('skill permissions', () => {
   test('orchestrator gets command-style bundled skills allowed by default', () => {
     const agents = createAgents(runtimeFor());
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator).toBeDefined();
     const skillPerm = (
       orchestrator?.config.permission as Record<string, unknown>
@@ -669,7 +669,7 @@ describe('skill permissions', () => {
 
   test('fixer does not get codemap skill allowed by default', () => {
     const agents = createAgents(runtimeFor());
-    const fixer = agents.find((a) => a.name === 'fixer');
+    const fixer = agents.find((a) => a.name === 'genetor');
     expect(fixer).toBeDefined();
     const skillPerm = (fixer?.config.permission as Record<string, unknown>)
       ?.skill as Record<string, string>;
@@ -679,7 +679,7 @@ describe('skill permissions', () => {
 
   test('oracle gets requesting-code-review skill allowed by default', () => {
     const agents = createAgents(runtimeFor());
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle).toBeDefined();
     const skillPerm = (oracle?.config.permission as Record<string, unknown>)
       ?.skill as Record<string, string>;
@@ -688,7 +688,7 @@ describe('skill permissions', () => {
 
   test('oracle gets simplify skill allowed by default', () => {
     const agents = createAgents(runtimeFor());
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle).toBeDefined();
     const skillPerm = (oracle?.config.permission as Record<string, unknown>)
       ?.skill as Record<string, string>;
@@ -705,7 +705,7 @@ describe('tool permissions', () => {
 
   test('oracle is denied access to task-control tools by default', () => {
     const agents = createAgents(runtimeFor());
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     const permission = (
       oracle as { config: { permission: Record<string, unknown> } }
     ).config.permission;
@@ -731,7 +731,7 @@ describe('tool permissions', () => {
         },
       }),
     );
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(
       (oracle as { config: { permission: Record<string, unknown> } }).config
         .permission.task_cancel,
@@ -741,7 +741,7 @@ describe('tool permissions', () => {
   test('subagents are denied access to wait_for_user', () => {
     const agents = createAgents(runtimeFor());
 
-    for (const name of ['oracle', 'explorer', 'fixer']) {
+    for (const name of ['dominus', 'magos', 'genetor']) {
       const agent = agents.find((candidate) => candidate.name === name);
       expect(
         (agent as { config: { permission: Record<string, unknown> } }).config
@@ -798,7 +798,7 @@ describe('tool permissions', () => {
 
 test('orchestrator prompt includes Council Mode block when councillors exist', () => {
   const agents = createAgents(runtimeFor({ council: councilConfig() }));
-  const orchestrator = agents.find((a) => a.name === 'orchestrator');
+  const orchestrator = agents.find((a) => a.name === 'omnissiah');
   const prompt = orchestrator?.config.prompt as string;
   expect(prompt).toContain('## Council Mode');
   expect(prompt).toContain("task(subagent_type='councillor-alpha'");
@@ -807,18 +807,18 @@ test('orchestrator prompt includes Council Mode block when councillors exist', (
 
 test('orchestrator prompt excludes Council Mode when no councillors', () => {
   const agents = createAgents(runtimeFor());
-  const orchestrator = agents.find((a) => a.name === 'orchestrator');
+  const orchestrator = agents.find((a) => a.name === 'omnissiah');
   const prompt = orchestrator?.config.prompt as string;
   expect(prompt).not.toContain('## Council Mode');
 });
 
 describe('isSubagent type guard', () => {
   test('returns true for valid subagent names', () => {
-    expect(isSubagent('explorer')).toBe(true);
-    expect(isSubagent('librarian')).toBe(true);
-    expect(isSubagent('oracle')).toBe(true);
-    expect(isSubagent('designer')).toBe(true);
-    expect(isSubagent('fixer')).toBe(true);
+    expect(isSubagent('magos')).toBe(true);
+    expect(isSubagent('logis')).toBe(true);
+    expect(isSubagent('dominus')).toBe(true);
+    expect(isSubagent('artisan')).toBe(true);
+    expect(isSubagent('genetor')).toBe(true);
   });
 
   test('returns false for orchestrator', () => {
@@ -834,9 +834,9 @@ describe('isSubagent type guard', () => {
 
 describe('agent classification', () => {
   test('SUBAGENT_NAMES excludes orchestrator', () => {
-    expect(SUBAGENT_NAMES).not.toContain('orchestrator');
-    expect(SUBAGENT_NAMES).toContain('explorer');
-    expect(SUBAGENT_NAMES).toContain('fixer');
+    expect(SUBAGENT_NAMES).not.toContain('omnissiah');
+    expect(SUBAGENT_NAMES).toContain('magos');
+    expect(SUBAGENT_NAMES).toContain('genetor');
   });
 
   test('getAgentConfigs applies correct classification visibility and mode', () => {
@@ -844,7 +844,7 @@ describe('agent classification', () => {
     const configs = getAgentConfigs(runtimeFor({ disabled_agents: [] }));
 
     // Primary agent
-    expect(configs.orchestrator.mode).toBe('primary');
+    expect(configs.omnissiah.mode).toBe('primary');
 
     // Subagents
     for (const name of SUBAGENT_NAMES) {
@@ -886,8 +886,8 @@ describe('createAgents', () => {
       }),
     );
 
-    const orchestrator = agents.find((agent) => agent.name === 'orchestrator');
-    const explorer = agents.find((agent) => agent.name === 'explorer');
+    const orchestrator = agents.find((agent) => agent.name === 'omnissiah');
+    const explorer = agents.find((agent) => agent.name === 'magos');
 
     expect(explorer?.config.prompt).toBe('Replacement explorer prompt.');
     expect(orchestrator?.config.prompt).not.toContain(
@@ -920,12 +920,12 @@ describe('createAgents', () => {
   test('creates all agents without config', () => {
     const agents = createAgents(runtimeFor());
     const names = agents.map((a) => a.name);
-    expect(names).toContain('orchestrator');
-    expect(names).toContain('explorer');
-    expect(names).toContain('designer');
-    expect(names).toContain('oracle');
-    expect(names).toContain('librarian');
-    expect(names).toContain('fixer');
+    expect(names).toContain('omnissiah');
+    expect(names).toContain('magos');
+    expect(names).toContain('artisan');
+    expect(names).toContain('dominus');
+    expect(names).toContain('logis');
+    expect(names).toContain('genetor');
   });
 
   test('creates exactly 6 agents by default (observer and council disabled)', () => {
@@ -937,7 +937,7 @@ describe('createAgents', () => {
     const runtime = runtimeFor();
     const agents = createAgents(runtime);
     const names = agents.map((a) => a.name);
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const configs = getAgentConfigs(runtime);
 
     expect(names).not.toContain('council');
@@ -955,7 +955,7 @@ describe('createAgents', () => {
     const runtime = runtimeFor({ council: councilConfig() });
     const agents = createAgents(runtime);
     const names = agents.map((a) => a.name);
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const configs = getAgentConfigs(runtime);
 
     expect(names).toContain('council');
@@ -977,17 +977,17 @@ describe('createAgents', () => {
 describe('getAgentConfigs', () => {
   test('returns config record keyed by agent name', () => {
     const configs = getAgentConfigs(runtimeFor());
-    expect(configs.orchestrator).toBeDefined();
-    expect(configs.explorer).toBeDefined();
+    expect(configs.omnissiah).toBeDefined();
+    expect(configs.magos).toBeDefined();
     // Agents have no hardcoded default model; OpenCode resolves them from the
     // global/session model unless users override per-agent models.
-    expect(configs.explorer.model).toBeUndefined();
+    expect(configs.magos.model).toBeUndefined();
   });
 
   test('includes description in SDK config', () => {
     const configs = getAgentConfigs(runtimeFor());
-    expect(configs.orchestrator.description).toBeDefined();
-    expect(configs.explorer.description).toBeDefined();
+    expect(configs.omnissiah.description).toBeDefined();
+    expect(configs.magos.description).toBeDefined();
   });
 
   test('omits temperature from default SDK agent configs', () => {
@@ -1011,12 +1011,12 @@ describe('getAgentConfigs', () => {
     );
 
     for (const name of [
-      'orchestrator',
-      'explorer',
-      'librarian',
-      'oracle',
-      'designer',
-      'fixer',
+      'omnissiah',
+      'magos',
+      'logis',
+      'dominus',
+      'artisan',
+      'genetor',
       'observer',
       'council',
       'councillor',
@@ -1038,8 +1038,8 @@ describe('getAgentConfigs', () => {
       }),
     );
 
-    expect(configs.explorer.temperature).toBe(0.5);
-    expect(configs.fixer.temperature).toBe(0);
+    expect(configs.magos.temperature).toBe(0.5);
+    expect(configs.genetor.temperature).toBe(0);
   });
 
   test('built-in agents get no default color', () => {
@@ -1068,7 +1068,7 @@ describe('getAgentConfigs', () => {
       }),
     );
 
-    expect(configs.oracle.color).toBe('#A1b2C3');
+    expect(configs.dominus.color).toBe('#A1b2C3');
     expect(configs.reviewer.color).toBe('warning');
   });
 
@@ -1199,7 +1199,7 @@ describe('options passthrough', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.options).toEqual({ textVerbosity: 'low' });
   });
 
@@ -1215,7 +1215,7 @@ describe('options passthrough', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.options).toEqual({
       thinking: { type: 'enabled', budgetTokens: 16000 },
     });
@@ -1233,7 +1233,7 @@ describe('options passthrough', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.model).toBe('openai/gpt-5.6');
     expect(oracle?.config.variant).toBe('high');
     expect(oracle?.config.temperature).toBe(0.7);
@@ -1250,7 +1250,7 @@ describe('options passthrough', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     expect(oracle?.config.options).toBeUndefined();
   });
 
@@ -1264,7 +1264,7 @@ describe('options passthrough', () => {
       },
     };
     const configs = getAgentConfigs(runtimeFor(config));
-    expect(configs.oracle.options).toEqual({ textVerbosity: 'low' });
+    expect(configs.dominus.options).toEqual({ textVerbosity: 'low' });
   });
 
   test('options are shallow-merged with existing agent config options', () => {
@@ -1278,7 +1278,7 @@ describe('options passthrough', () => {
       },
     };
     const agents = createAgents(runtimeFor(config));
-    const oracle = agents.find((a) => a.name === 'oracle');
+    const oracle = agents.find((a) => a.name === 'dominus');
     // Override options should merge with (not replace) any factory defaults
     expect(oracle?.config.options).toEqual({ reasoningEffort: 'medium' });
   });
@@ -1466,7 +1466,7 @@ describe('AgentOverrideConfigSchema options validation', () => {
       },
     };
     const configs = getAgentConfigs(runtimeFor(config));
-    expect(configs.oracle.description).toBe('Custom oracle description');
+    expect(configs.dominus.description).toBe('Custom oracle description');
   });
 });
 
@@ -1601,10 +1601,10 @@ describe('disabled_agents', () => {
     const names = agents.map((a) => a.name);
     expect(names).not.toContain('designer');
     expect(names).not.toContain('fixer');
-    expect(names).toContain('orchestrator');
-    expect(names).toContain('explorer');
-    expect(names).toContain('oracle');
-    expect(names).toContain('librarian');
+    expect(names).toContain('omnissiah');
+    expect(names).toContain('magos');
+    expect(names).toContain('dominus');
+    expect(names).toContain('logis');
   });
 
   test('protected agents cannot be disabled', () => {
@@ -1617,7 +1617,7 @@ describe('disabled_agents', () => {
     const names = agents.map((a) => a.name);
     expect(runtime.disabledAgents.has('orchestrator')).toBe(false);
     expect(runtime.disabledAgents.has('councillor')).toBe(false);
-    expect(names).toContain('orchestrator');
+    expect(names).toContain('omnissiah');
     expect(names).toContain('councillor');
   });
 
@@ -1638,7 +1638,7 @@ describe('disabled_agents', () => {
     expect(agents.length).toBe(6); // observer and council disabled
 
     const disabledConfig: PluginConfig = {
-      disabled_agents: ['observer', 'designer'],
+      disabled_agents: ['observer', 'artisan'],
     };
     const disabledAgents = createAgents(runtimeFor(disabledConfig));
     expect(disabledAgents.length).toBe(5);
@@ -1808,7 +1808,7 @@ describe('createAgents with malformed disabled_tools', () => {
       disabled_tools: 'not-an-array' as any,
     };
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     expect(orchestrator).toBeDefined();
     // When disabled_tools is malformed (treated as empty array), wait_for_user
     // should be enabled, which is reflected in the prompt text

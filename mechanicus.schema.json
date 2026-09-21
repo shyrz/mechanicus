@@ -69,7 +69,8 @@
               "type": "string",
               "enum": [
                 "session",
-                "orchestrator"
+                "orchestrator",
+                "omnissiah"
               ]
             },
             "temperature": {
@@ -554,7 +555,8 @@
             "type": "string",
             "enum": [
               "session",
-              "orchestrator"
+              "orchestrator",
+              "omnissiah"
             ]
           },
           "temperature": {
@@ -1396,7 +1398,7 @@
           "type": "boolean"
         },
         "model": {
-          "description": "Dedicated model(s) for smartfetch secondary-model summarization. Same shape as agent model config (string, array of strings/objects with id+variant). Takes priority over small_model, agents.explorer.model, and agents.librarian.model.",
+          "description": "Dedicated model(s) for smartfetch secondary-model summarization. Same shape as agent model config (string, array of strings/objects with id+variant). Takes priority over small_model, agents.magos.model, and agents.logis.model.",
           "anyOf": [
             {
               "type": "string"

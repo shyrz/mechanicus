@@ -41,7 +41,7 @@ export function createOracleAgent(
   }
 
   return {
-    name: 'oracle',
+    name: 'dominus',
     description:
       'Strategic technical advisor. Use for architecture decisions, complex debugging, code review, simplification, and engineering guidance.',
     config: {

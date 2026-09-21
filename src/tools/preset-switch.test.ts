@@ -110,9 +110,9 @@ describe('switchPresetOnDisk', () => {
       'current session keeps its existing agent models',
     );
     expect(result.summary).toContain(
-      'orchestrator → model: anthropic/claude-3.5-haiku',
+      'omnissiah → model: anthropic/claude-3.5-haiku',
     );
-    expect(result.summary).toContain('explorer → model: openai/gpt-5.6-luna');
+    expect(result.summary).toContain('magos → model: openai/gpt-5.6-luna');
   });
 
   test('persists preset name to a JSONC user config file', () => {
@@ -183,7 +183,7 @@ describe('switchPresetOnDisk', () => {
     expect(persisted.agents).toEqual({ oracle: { model: 'old-model' } });
   });
 
-  test('resolves legacy alias keys (explore → explorer)', () => {
+  test('resolves legacy alias keys (explore → magos)', () => {
     const config: PluginConfig = {
       presets: {
         scout: { explore: { model: 'openai/gpt-5.6-luna' } },
@@ -193,7 +193,7 @@ describe('switchPresetOnDisk', () => {
     const result = switchPresetOnDisk(tempDir, 'scout', config);
 
     expect(result.ok).toBe(true);
-    expect(result.summary.some((l) => l.startsWith('explorer →'))).toBe(true);
+    expect(result.summary.some((l) => l.startsWith('magos →'))).toBe(true);
   });
 
   test('skips agents with empty overrides in a mixed preset', () => {
@@ -210,12 +210,10 @@ describe('switchPresetOnDisk', () => {
     const result = switchPresetOnDisk(tempDir, 'mixed', config);
 
     expect(result.ok).toBe(true);
-    expect(result.summary.some((l) => l.startsWith('orchestrator →'))).toBe(
-      true,
-    );
-    expect(result.summary.some((l) => l.startsWith('oracle →'))).toBe(true);
-    // explorer has no usable override and must not appear in the summary
-    expect(result.summary.some((l) => l.startsWith('explorer →'))).toBe(false);
+    expect(result.summary.some((l) => l.startsWith('omnissiah →'))).toBe(true);
+    expect(result.summary.some((l) => l.startsWith('dominus →'))).toBe(true);
+    // magos has no usable override and must not appear in the summary
+    expect(result.summary.some((l) => l.startsWith('magos →'))).toBe(false);
   });
 
   test('resolves array-form model to the first string entry', () => {
@@ -233,7 +231,7 @@ describe('switchPresetOnDisk', () => {
 
     expect(result.ok).toBe(true);
     expect(result.summary).toContain(
-      'orchestrator → model: anthropic/claude-3.5-haiku',
+      'omnissiah → model: anthropic/claude-3.5-haiku',
     );
   });
 
@@ -255,7 +253,7 @@ describe('switchPresetOnDisk', () => {
 
     expect(result.ok).toBe(true);
     expect(result.summary).toContain(
-      'oracle → model: anthropic/claude-sonnet-4-6 → variant: thinking',
+      'dominus → model: anthropic/claude-sonnet-4-6 → variant: thinking',
     );
   });
 
@@ -276,7 +274,7 @@ describe('switchPresetOnDisk', () => {
 
     expect(result.ok).toBe(true);
     expect(result.summary).toContain(
-      'orchestrator → model: openai/o3 → temp: 0.1 → options: yes',
+      'omnissiah → model: openai/o3 → temp: 0.1 → options: yes',
     );
   });
 
@@ -492,7 +490,7 @@ describe('setAgentOverride / removeAgentFromPreset', () => {
 describe('buildPresetSummary', () => {
   test('orders fields as model, variant, temp, options', () => {
     const summary = buildPresetSummary({
-      oracle: {
+      dominus: {
         model: 'anthropic/claude-sonnet-4-6',
         variant: 'thinking',
         temperature: 0.2,
@@ -501,7 +499,7 @@ describe('buildPresetSummary', () => {
     });
 
     expect(summary).toEqual([
-      'oracle → model: anthropic/claude-sonnet-4-6 → variant: thinking → temp: 0.2 → options: yes',
+      'dominus → model: anthropic/claude-sonnet-4-6 → variant: thinking → temp: 0.2 → options: yes',
     ]);
   });
 });

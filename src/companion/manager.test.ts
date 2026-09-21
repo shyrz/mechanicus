@@ -91,7 +91,19 @@ describe('CompanionManager', () => {
     expect(state.sessions[0].pid).toBe(process.pid);
   });
 
-  it('shows orchestrator while orchestrator is busy with no specialists', () => {
+  it('shows the primary agent while it is busy with no specialists', () => {
+    const m = make();
+    m.onLoad();
+    m.onSessionStatus({
+      sessionId: 'ses_orch',
+      agent: 'omnissiah',
+      status: 'busy',
+    });
+    expect(readState().sessions[0].active_agents).toEqual(['omnissiah']);
+    expect(readState().sessions[0].status).toBe('busy');
+  });
+
+  it('accepts the legacy orchestrator alias for the primary agent', () => {
     const m = make();
     m.onLoad();
     m.onSessionStatus({
@@ -99,7 +111,7 @@ describe('CompanionManager', () => {
       agent: 'orchestrator',
       status: 'busy',
     });
-    expect(readState().sessions[0].active_agents).toEqual(['orchestrator']);
+    expect(readState().sessions[0].active_agents).toEqual(['omnissiah']);
     expect(readState().sessions[0].status).toBe('busy');
   });
 
@@ -158,17 +170,17 @@ describe('CompanionManager', () => {
     expect(readState().sessions[0].active_agents).toEqual(['fixer']);
   });
 
-  it('falls back to orchestrator when last specialist finishes but orchestrator still busy', () => {
+  it('falls back to the primary agent when last specialist finishes but it is still busy', () => {
     const m = make();
     m.onLoad();
     m.onSessionStatus({
       sessionId: 'ses_orch',
-      agent: 'orchestrator',
+      agent: 'omnissiah',
       status: 'busy',
     });
     m.onSessionStatus({ sessionId: 'ses_a', agent: 'oracle', status: 'busy' });
     m.onSessionStatus({ sessionId: 'ses_a', agent: 'oracle', status: 'idle' });
-    expect(readState().sessions[0].active_agents).toEqual(['orchestrator']);
+    expect(readState().sessions[0].active_agents).toEqual(['omnissiah']);
   });
 
   it('keeps background specialists visible when orchestrator goes idle', () => {

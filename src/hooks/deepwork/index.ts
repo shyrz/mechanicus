@@ -15,7 +15,7 @@ function activationPrompt(task: string): string {
     '- draft a phased implementation/delegation plan with a small number of coherent phases based on dependencies and natural delivery boundaries; do not split work merely to reduce review scope;',
     '- before execution, show the user a compact overview with phase titles/order, delegated specialists and ownership/scope, plus the Oracle review total, gate after each phase, and a short reason for each;',
     '- execute phase by phase with background specialists where useful;',
-    '- wait for hook-driven background completion, reconcile results, validate and update state, then ask `@oracle` to review every planned phase before continuing;',
+    '- wait for hook-driven background completion, reconcile results, validate and update state, then ask `@dominus` to review every planned phase before continuing;',
     '- batch material actionable Oracle findings, including simplify/readability feedback, into one bounded remediation pass and validate it with focused evidence; only re-review when the remediation changes the reviewed decision/risk or the original concern cannot otherwise be verified.',
     '',
     'Task:',

@@ -39,7 +39,7 @@ export function createV1InterviewSessionRuntime(
       await client.session.promptAsync({
         path: { id: sessionID },
         body: {
-          agent: 'orchestrator',
+          agent: 'omnissiah',
           parts: [createInternalAgentTextPart(text)],
           ...(model ? { model } : {}),
         },

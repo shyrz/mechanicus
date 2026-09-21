@@ -578,7 +578,7 @@ describe('plugin TUI agent activity', () => {
     } as never);
 
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-      'fixer-b': 'fixer',
+      'fixer-b': 'genetor',
     });
 
     await hooks?.event?.({
@@ -610,13 +610,13 @@ describe('plugin TUI agent activity', () => {
     );
     await busy('oracle-live');
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-      'oracle-live': 'oracle',
+      'oracle-live': 'dominus',
     });
 
     const second = await createActivityPlugin();
     try {
       expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-        'oracle-live': 'oracle',
+        'oracle-live': 'dominus',
       });
     } finally {
       await second.dispose?.();
@@ -648,7 +648,7 @@ describe('plugin TUI agent activity', () => {
       } as never);
 
       expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-        'explorer-b': 'explorer',
+        'explorer-b': 'magos',
       });
     } finally {
       await otherHooks.dispose?.();
@@ -833,7 +833,7 @@ describe('plugin TUI agent activity', () => {
     await busy('lib-child');
 
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-      'lib-child': 'librarian',
+      'lib-child': 'logis',
     });
   });
 
@@ -868,7 +868,7 @@ describe('plugin TUI agent activity', () => {
     );
 
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-      'late-agent': 'fixer',
+      'late-agent': 'genetor',
     });
   });
 
@@ -892,7 +892,7 @@ describe('plugin TUI agent activity', () => {
     );
 
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({
-      root: 'fixer',
+      root: 'genetor',
     });
   });
 
@@ -1063,7 +1063,7 @@ describe('plugin TUI agent activity', () => {
     expect(snapshot.sessionDetails['child-launch-first']?.alias).toMatch(
       /^ora-\d+$/,
     );
-    expect(snapshot.activeSessions['child-launch-first']).toBe('oracle');
+    expect(snapshot.activeSessions['child-launch-first']).toBe('dominus');
   });
 
   test('busy then launch backfills the alias without resurrecting idle sessions', async () => {
@@ -1111,7 +1111,7 @@ describe('plugin TUI agent activity', () => {
     await busy('child-fg-1');
 
     expect(readTuiSnapshot(projectDir).activeSessions['child-fg-1']).toBe(
-      'oracle',
+      'dominus',
     );
 
     await hooks?.['tool.execute.after']?.(
@@ -1170,7 +1170,7 @@ describe('plugin TUI agent activity', () => {
     await busy('child-fg-2');
 
     expect(readTuiSnapshot(projectDir).activeSessions['child-fg-2']).toBe(
-      'oracle',
+      'dominus',
     );
 
     await hooks?.['tool.execute.after']?.(
@@ -1190,7 +1190,7 @@ describe('plugin TUI agent activity', () => {
     // Unconfirmed attribution keeps the full runtime discipline: the
     // terminal text alone must not clear the active session yet.
     expect(readTuiSnapshot(projectDir).activeSessions['child-fg-2']).toBe(
-      'oracle',
+      'dominus',
     );
 
     // Idle runtime evidence is what publishes the terminal state.
@@ -1216,7 +1216,7 @@ describe('plugin TUI agent activity', () => {
     );
     await busy('fixer-str');
     expect(readTuiSnapshot(projectDir).activeSessions['fixer-str']).toBe(
-      'fixer',
+      'genetor',
     );
 
     await hooks?.event?.({
@@ -1238,7 +1238,7 @@ describe('plugin TUI agent activity', () => {
     );
     await busy('oracle-err');
     expect(readTuiSnapshot(projectDir).activeSessions['oracle-err']).toBe(
-      'oracle',
+      'dominus',
     );
 
     await hooks?.event?.({
@@ -1747,7 +1747,7 @@ describe('plugin config model inheritance', () => {
     }
   });
 
-  test('config() writes the visible orchestrator display name as default_agent', async () => {
+  test('config() writes the visible primary display name as default_agent', async () => {
     const hooks = await loadConfiguredPlugin({
       council: {
         presets: { default: { alpha: { model: 'test/councillor' } } },
@@ -1762,8 +1762,8 @@ describe('plugin config model inheritance', () => {
     try {
       await hooks.config?.(hostConfig);
 
-      // The orchestrator's visible entry is keyed by its display name;
-      // canonical 'orchestrator' is only a hidden alias, so default_agent
+      // The primary agent's visible entry is keyed by its display name;
+      // canonical 'omnissiah' is only a hidden alias, so default_agent
       // must target the display-name entry.
       expect(hostConfig.default_agent).toBe('EngineeringLead');
       const agents = hostConfig.agent as Record<
@@ -1771,7 +1771,7 @@ describe('plugin config model inheritance', () => {
         Record<string, unknown>
       >;
       expect(agents.EngineeringLead?.hidden).toBeUndefined();
-      expect(agents.orchestrator?.hidden).toBe(true);
+      expect(agents.omnissiah?.hidden).toBe(true);
       expect(agents.ArchitectureCouncil?.hidden).toBeUndefined();
       expect(agents.council?.hidden).toBe(true);
     } finally {

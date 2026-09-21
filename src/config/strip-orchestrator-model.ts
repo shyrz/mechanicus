@@ -9,9 +9,12 @@ export function stripOrchestratorModel(
   enabled: boolean | undefined,
   preset: Preset | undefined,
 ): void {
-  if (enabled !== true || preset?.orchestrator?.model !== undefined) return;
+  const presetPrimaryModel = (preset?.omnissiah ?? preset?.orchestrator)?.model;
+  if (enabled !== true || presetPrimaryModel !== undefined) return;
 
-  const orchestrator = agents.orchestrator;
+  // Accept both the canonical 'omnissiah' key and the legacy 'orchestrator'
+  // key for the primary agent's override entry.
+  const orchestrator = agents.omnissiah ?? agents.orchestrator;
   if (!isRecord(orchestrator)) return;
 
   delete orchestrator.model;

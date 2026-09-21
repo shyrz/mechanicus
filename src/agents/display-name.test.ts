@@ -20,11 +20,11 @@ describe('displayName', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
     expect(explorer?.displayName).toBe('researcher');
 
     const sdkConfigs = getAgentConfigs(runtimeFor(config));
-    expect((sdkConfigs.explorer as { displayName?: string }).displayName).toBe(
+    expect((sdkConfigs.magos as { displayName?: string }).displayName).toBe(
       'researcher',
     );
   });
@@ -37,7 +37,7 @@ describe('displayName', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const prompt = orchestrator?.config.prompt ?? '';
 
     expect(prompt).toContain('@researcher');
@@ -52,7 +52,7 @@ describe('displayName', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const prompt = orchestrator?.config.prompt ?? '';
 
     expect(prompt).toContain('@researcher');
@@ -68,7 +68,7 @@ describe('displayName', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
     const prompt = orchestrator?.config.prompt ?? '';
 
     expect(prompt).toContain('@researcher');
@@ -158,7 +158,7 @@ describe('displayName', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
 
     expect(explorer?.displayName).toBe('researcher');
   });
@@ -179,12 +179,16 @@ describe('displayName', () => {
     expect(sdkConfigs.advisor.mode).toBe('subagent');
     expect(sdkConfigs.advisor.hidden).toBeUndefined();
 
-    expect(sdkConfigs.oracle).toBeDefined();
-    expect(sdkConfigs.oracle.mode).toBe('subagent');
-    expect(sdkConfigs.oracle.hidden).toBe(true);
+    // Legacy alias key on purpose: agents.oracle must keep working after the
+    // rename to dominus; the registered canonical key is dominus.
+    expect(sdkConfigs.dominus).toBeDefined();
+    expect(sdkConfigs.dominus.mode).toBe('subagent');
+    expect(sdkConfigs.dominus.hidden).toBe(true);
   });
 
-  test('uses orchestrator displayName as host-facing key with hidden internal alias', () => {
+  test('uses primary agent displayName as host-facing key with hidden internal alias', () => {
+    // Legacy alias key on purpose: config written as agents.orchestrator must
+    // keep working after the rename to omnissiah.
     const config: PluginConfig = {
       agents: {
         orchestrator: { displayName: 'engineer' },
@@ -200,9 +204,9 @@ describe('displayName', () => {
     expect(sdkConfigs.engineer.mode).toBe('primary');
     expect(sdkConfigs.engineer.hidden).toBeUndefined();
 
-    expect(sdkConfigs.orchestrator).toBeDefined();
-    expect(sdkConfigs.orchestrator.mode).toBe('primary');
-    expect(sdkConfigs.orchestrator.hidden).toBe(true);
+    expect(sdkConfigs.omnissiah).toBeDefined();
+    expect(sdkConfigs.omnissiah.mode).toBe('primary');
+    expect(sdkConfigs.omnissiah.hidden).toBe(true);
   });
 
   test('keeps internal-only council agents hidden even with displayName configured', () => {

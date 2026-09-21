@@ -1,18 +1,15 @@
-import {
-  AGENT_ALIASES,
-  type AgentOverrideConfig,
-  ALL_AGENT_NAMES,
-} from '../config';
+import { AGENT_ALIASES, ALL_AGENT_NAMES, lookupAgentEntry } from '../config';
 import type { RuntimeConfig } from '../config/runtime';
+import type { AgentOverrideConfig } from '../config/schema';
 
 /**
  * Normalizes an agent name by trimming whitespace and removing the optional @ prefix.
  *
- * @param agentName - The agent name to normalize (e.g., "@oracle" or "oracle")
+ * @param agentName - The agent name to normalize (e.g., "@dominus" or "dominus")
  * @returns The normalized agent name without @ prefix and trimmed of whitespace
  *
  * @example
- * normalizeAgentName("@oracle") // returns "oracle"
+ * normalizeAgentName("@dominus") // returns "dominus"
  * normalizeAgentName("  explore  ") // returns "explore"
  */
 export function normalizeAgentName(agentName: string): string {
@@ -33,23 +30,16 @@ function getPluginOverride(
   runtime: RuntimeConfig,
   name: string,
 ): AgentOverrideConfig | undefined {
-  const agents = runtime.agents();
-  return (
-    agents[name] ??
-    agents[
-      Object.keys(AGENT_ALIASES).find((key) => AGENT_ALIASES[key] === name) ??
-        ''
-    ]
-  );
+  return lookupAgentEntry(runtime.agents(), name);
 }
 
 /**
  * Resolve a runtime-provided agent name to an internal agent name.
  *
  * Supports:
- * - internal names (e.g. "oracle")
- * - @-prefixed names (e.g. "@oracle")
- * - displayName aliases (e.g. "advisor" -> "oracle")
+ * - internal names (e.g. "dominus")
+ * - @-prefixed names (e.g. "@dominus")
+ * - displayName aliases (e.g. "advisor" -> "dominus")
  */
 export function resolveRuntimeAgentName(
   runtime: RuntimeConfig,

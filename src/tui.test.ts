@@ -58,35 +58,35 @@ function createSnapshot(overrides: Partial<TuiSnapshot> = {}): TuiSnapshot {
 describe('tui sidebar agents', () => {
   test('scopes active agents to the visible conversation (#1147)', () => {
     const snapshot = createSnapshot({
-      activeSessions: { 'c1-oracle': 'oracle', 'c2-fixer': 'fixer' },
-      sessionParents: { 'c1-oracle': 'conv-1', 'c2-fixer': 'conv-2' },
+      activeSessions: { 'c1-dominus': 'dominus', 'c2-genetor': 'genetor' },
+      sessionParents: { 'c1-dominus': 'conv-1', 'c2-genetor': 'conv-2' },
     });
 
     expect(getActiveSidebarAgentNames(snapshot, 'conv-1')).toEqual(
-      new Set(['oracle']),
+      new Set(['dominus']),
     );
     expect(getActiveSidebarAgentNames(snapshot, 'conv-2')).toEqual(
-      new Set(['fixer']),
+      new Set(['genetor']),
     );
     // Home route: no visible conversation, keep the union.
     expect(getActiveSidebarAgentNames(snapshot)).toEqual(
-      new Set(['oracle', 'fixer']),
+      new Set(['dominus', 'genetor']),
     );
   });
 
   test('navigating into a child route keeps its own spinner visible', () => {
     const snapshot = createSnapshot({
-      activeSessions: { 'child-a': 'oracle' },
+      activeSessions: { 'child-a': 'dominus' },
       sessionParents: { 'child-a': 'root-a' },
     });
 
     // Route points at the child; it must resolve to its root before
     // filtering, otherwise its own spinner disappears (#1147).
     expect(getActiveSidebarAgentNames(snapshot, 'child-a')).toEqual(
-      new Set(['oracle']),
+      new Set(['dominus']),
     );
     expect(getActiveSidebarAgentNames(snapshot, 'root-a')).toEqual(
-      new Set(['oracle']),
+      new Set(['dominus']),
     );
   });
 
@@ -94,15 +94,15 @@ describe('tui sidebar agents', () => {
     const agentNames = getSidebarAgentNames(
       createSnapshot({
         agentModels: {
-          explorer: 'openai/gpt-5.6-luna',
-          fixer: 'openai/gpt-5.6-luna',
+          magos: 'openai/gpt-5.6-luna',
+          genetor: 'openai/gpt-5.6-luna',
         },
       }),
     );
 
-    expect(agentNames).toEqual(['explorer', 'fixer']);
+    expect(agentNames).toEqual(['magos', 'genetor']);
     expect(agentNames).not.toContain('observer');
-    expect(agentNames).not.toContain('librarian');
+    expect(agentNames).not.toContain('logis');
   });
 
   test('fills empty snapshot models from the v1 host agent list (#1133)', async () => {
@@ -114,15 +114,15 @@ describe('tui sidebar agents', () => {
           return {
             data: [
               {
-                name: 'explorer',
+                name: 'magos',
                 model: { providerID: 'openai', modelID: 'gpt-5.6-luna' },
               },
               {
-                name: 'fixer',
+                name: 'genetor',
                 model: { providerID: 'openai', modelID: 'gpt-5.6' },
               },
               { name: 'unrelated', model: { providerID: 'x', modelID: 'y' } },
-              { name: 'oracle' },
+              { name: 'dominus' },
             ],
           };
         },
@@ -132,17 +132,17 @@ describe('tui sidebar agents', () => {
     const remote = await fetchRemoteAgentModels(client, '/tmp/project');
     expect(seen).toEqual([{ directory: '/tmp/project' }]);
     expect(remote).toEqual({
-      explorer: 'openai/gpt-5.6-luna',
-      fixer: 'openai/gpt-5.6',
+      magos: 'openai/gpt-5.6-luna',
+      genetor: 'openai/gpt-5.6',
     });
 
     const merged = applyRemoteAgentModels(
-      createSnapshot({ agentModels: { explorer: 'local/model' } }),
+      createSnapshot({ agentModels: { magos: 'local/model' } }),
       remote,
     );
     expect(merged.agentModels).toEqual({
-      explorer: 'local/model',
-      fixer: 'openai/gpt-5.6',
+      magos: 'local/model',
+      genetor: 'openai/gpt-5.6',
     });
   });
 
@@ -156,15 +156,15 @@ describe('tui sidebar agents', () => {
             data: {
               data: [
                 {
-                  id: 'explorer',
+                  id: 'magos',
                   model: { providerID: 'openai', id: 'gpt-5.6-luna' },
                 },
                 {
-                  id: 'fixer',
+                  id: 'genetor',
                   model: { providerID: 'openai', id: 'gpt-5.6' },
                 },
                 { id: 'unrelated', model: { providerID: 'x', id: 'y' } },
-                { id: 'oracle' },
+                { id: 'dominus' },
               ],
             },
           };
@@ -175,8 +175,8 @@ describe('tui sidebar agents', () => {
     const remote = await fetchRemoteAgentModels(client, '/srv/project');
     expect(seen).toEqual([{ location: { directory: '/srv/project' } }]);
     expect(remote).toEqual({
-      explorer: 'openai/gpt-5.6-luna',
-      fixer: 'openai/gpt-5.6',
+      magos: 'openai/gpt-5.6-luna',
+      genetor: 'openai/gpt-5.6',
     });
   });
 
@@ -192,7 +192,7 @@ describe('tui sidebar agents', () => {
                 location: { directory: '/srv/project' },
                 data: [
                   {
-                    id: 'explorer',
+                    id: 'magos',
                     model: { providerID: 'openai', id: 'gpt-5.6-luna' },
                   },
                 ],
@@ -205,7 +205,7 @@ describe('tui sidebar agents', () => {
 
     const remote = await fetchRemoteAgentModels(client, '/srv/project');
     expect(seen).toEqual([{ location: { directory: '/srv/project' } }]);
-    expect(remote).toEqual({ explorer: 'openai/gpt-5.6-luna' });
+    expect(remote).toEqual({ magos: 'openai/gpt-5.6-luna' });
   });
 
   test('remote model fetch is a no-op without a host client', async () => {
@@ -252,8 +252,8 @@ describe('tui sidebar agents', () => {
   test('uses default-enabled fallback before models are persisted', () => {
     const agentNames = getSidebarAgentNames(createSnapshot({}));
 
-    expect(agentNames).toContain('explorer');
-    expect(agentNames).toContain('fixer');
+    expect(agentNames).toContain('magos');
+    expect(agentNames).toContain('genetor');
     expect(agentNames).not.toContain('observer');
     expect(agentNames).not.toContain('council');
     expect(agentNames).not.toContain('councillor');
@@ -263,14 +263,14 @@ describe('tui sidebar agents', () => {
     const activeAgents = getActiveSidebarAgentNames(
       createSnapshot({
         activeSessions: {
-          'fixer-a': 'fixer',
-          'fixer-b': 'fixer',
-          'oracle-a': 'oracle',
+          'genetor-a': 'genetor',
+          'genetor-b': 'genetor',
+          'dominus-a': 'dominus',
         },
       }),
     );
 
-    expect([...activeAgents]).toEqual(['fixer', 'oracle']);
+    expect([...activeAgents]).toEqual(['genetor', 'dominus']);
   });
 
   test('renders a stable blank column or deterministic braille frame', () => {
@@ -294,8 +294,8 @@ describe('tui sidebar agents', () => {
       recordTuiAgentModels(
         {
           agentModels: {
-            explorer: 'fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo',
-            oracle: 'openai/gpt-5.6-luna-fast',
+            magos: 'fireworks-ai/accounts/fireworks/routers/kimi-k2p5-turbo',
+            dominus: 'openai/gpt-5.6-luna-fast',
           },
         },
         projectDir,
@@ -341,20 +341,20 @@ describe('tui sidebar agents', () => {
       const frame = setup.captureCharFrame();
       const lines = frame.split('\n').map((l) => l.trimEnd());
 
-      // Find the explorer and oracle lines
-      const explorerLineIdx = lines.findIndex((l) => l.includes('explorer'));
-      const oracleLineIdx = lines.findIndex((l) => l.includes('oracle'));
+      // Find the magos and dominus lines
+      const explorerLineIdx = lines.findIndex((l) => l.includes('magos'));
+      const oracleLineIdx = lines.findIndex((l) => l.includes('dominus'));
 
       expect(explorerLineIdx).toBeGreaterThan(-1);
       expect(oracleLineIdx).toBe(explorerLineIdx + 1); // Strictly adjacent consecutive rows (no multi-line wrapping)
 
-      // Explorer row should have the agent label on left and truncated model on right
+      // Magos row should have the agent label on left and truncated model on right
       const explorerLine = lines[explorerLineIdx];
-      expect(explorerLine).toMatch(/explorer\s+account\.\.\.p5-turbo/);
+      expect(explorerLine).toMatch(/magos\s+account\.\.\.p5-turbo/);
 
       // Oracle row should be single-line with right-aligned model
       const oracleLine = lines[oracleLineIdx];
-      expect(oracleLine).toMatch(/oracle\s+gpt-5\.6-luna-fast/);
+      expect(oracleLine).toMatch(/dominus\s+gpt-5\.6-luna-fast/);
 
       // No unwrapped model path fragments should appear on separate lines
       expect(frame).not.toMatch(/fireworks\/routers\//);

@@ -566,20 +566,27 @@ describe('task_cancel tool', () => {
     expect(String(parent)).toContain('cannot cancel parent session');
   });
 
-  test('enforces orchestrator ownership', async () => {
+  test('enforces primary-agent ownership', async () => {
     const { taskCancel } = createTool({ shouldManageSession: () => false });
 
     await expect(
       taskCancel.execute({ task_id: 'ses_1' }, {
         sessionID: 'parent-1',
+        agent: 'omnissiah',
+      } as any),
+    ).rejects.toThrow('Omnissiah sessions');
+    // The legacy orchestrator alias is still accepted as the primary agent.
+    await expect(
+      taskCancel.execute({ task_id: 'ses_1' }, {
+        sessionID: 'parent-1',
         agent: 'orchestrator',
       } as any),
-    ).rejects.toThrow('orchestrator sessions');
+    ).rejects.toThrow('Omnissiah sessions');
     await expect(
       taskCancel.execute({ task_id: 'ses_1' }, {
         sessionID: 'parent-1',
         agent: 'fixer',
       } as any),
-    ).rejects.toThrow('orchestrator');
+    ).rejects.toThrow('Omnissiah');
   });
 });

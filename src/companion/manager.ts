@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { isPrimaryAgentName, PRIMARY_AGENT_NAME } from '../config/constants';
 import type { CompanionConfig } from '../config/schema';
 import { log } from '../utils/logger';
 
@@ -305,8 +306,8 @@ export class CompanionManager {
     const { sessionId, agent, status } = input;
     if (!sessionId || (status !== 'busy' && status !== 'idle')) return;
 
-    if (agent === 'orchestrator') {
-      // Orchestrator going idle does NOT clear specialists: with background
+    if (isPrimaryAgentName(agent)) {
+      // The primary agent going idle does NOT clear specialists: with background
       // orchestration it idles while dispatched agents are still running.
       // Specialists are removed only by their own idle/deleted events.
       this.status = status;
@@ -401,7 +402,7 @@ export class CompanionManager {
     const agents = Array.from(this.busyAgentSessions.values());
     if (agents.length > 0) return agents.slice(0, 9);
     if (this.status === 'waiting-input') return ['input'];
-    if (this.status === 'busy') return ['orchestrator'];
+    if (this.status === 'busy') return [PRIMARY_AGENT_NAME];
     return ['intro'];
   }
 

@@ -3,6 +3,7 @@ import {
   type ToolDefinition,
   tool,
 } from '@opencode-ai/plugin';
+import { isPrimaryAgentName } from '../config/constants';
 import type { BackgroundJobLease } from '../utils/background-job-board';
 import type { BackgroundJobStore } from '../utils/background-job-store';
 import {
@@ -522,11 +523,11 @@ export function assertOrchestrator(
 ): string {
   const parentSessionID = toolContext?.sessionID;
   if (!parentSessionID) throw new Error(`${toolName} requires sessionID`);
-  if (toolContext.agent && toolContext.agent !== 'orchestrator') {
-    throw new Error(`${toolName} can only be used by orchestrator`);
+  if (toolContext.agent && !isPrimaryAgentName(toolContext.agent)) {
+    throw new Error(`${toolName} can only be used by the Omnissiah`);
   }
   if (!options.shouldManageSession(parentSessionID)) {
-    throw new Error(`${toolName} can only be used in orchestrator sessions`);
+    throw new Error(`${toolName} can only be used in Omnissiah sessions`);
   }
   return parentSessionID;
 }

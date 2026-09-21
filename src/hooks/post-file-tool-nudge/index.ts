@@ -6,7 +6,7 @@
  * messages.transform, and consumed once. File tool output stays clean.
  */
 
-import { PHASE_REMINDER } from '../../config/constants';
+import { isPrimaryAgentName, PHASE_REMINDER } from '../../config/constants';
 import { isInternalInitiatorPart } from '../../utils';
 import { appendTaggedSyntheticPart } from '../cache-safe-injection';
 import {
@@ -80,7 +80,7 @@ function getEligibleMessage(
   if (
     !isUserMessageWithParts(message) ||
     !message.info.sessionID ||
-    message.info.agent !== 'orchestrator'
+    !isPrimaryAgentName(message.info.agent)
   ) {
     return undefined;
   }

@@ -34,7 +34,7 @@ describe('available-skills integration with skill directives', () => {
     };
 
     const runtime = runtimeFor(config);
-    expect(runtime.agents().oracle?.skills).toEqual(['skill1', 'skill2']);
+    expect(runtime.agents().dominus?.skills).toEqual(['skill1', 'skill2']);
 
     const hook = createFilterAvailableSkillsHook(mockCtx, runtime);
     const output = {

@@ -25,6 +25,8 @@ import {
   DEFAULT_READ_CONTEXT_MAX_FILES,
   DEFAULT_READ_CONTEXT_MIN_LINES,
   type ImageRouting,
+  lookupAgentEntry,
+  PRIMARY_AGENT_NAME,
   PROTECTED_AGENTS,
   resolveImageRouting,
   SUBAGENT_NAMES,
@@ -115,6 +117,29 @@ function primaryModelFromOverride(
 }
 
 /**
+ * Normalize a layer's agent keys onto canonical names. Without this, a preset
+ * keyed 'explore' and a root entry keyed 'explorer' stay separate records and
+ * their fields never combine, so an alias-supplied directive (e.g.
+ * skills_include_local) would drop the canonical layer's fields instead of
+ * merging with them.
+ */
+function canonicalizeAgentKeys(
+  layer: Record<string, AgentOverrideConfig>,
+): Record<string, AgentOverrideConfig> {
+  const out: Record<string, AgentOverrideConfig> = {};
+  for (const [name, value] of Object.entries(layer)) {
+    const canonical = AGENT_ALIASES[name] ?? name;
+    const existing = out[canonical];
+    // Canonical spelling wins when one layer carries both spellings.
+    out[canonical] =
+      existing === undefined || name === canonical
+        ? value
+        : (deepMerge(existing, value) ?? existing);
+  }
+  return out;
+}
+
+/**
  * Merge agent layers while allowing an explicit inheritance policy to clear a
  * model supplied by a lower-precedence layer. A missing `model` normally
  * means "keep the lower layer", but `inheritModelFrom` is an intentional
@@ -124,7 +149,9 @@ function mergeAgentOverrides(
   base: Record<string, AgentOverrideConfig>,
   override: Record<string, AgentOverrideConfig>,
 ): Record<string, AgentOverrideConfig> {
-  const merged = deepMerge(base, override) ?? base;
+  const merged =
+    deepMerge(canonicalizeAgentKeys(base), canonicalizeAgentKeys(override)) ??
+    base;
   for (const [name, agentOverride] of Object.entries(override)) {
     if (
       agentOverride.model !== undefined ||
@@ -275,7 +302,7 @@ export class RuntimeConfig {
     const runtimePreset = this.runtimePresetAgents();
     const merged = runtimePreset
       ? mergeAgentOverrides(base, runtimePreset)
-      : base;
+      : canonicalizeAgentKeys(base);
     const includesLocalSkills = Object.values(merged).some(
       (override) => override.skills_include_local === true,
     );
@@ -309,8 +336,12 @@ export class RuntimeConfig {
       : DEFAULT_DISABLED_AGENTS;
     const disabled = new Set<string>();
     for (const name of disabledSource) {
-      if (!PROTECTED_AGENTS.has(name)) {
-        disabled.add(name);
+      if (PROTECTED_AGENTS.has(name)) continue;
+      // Normalize legacy aliases so `disabled_agents: ["oracle"]` still
+      // disables the agent now named `dominus`.
+      const canonical = AGENT_ALIASES[name] ?? name;
+      if (!PROTECTED_AGENTS.has(canonical)) {
+        disabled.add(canonical);
       }
     }
     return disabled;
@@ -459,14 +490,19 @@ export class RuntimeConfig {
     if (!activePreset) {
       return undefined;
     }
+    // Alias-aware: presets may key the primary agent by its canonical name
+    // ('omnissiah') or the legacy 'orchestrator'.
     const orchestratorModel = primaryModelFromOverride(
-      activePreset.orchestrator,
+      lookupAgentEntry(activePreset, PRIMARY_AGENT_NAME),
     );
     if (orchestratorModel) {
       return orchestratorModel;
     }
     for (const name of SUBAGENT_NAMES) {
-      const model = primaryModelFromOverride(activePreset[name]);
+      // Alias-aware: e.g. a preset keyed 'explorer' still resolves to 'magos'.
+      const model = primaryModelFromOverride(
+        lookupAgentEntry(activePreset, name),
+      );
       if (model) {
         return model;
       }
@@ -483,9 +519,11 @@ export class RuntimeConfig {
     return this.hostSnapshot;
   }
 
-  /** The host's opencode.json agent entry for one agent. */
+  /** The host's opencode.json agent entry for one agent (alias-aware). */
   hostAgent(name: string): HostAgentConfig | undefined {
-    return this.hostSnapshot?.agent?.[name];
+    // Legacy alias lookup: e.g. host config written as agent.orchestrator
+    // for the primary agent now named omnissiah.
+    return lookupAgentEntry(this.hostSnapshot?.agent, name);
   }
 
   /** The host's top-level small_model, when configured. */
@@ -557,12 +595,6 @@ export class RuntimeConfig {
     agents: Record<string, AgentOverrideConfig>,
     name: string,
   ): AgentOverrideConfig | undefined {
-    return (
-      agents[name] ??
-      agents[
-        Object.keys(AGENT_ALIASES).find((key) => AGENT_ALIASES[key] === name) ??
-          ''
-      ]
-    );
+    return lookupAgentEntry(agents, name);
   }
 }

@@ -33,7 +33,7 @@ describe('v1 interview session runtime', () => {
       expect.objectContaining({
         path: { id: 'ses_1' },
         body: expect.objectContaining({
-          agent: 'orchestrator',
+          agent: 'omnissiah',
           model: { providerID: 'openai', modelID: 'gpt-5' },
         }),
       }),

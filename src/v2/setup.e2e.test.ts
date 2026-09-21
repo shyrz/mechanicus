@@ -312,8 +312,8 @@ describe('createV2Setup e2e', () => {
     const { ctx, calls } = makeMockV2Context(projectDir);
     const cleanup = await createV2Setup()(ctx);
 
-    expect(calls.agentUpdates.map((u) => u.id)).toContain('orchestrator');
-    expect(calls.agentDefault).toBe('orchestrator');
+    expect(calls.agentUpdates.map((u) => u.id)).toContain('omnissiah');
+    expect(calls.agentDefault).toBe('omnissiah');
     expect(calls.toolAdds.length).toBeGreaterThan(0);
     // CodeMode split (upstream Tool.snapshot): every registered tool must
     // carry `options: { codemode: false }` or it never becomes a direct
@@ -352,7 +352,7 @@ describe('createV2Setup e2e', () => {
       const beforeEvent = {
         tool: 'subagent',
         sessionID: 'ses_parent',
-        agent: 'orchestrator',
+        agent: 'omnissiah',
         messageID: 'msg_1',
         id: 'call_1',
         input: {
@@ -383,7 +383,7 @@ describe('createV2Setup e2e', () => {
       const resumeEvent = {
         tool: 'subagent',
         sessionID: 'ses_parent',
-        agent: 'orchestrator',
+        agent: 'omnissiah',
         messageID: 'msg_1',
         id: 'call_2',
         input: {
@@ -411,7 +411,7 @@ describe('createV2Setup e2e', () => {
       await afterHook({
         tool: 'subagent',
         sessionID: 'ses_parent',
-        agent: 'orchestrator',
+        agent: 'omnissiah',
         messageID: 'msg_1',
         id: 'call_1',
         input: beforeEvent.input,

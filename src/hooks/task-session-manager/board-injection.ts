@@ -8,6 +8,7 @@
  * ../cache-safe-injection.ts to ensure prompt cache safety.
  */
 import { createHash } from 'node:crypto';
+import { isPrimaryAgentName } from '../../config/constants';
 import type {
   BackgroundJobExecution,
   BackgroundJobInjectedCompletionFence,
@@ -1214,7 +1215,7 @@ function injectLatestBoard(state: InjectionState, messages: unknown[]): void {
   }
 
   if (!trigger) return;
-  if (trigger.info.agent && trigger.info.agent !== 'orchestrator') return;
+  if (trigger.info.agent && !isPrimaryAgentName(trigger.info.agent)) return;
   if (!sessionID || !state.shouldManageSession(sessionID)) return;
   if (!anchor) return;
 
@@ -1578,7 +1579,7 @@ function injectCheckpointBoard(
   const canSurface =
     triggeringMessage !== undefined &&
     (!triggeringMessage.info.agent ||
-      triggeringMessage.info.agent === 'orchestrator') &&
+      isPrimaryAgentName(triggeringMessage.info.agent)) &&
     textPart !== undefined &&
     !isInternalInitiatorPart(textPart);
 

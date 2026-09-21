@@ -194,12 +194,12 @@ const CANONICAL_TERMINAL_STATES = new Set<TaskOutputState>([
 
 const AGENT_PREFIX: Record<string, string> = {
   council: 'cou',
-  designer: 'des',
-  explorer: 'exp',
-  fixer: 'fix',
-  librarian: 'lib',
+  artisan: 'art',
+  magos: 'mag',
+  genetor: 'gen',
+  logis: 'log',
   observer: 'obs',
-  oracle: 'ora',
+  dominus: 'dom',
 };
 
 export class BackgroundJobBoard implements BackgroundJobStore {

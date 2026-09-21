@@ -1,4 +1,5 @@
 import type { PluginInput } from '@opencode-ai/plugin';
+import { isPrimaryAgentName } from '../../config/constants';
 import {
   BackgroundJobBoard,
   type BackgroundJobExecution,
@@ -79,7 +80,7 @@ function rehydrateHistoricalRunningTasks(
 
   for (const message of messages) {
     if (!isMessageWithParts(message)) continue;
-    if (message.info.agent !== 'orchestrator') continue;
+    if (!isPrimaryAgentName(message.info.agent)) continue;
 
     const parentSessionID = message.info.sessionID;
     if (!parentSessionID) continue;

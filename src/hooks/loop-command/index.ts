@@ -24,7 +24,7 @@ function activationPrompt(text: string): string {
     '',
     'For each attempt:',
     `1. Read \`${dir}/\` for prior results`,
-    '2. Dispatch @fixer with the goal',
+    '2. Dispatch @genetor with the goal',
     '3. Verify per the successCriteria',
     `4. Write result to \`${dir}/history-{NNN}.md\` (PASS/FAIL + reason)`,
     '5. PASS -> stop. FAIL under maxAttempts -> retry. FAIL at max -> escalate.',
@@ -57,7 +57,7 @@ export function createLoopCommandHook(): {
         opencodeConfig,
         COMMAND_NAME,
         'Run an automated execute-verify loop',
-        'Dispatch fixer, verify, iterate with file-based history on disk.',
+        'Dispatch genetor, verify, iterate with file-based history on disk.',
       );
     },
 

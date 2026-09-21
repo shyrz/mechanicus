@@ -180,7 +180,7 @@ describe('v2 interview bridge', () => {
     await bridge.runtime.continue('ses_c', 'go on');
     expect(calls).toContainEqual({
       method: 'switchAgent',
-      input: { sessionID: 'ses_c', agent: 'orchestrator' },
+      input: { sessionID: 'ses_c', agent: 'omnissiah' },
     });
     expect(calls).toContainEqual({
       method: 'prompt',

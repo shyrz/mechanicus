@@ -13,19 +13,19 @@ function runtimeFor(config: PluginConfig | undefined = {}) {
 
 describe('normalizeAgentName', () => {
   test('returns name unchanged if no @ prefix', () => {
-    expect(normalizeAgentName('oracle')).toBe('oracle');
+    expect(normalizeAgentName('dominus')).toBe('dominus');
   });
 
   test('strips @ prefix from agent name', () => {
-    expect(normalizeAgentName('@oracle')).toBe('oracle');
+    expect(normalizeAgentName('@dominus')).toBe('dominus');
   });
 
   test('trims whitespace', () => {
-    expect(normalizeAgentName('  oracle  ')).toBe('oracle');
+    expect(normalizeAgentName('  dominus  ')).toBe('dominus');
   });
 
   test('handles @ prefix with whitespace', () => {
-    expect(normalizeAgentName('  @explore  ')).toBe('explore');
+    expect(normalizeAgentName('  @magos  ')).toBe('magos');
   });
 
   test('handles empty string', () => {
@@ -37,42 +37,45 @@ describe('resolveRuntimeAgentName', () => {
   test('keeps internal agent names unchanged', () => {
     const config = {
       agents: {
-        oracle: { displayName: 'advisor' },
+        dominus: { displayName: 'advisor' },
       },
     } as PluginConfig;
 
-    expect(resolveRuntimeAgentName(runtimeFor(config), 'oracle')).toBe(
-      'oracle',
+    expect(resolveRuntimeAgentName(runtimeFor(config), 'dominus')).toBe(
+      'dominus',
     );
   });
 
   test('resolves displayName to internal name', () => {
     const config = {
       agents: {
-        oracle: { displayName: 'advisor' },
+        dominus: { displayName: 'advisor' },
       },
     } as PluginConfig;
 
     expect(resolveRuntimeAgentName(runtimeFor(config), 'advisor')).toBe(
-      'oracle',
+      'dominus',
     );
   });
 
   test('resolves legacy aliases to internal names', () => {
     expect(
+      resolveRuntimeAgentName(runtimeFor({} as PluginConfig), 'oracle'),
+    ).toBe('dominus');
+    expect(
       resolveRuntimeAgentName(runtimeFor({} as PluginConfig), 'explore'),
-    ).toBe('explorer');
+    ).toBe('magos');
   });
 
   test('resolves displayName with @ prefix and whitespace', () => {
     const config = {
       agents: {
-        oracle: { displayName: 'advisor' },
+        dominus: { displayName: 'advisor' },
       },
     } as PluginConfig;
 
     expect(resolveRuntimeAgentName(runtimeFor(config), '  @advisor  ')).toBe(
-      'oracle',
+      'dominus',
     );
   });
 
@@ -84,14 +87,14 @@ describe('resolveRuntimeAgentName', () => {
     } as PluginConfig;
 
     expect(resolveRuntimeAgentName(runtimeFor(config), 'researcher')).toBe(
-      'explorer',
+      'magos',
     );
   });
 
   test('returns normalized name when no displayName match exists', () => {
     const config = {
       agents: {
-        oracle: { displayName: 'advisor' },
+        dominus: { displayName: 'advisor' },
       },
     } as PluginConfig;
 

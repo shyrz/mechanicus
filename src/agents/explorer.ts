@@ -47,7 +47,7 @@ export function createExplorerAgent(
   }
 
   return {
-    name: 'explorer',
+    name: 'magos',
     description:
       "Fast codebase search and pattern matching. Use for finding files, locating code patterns, and answering 'where is X?' questions.",
     config: {

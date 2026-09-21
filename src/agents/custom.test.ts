@@ -55,7 +55,7 @@ describe('custom-agent creation', () => {
       'You are a custom subagent for auditing.',
     );
 
-    const orchestrator = agents.find((agent) => agent.name === 'orchestrator');
+    const orchestrator = agents.find((agent) => agent.name === 'omnissiah');
     expect(orchestrator?.config.prompt).toContain(
       '@test-auditor\n- Role: Compliance audit specialist',
     );
@@ -79,7 +79,7 @@ describe('custom-agent creation', () => {
         agentDefs.find((agent) => agent.name === 'janitor'),
       ).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
-        "[oh-my-opencode] Custom agent 'janitor' skipped: 'model' is required",
+        "[mechanicus] Custom agent 'janitor' skipped: 'model' is required",
       );
     } finally {
       warnSpy.mockRestore();
@@ -128,7 +128,7 @@ describe('custom-agent creation', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((agent) => agent.name === 'orchestrator');
+    const orchestrator = agents.find((agent) => agent.name === 'omnissiah');
     expect(orchestrator?.config.prompt).toContain(
       '@cleanup\n- Role: Cleanup specialist',
     );
@@ -151,7 +151,7 @@ describe('custom-agent creation', () => {
 
     const agents = createAgents(runtimeFor(config));
     const wrapper = agents.find((agent) => agent.name === 'claude-research');
-    const orchestrator = agents.find((agent) => agent.name === 'orchestrator');
+    const orchestrator = agents.find((agent) => agent.name === 'omnissiah');
 
     expect(wrapper).toBeDefined();
     expect(wrapper?.description).toBe('Claude Code research via ACP');
@@ -288,7 +288,7 @@ describe('custom-agent creation', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((agent) => agent.name === 'orchestrator');
+    const orchestrator = agents.find((agent) => agent.name === 'omnissiah');
     const prompt = orchestrator?.config.prompt ?? '';
 
     // Verify Project-specific routing guidance exists and has the custom agent override prompt rewritten
@@ -341,7 +341,7 @@ describe('custom-agent creation', () => {
 
     const agentsOnlyAcp = createAgents(runtimeFor(configOnlyAcp));
     const orchestratorOnlyAcp = agentsOnlyAcp.find(
-      (agent) => agent.name === 'orchestrator',
+      (agent) => agent.name === 'omnissiah',
     );
     const promptOnlyAcp = orchestratorOnlyAcp?.config.prompt ?? '';
 
@@ -384,7 +384,7 @@ describe('custom-agent permission passthrough', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const explorer = agents.find((a) => a.name === 'explorer');
+    const explorer = agents.find((a) => a.name === 'magos');
 
     expect(explorer).toBeDefined();
     expect(explorer?.config.permission).toMatchObject({
@@ -492,7 +492,7 @@ describe('permission edge cases', () => {
     };
 
     const agents = createAgents(runtimeFor(config));
-    const orchestrator = agents.find((a) => a.name === 'orchestrator');
+    const orchestrator = agents.find((a) => a.name === 'omnissiah');
 
     expect(orchestrator).toBeDefined();
     // User-supplied key survives
