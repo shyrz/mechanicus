@@ -211,18 +211,18 @@ content.addEventListener('pointerup', async (event) => {
   dragging = false;
   if (wasDragging || event.button !== 0) return;
 
-  // A click asks the OpenCode TUI to open the session being shown. There is no
-  // direct channel, so this becomes a file the plugin polls; if no window is
-  // showing this project, nothing happens and the click is simply inert.
+  // Reveal the session being shown, as far as the host allows: a TUI opens it
+  // (through a request file the plugin polls), while a desktop host can only be
+  // raised. Rust picks between the two from the host the plugin publishes.
   const session = payload?.session;
   if (!session?.session_id) return;
   try {
-    await window.__TAURI__?.core?.invoke('navigate_to_session', {
+    await window.__TAURI__?.core?.invoke('reveal_session', {
       sessionId: session.session_id,
       cwd: session.cwd,
     });
   } catch (err) {
-    console.error('[companion] navigate request failed', err);
+    console.error('[companion] reveal failed', err);
   }
 });
 

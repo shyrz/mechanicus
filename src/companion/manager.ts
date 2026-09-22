@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { isPrimaryAgentName, PRIMARY_AGENT_NAME } from '../config/constants';
 import type { CompanionConfig } from '../config/schema';
 import { log } from '../utils/logger';
+import type { CompanionHost } from './host';
 
 // Only one companion `process.on('exit')` listener should be live per process.
 // The plugin function can re-run (config.update() → Instance.dispose()),
@@ -37,6 +38,11 @@ interface CompanionState {
   version: 1;
   sessions: CompanionSession[];
   window_positions?: Record<string, { x: number; y: number }>;
+  /**
+   * What a click on the companion can achieve on this host. Absent means a
+   * session can be opened, which is the behaviour for every TUI-shaped host.
+   */
+  host?: CompanionHost;
   config?: {
     enabled: boolean;
     position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
@@ -236,14 +242,25 @@ export class CompanionManager {
   /** sessionId → agent name, for sessions currently busy. */
   private readonly busyAgentSessions = new Map<string, string>();
   private readonly config?: CompanionConfig;
+  /**
+   * What a click can achieve here, as published to the companion. `undefined`
+   * for hosts that can open a session.
+   */
+  private readonly host?: CompanionHost;
   private companionProcess: ChildProcess | null = null;
   private wasSpawner = false;
   private spawnedCompanionPid: number | null = null;
 
-  constructor(sessionId: string, cwd: string, config?: CompanionConfig) {
+  constructor(
+    sessionId: string,
+    cwd: string,
+    config?: CompanionConfig,
+    host?: CompanionHost,
+  ) {
     this.id = sessionId;
     this.cwd = cwd;
     this.config = config;
+    this.host = host;
   }
 
   onLoad(): void {
@@ -434,6 +451,11 @@ export class CompanionManager {
         } else {
           state.sessions.push(entry);
         }
+        // Republished on every flush: the companion reads it fresh, so a host
+        // that starts reporting a different identity is picked up without a
+        // restart. Clearing it when absent keeps a stale desktop marker from
+        // outliving the desktop host.
+        state.host = this.host;
         if (this.config) {
           state.config = {
             enabled: this.config.enabled ?? false,

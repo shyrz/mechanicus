@@ -12,6 +12,7 @@ import {
   resolvePrimaryModelValue,
 } from './agents';
 import { buildOrchestratorPrompt } from './agents/orchestrator';
+import { describeHost } from './companion/host';
 import { CompanionManager } from './companion/manager';
 import { ensureCompanionVersion } from './companion/updater';
 import { deepMerge, loadPluginConfig, type MultiplexerConfig } from './config';
@@ -888,6 +889,12 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       `proc_${process.pid}`,
       ctx.directory,
       runtime.companion,
+      // Which app hosts us decides whether a click can open a session or only
+      // bring the host forward; see src/companion/host.ts.
+      describeHost(
+        (ctx as Parameters<Plugin>[0] & { hostApp?: { name?: string } }).hostApp
+          ?.name,
+      ),
     );
     taskCancelTools = createCancelTaskTool({
       input: ctx,

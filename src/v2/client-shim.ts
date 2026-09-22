@@ -608,6 +608,10 @@ export function buildPluginInput(
   return {
     client,
     hostFlavor: 'v2',
+    // v1 hosts publish no host identity; forwarding the v2 host's own `app` is
+    // what lets the companion tell a desktop host (no session router) from a
+    // TUI one. See src/companion/host.ts.
+    hostApp: ctx.app,
     project: {
       id: ctx.location?.project?.id ?? 'global',
       directory,

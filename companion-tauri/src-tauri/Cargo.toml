@@ -18,12 +18,16 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 dirs = "5"
 
-# AppKit is used to read screen geometry (work area / Dock) and the physical
-# mouse-button state; it must be pinned to the versions Tauri already resolves so
-# nothing is duplicated.
+# AppKit is used to read screen geometry (work area / Dock), the physical
+# mouse-button state, and to raise the host app; it must be pinned to the
+# versions Tauri already resolves so nothing is duplicated.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSEvent", "NSScreen"] }
+objc2-app-kit = { version = "0.3", features = [
+  "NSEvent",
+  "NSRunningApplication",
+  "NSScreen",
+] }
 objc2-foundation = "0.3"
 
 [profile.release]

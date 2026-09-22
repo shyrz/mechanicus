@@ -7,6 +7,7 @@
 //! original Rust companion can run side by side. Point
 //! `companion.binaryPath` at this binary to try it.
 
+mod activate;
 mod command;
 mod hit_test;
 mod pointer;
@@ -234,14 +235,38 @@ fn get_state() -> Payload {
     build_payload(&st, owner.as_deref())
 }
 
-/// Asks a TUI window to open the session the overlay is showing.
-///
-/// The companion has no channel to the plugin, so a click becomes a file that
-/// whichever window is showing this project picks up. Best-effort: a click that
-/// no window answers leaves the overlay exactly as it was.
+/// Handles a click on the overlay, revealing the session it is showing as far
+/// as the host allows.
 #[tauri::command]
-fn navigate_to_session(session_id: String, cwd: String) -> Result<(), String> {
-    command::request_navigation(&session_id, &cwd).map_err(|e| e.to_string())
+fn reveal_session(session_id: String, cwd: String) -> Result<(), String> {
+    reveal(&session_id, &cwd)
+}
+
+/// The click's policy, shared by the command and the test hook so a scripted
+/// click exercises the same decisions a real one does.
+///
+/// A TUI owns a router, so the click becomes a request file that whichever
+/// window is showing this project picks up. A desktop host cannot focus a
+/// session at all, so there the click raises the app with the session URL.
+/// Best-effort in both cases: a click nothing answers leaves the overlay as it
+/// was.
+fn reveal(session_id: &str, cwd: &str) -> Result<(), String> {
+    match host_capability() {
+        Some(host) => {
+            // No session router here, so raising the app is the whole gesture.
+            if activate::reveal_host(session_id, host.bundle_id.as_deref()) {
+                Ok(())
+            } else {
+                Err(format!("could not raise the {:?} host", host.kind))
+            }
+        }
+        None => command::request_navigation(session_id, cwd).map_err(|e| e.to_string()),
+    }
+}
+
+/// The host's click capability, as last published by the plugin.
+fn host_capability() -> Option<state::HostInfo> {
+    state::read_state(&state::state_file_path()).host
 }
 
 /// Toggles window-level mouse pass-through. Used while validating whether a
@@ -405,12 +430,10 @@ fn poll_test_hook(window: &tauri::WebviewWindow, controller: &Arc<snap::SnapCont
         };
 
         match target {
-            Some((session_id, cwd)) => {
-                match command::request_navigation(&session_id, &cwd) {
-                    Ok(()) => eprintln!("[test-hook] click -> {session_id} ({cwd})"),
-                    Err(err) => eprintln!("[test-hook] click failed: {err}"),
-                }
-            }
+            Some((session_id, cwd)) => match reveal(&session_id, &cwd) {
+                Ok(()) => eprintln!("[test-hook] click -> {session_id} ({cwd})"),
+                Err(err) => eprintln!("[test-hook] click failed: {err}"),
+            },
             None => eprintln!("[test-hook] click: no session to target"),
         }
         return;
@@ -539,7 +562,7 @@ fn main() {
         .manage(Arc::clone(&snap_controller))
         .invoke_handler(tauri::generate_handler![
             get_state,
-            navigate_to_session,
+            reveal_session,
             set_click_through,
             set_snap_enabled,
             set_dragging,

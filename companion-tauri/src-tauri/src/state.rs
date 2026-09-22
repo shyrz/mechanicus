@@ -18,6 +18,23 @@ pub struct CompanionState {
     pub config: Option<CompanionConfigState>,
     #[serde(default)]
     pub window_positions: BTreeMap<String, WindowPositionState>,
+    /// What a click can achieve on this host. Absent means a session can be
+    /// opened, which is the behaviour for every TUI-shaped host.
+    #[serde(default)]
+    pub host: Option<HostInfo>,
+}
+
+/// Publishes the host's click capability.
+///
+/// The companion cannot otherwise tell a host that can open a session from one
+/// that cannot, and the two need different click behaviour.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HostInfo {
+    /// Matches the plugin's `CompanionHost.kind`.
+    pub kind: String,
+    /// Bundle to activate when a session cannot be opened.
+    #[serde(default)]
+    pub bundle_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -138,6 +155,44 @@ pub fn choose_session(sessions: &[SessionInfo], owner_session_id: Option<&str>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_plugin_host_shape_deserializes() {
+        // Pins the wire contract. serde ignores unknown keys, so a misspelled
+        // field parses "successfully" while arriving empty -- which would make
+        // the desktop host look like it had no bundle to raise. Deserializing
+        // the plugin's actual output is what catches that.
+        let raw = r#"{"version":1,"sessions":[],"host":{"kind":"desktop","bundle_id":"ai.opencode.desktop"}}"#;
+        let state: CompanionState = serde_json::from_str(raw).expect("plugin shape must parse");
+
+        let host = state.host.expect("host must survive deserialization");
+        assert_eq!(host.kind, "desktop");
+        assert_eq!(
+            host.bundle_id.as_deref(),
+            Some("ai.opencode.desktop"),
+            "the bundle id must not be silently dropped"
+        );
+    }
+
+    #[test]
+    fn a_camel_case_bundle_is_dropped_rather_than_accepted() {
+        // Documents the failure mode the test above guards against: this parses,
+        // so nothing surfaces the mistake except asserting the field's value.
+        let raw = r#"{"version":1,"sessions":[],"host":{"kind":"desktop","bundleId":"ai.opencode.desktop"}}"#;
+        let state: CompanionState = serde_json::from_str(raw).expect("still parses");
+
+        let host = state.host.expect("host is recognised");
+        assert_eq!(host.kind, "desktop");
+        assert_eq!(host.bundle_id, None, "camelCase is not the contract");
+    }
+
+    #[test]
+    fn a_state_file_without_a_host_is_tui_shaped() {
+        // Absent means "a session can be opened", which is every TUI host.
+        let raw = r#"{"version":1,"sessions":[]}"#;
+        let state: CompanionState = serde_json::from_str(raw).expect("parse");
+        assert_eq!(state.host, None);
+    }
 
     fn session(id: &str, status: &str, agents: &[&str]) -> SessionInfo {
         SessionInfo {

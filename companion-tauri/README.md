@@ -14,12 +14,14 @@ The plugin ↔ companion boundary was already clean:
 | Contract | Value |
 | --- | --- |
 | State file (read) | `~/.local/share/opencode/storage/mechanicus/companion-state.json` |
-| Command file (write) | `~/.local/share/opencode/storage/mechanicus/companion-command.json` |
+| Command file (write, TUI hosts only) | `~/.local/share/opencode/storage/mechanicus/companion-command.json` |
 | Env | `MECHANICUS_COMPANION_SESSION_ID`, `MECHANICUS_COMPANION_DEBUG` |
 | Pid files | `companion.pid`, `companion.<sessionId>.pid` |
 
 `companion-state.json` is read-only from here; the command file is this
-process's only write, and it carries clicks rather than state.
+process's only write, and it carries clicks rather than state. The state file
+also publishes `host`, which is what tells the companion whether a click can
+open a session or only raise the app.
 
 Nothing in `src/companion/manager.ts` needs to change to run this binary, which
 is what makes the replacement safe to trial and easy to roll back.
@@ -33,6 +35,7 @@ companion-tauri/
 │   ├── src/snap.rs     # snap targets, envelope geometry, drag settling
 │   ├── src/workarea.rs # display/work-area measurement (AppKit)
 │   ├── src/pointer.rs  # physical mouse-button state (AppKit)
+│   ├── src/activate.rs # raising the host app (AppKit)
 │   ├── src/hit_test.rs # click-through regions
 │   ├── src/state.rs    # companion-state.json contract + session selection
 │   ├── src/command.rs  # companion → plugin navigation requests
@@ -88,8 +91,9 @@ it to take effect.
   `unknown` fallback
 - Native window drag with a click/drag threshold
 - Per-project window position restore
-- Click to open the session being shown, through a file-based channel to the
-  plugin (see [Clicking the overlay](#clicking-the-overlay))
+- Click to reveal the session being shown, as far as the host allows: opened on
+  a TUI through a file-based channel to the plugin, and the app raised on the
+  desktop app (see [Clicking the overlay](#clicking-the-overlay))
 
 ## Snapping
 
@@ -155,12 +159,22 @@ the position heuristic alone.
 
 ## Clicking the overlay
 
-A primary click that is not a drag asks the OpenCode TUI to open the session the
-overlay is showing. The companion is a detached process with no channel to the
-plugin, so the click becomes a file and the plugin polls for it.
+A primary click that is not a drag reveals the session the overlay is showing, as
+far as the host allows. The plugin publishes which host it is in the state file,
+and that decides everything:
+
+| Host | What a click does |
+| --- | --- |
+| TUI (or no host published) | Opens the session: writes a request file the TUI polls |
+| Desktop app | Raises the app with `opencode://session/<id>` |
+
+### On a TUI host
+
+The companion is a detached process with no channel to the plugin, so the click
+becomes a file and the plugin polls for it.
 
 ```
-Click → navigate_to_session → companion-command.json → TUI claims it → routes to the session
+Click → reveal_session → companion-command.json → TUI claims it → routes to the session
 ```
 
 - `src-tauri/src/command.rs` writes the request atomically (temp file + rename),
@@ -176,9 +190,21 @@ Click → navigate_to_session → companion-command.json → TUI claims it → r
   window that happened to start afterwards. With no TUI window running, the
   request simply expires and nothing happens.
 
-This channel never writes `companion-state.json`. That file belongs to the
-plugin, and the companion's read-only contract with it is what lets both
-implementations run side by side.
+### On the desktop app
+
+The desktop app has no way to focus a session. `opencode://session/<id>` reaches
+its renderer and is dropped — upstream closed the request to open sessions this
+way as "not planned" — while the bare scheme is registered to it, so the URL
+does reliably raise the app.
+
+The click therefore fires that URL rather than activating the app directly. The
+two are equivalent today, but the URL carries the session, so if the host ever
+learns to focus one this click starts navigating with no change here. Activating
+by bundle id stays as the fallback for a host that drops the scheme.
+
+Neither path writes `companion-state.json`. That file belongs to the plugin, and
+the companion's read-only contract with it is what lets both implementations run
+side by side.
 
 ## Test hooks
 
@@ -192,7 +218,7 @@ enables file-driven stand-ins that run through the same code paths:
 | `companion-tauri-test-drop` | `x,y` in logical px | Emulates "dragged and released here": moves the window, then lets the settle watcher evaluate the snap |
 | `companion-tauri-test-drop` | `hold x,y` | Emulates a drag still in flight: the settle watcher is suppressed so the dim overlay and its markers can be observed |
 | `companion-tauri-test-drop` | `release` | Ends a `hold`, handing back to the normal settle path |
-| `companion-tauri-test-drop` | `click` | Emulates a click on the overlay, requesting navigation to the session it is showing |
+| `companion-tauri-test-drop` | `click` | Emulates a click on the overlay, running the same host-aware reveal a real click does |
 | `companion-tauri-test-drop` | `click <sessionId>` | Same, but targeting a specific session so the request is assertable |
 | `companion-tauri-test-cursor` | `x,y` in logical px | Overrides the polled global cursor, for hover/expand testing |
 

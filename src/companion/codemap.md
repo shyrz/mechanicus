@@ -29,6 +29,15 @@ The companion system consists of two main components following a **Producer-Cons
   - Never touches `companion-state.json`, which stays plugin-owned so the
     original and Tauri companions can run side by side
 
+- **Host descriptor (host.ts)**: What a click can achieve, per host
+  - Published into the state file's `host`; absent means "a session can be
+    opened", which is every TUI-shaped host including v1 hosts
+  - The desktop app is recognised by `ctx.app.name`, and cannot focus a session
+    at all, so there a click raises the app with `opencode://session/<id>`
+  - Field names are snake_case to match the rest of the state file; the
+    companion deserializes into a fixed struct that drops unknown keys
+    silently, so a camelCase spelling would arrive empty rather than fail
+
 ### Key Interfaces
 
 ```typescript
@@ -91,11 +100,18 @@ OpenCode Session → CompanionManager.onSessionStatus() → Updates state → Sp
 ### Click-to-Session Flow
 
 ```
-Click on companion → Rust writes companion-command.json → TUI polls and claims it → routes.navigate("session", { sessionID })
+Click on companion → Rust reads the host from state → TUI: request file / desktop: open the session URL
 ```
 
+The host decides the path. A TUI owns a router, so the click becomes a request
+file the plugin polls. The desktop app cannot focus a session (its renderer
+receives `opencode://session/<id>` and drops it, and upstream closed the request
+as "not planned"), so there the same URL is used to raise the app instead.
+
+On a TUI, the request flows:
+
 1. **Click** (`ui/main.js`): a primary click that is not a drag calls the
-   `navigate_to_session` command with the session the overlay is showing
+   `reveal_session` command with the session the overlay is showing
 2. **Request** (`src-tauri/src/command.rs`): writes the request atomically to
    `companion-command.json`, so a polling reader never sees a partial file
 3. **Poll** (`startCompanionNavigation` in `src/tui.ts`): every 250 ms, cheap
