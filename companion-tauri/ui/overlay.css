@@ -1,0 +1,82 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  /* The whole surface is a pass-through indicator, never a target. */
+  pointer-events: none;
+}
+
+/* Dims the desktop so the white markers read clearly against any wallpaper. */
+.dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.dim.on {
+  opacity: 1;
+}
+
+.pills {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * Landing markers. Each one previews the collapsed handle's exact footprint, so
+ * the marker is where the overlay will really sit rather than an approximation.
+ */
+.pill {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Grows into place when the drag starts. */
+  transform: scale(0.72);
+  opacity: 0;
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease-out,
+    background-color 120ms ease-out;
+}
+
+.pill.on {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* The marker the overlay would dock to if released right now. */
+.pill.active {
+  background: #ffffff;
+  transform: scale(1.12);
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.34),
+    0 0 0 4px rgba(255, 255, 255, 0.22);
+}
+
+.pill-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(28, 28, 32, 0.9);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.pill.active .pill-dot {
+  opacity: 1;
+}

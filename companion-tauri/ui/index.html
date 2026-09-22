@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mechanicus companion</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!--
+      While snapped, the window is sized to an envelope that holds both the
+      expanded overlay and the collapsed handle, so the native window is never
+      resized per frame: only this content rect animates.
+    -->
+    <div id="content" class="content">
+      <div id="grid" class="grid"></div>
+      <div id="handle" class="handle" aria-hidden="true">
+        <span class="handle-grip"></span>
+      </div>
+      <div id="label" class="label"></div>
+    </div>
+    <script src="main.js"></script>
+  </body>
+</html>

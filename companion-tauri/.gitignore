@@ -1,0 +1,6 @@
+# Generated from ../../companion/animations by scripts/sync-assets.sh
+ui/assets/
+
+# Rust build output
+src-tauri/target/
+src-tauri/gen/
