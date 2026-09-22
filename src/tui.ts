@@ -8,6 +8,7 @@ import { type ColorInput, parseColor, RGBA } from '@opentui/core';
 import type { JSX } from '@opentui/solid';
 import { createElement, insert, setProp } from '@opentui/solid';
 import { createSignal } from 'solid-js';
+import { claimNavigation } from './companion/command';
 import {
   ALL_AGENT_NAMES,
   DEFAULT_DISABLED_AGENTS,
@@ -39,6 +40,14 @@ const FALLBACK_SIDEBAR_AGENTS = SUBAGENT_NAMES.filter(
 const BORDER = { type: 'single' };
 const TMUX_PANE_HEARTBEAT_MS = 10_000;
 const ACTIVITY_FRAME_MS = 100;
+/**
+ * How often to look for a companion navigation request.
+ *
+ * A click should feel answered, and the check is one small read of a file that
+ * usually does not exist, so it can run far more often than the render cadence
+ * without costing anything noticeable.
+ */
+const COMPANION_COMMAND_POLL_MS = 250;
 const ACTIVITY_FRAMES = [
   '⠋',
   '⠙',
@@ -631,6 +640,26 @@ export function makeRouteNavigator(
       // Navigation is best-effort; never break the sidebar on a host error.
     }
   };
+}
+
+/**
+ * Routes companion clicks to this window's router.
+ *
+ * The companion is a separate process that cannot call in, so its request
+ * arrives as a file and polling is the only way to notice one. Returns a
+ * disposer; a host without navigation simply gets a no-op, matching how the
+ * sidebar degrades when the router is absent.
+ */
+export function startCompanionNavigation(
+  directory: () => string,
+  navigate: ((sessionID: string) => void) | undefined,
+): () => void {
+  if (navigate === undefined) return () => {};
+  const timer = setInterval(() => {
+    const command = claimNavigation(directory());
+    if (command !== undefined) navigate(command.sessionID);
+  }, COMPANION_COMMAND_POLL_MS);
+  return () => clearInterval(timer);
 }
 
 export function getSidebarActivityIndicator(
@@ -1520,6 +1549,11 @@ async function setup(ctx: V2TuiContext): Promise<undefined | (() => void)> {
     makeRouteNavigator(ctx.ui.router, 'navigate', true),
     selectionGuard(ctx.renderer),
   );
+  // A click on the companion asks this window to open a session.
+  const disposeNavigation = startCompanionNavigation(
+    () => configDirectory,
+    interaction.navigate,
+  );
 
   const disposeSlot = ctx.ui.slot({
     append: 'sidebar.content',
@@ -1549,6 +1583,7 @@ async function setup(ctx: V2TuiContext): Promise<undefined | (() => void)> {
   return () => {
     disposed = true;
     disposeSlot();
+    disposeNavigation();
     clearInterval(renderTimer);
     clearInterval(animationTimer);
     clearTmuxPaneRegistration(tmuxRegistration);
@@ -1650,17 +1685,23 @@ const plugin: TuiDualContractModule = {
       }
     }, ACTIVITY_FRAME_MS);
 
-    api.lifecycle.onDispose(() => {
-      clearInterval(renderTimer);
-      clearInterval(animationTimer);
-      clearTmuxPaneRegistration(tmuxRegistration);
-    });
-
     // Clickable sidebar: v1 hosts always expose api.route.navigate.
     const interaction = createSidebarInteraction(
       makeRouteNavigator(api.route, 'navigate', false),
       selectionGuard(api.renderer),
     );
+    // A click on the companion asks this window to open a session.
+    const disposeNavigation = startCompanionNavigation(
+      () => configDirectory,
+      interaction.navigate,
+    );
+
+    api.lifecycle.onDispose(() => {
+      clearInterval(renderTimer);
+      clearInterval(animationTimer);
+      clearTmuxPaneRegistration(tmuxRegistration);
+      disposeNavigation();
+    });
 
     api.slots.register({
       order: resolveSidebarSlotOrder(api.tuiConfig?.plugin, PLUGIN_NAME),

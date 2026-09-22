@@ -21,6 +21,14 @@ The companion system consists of two main components following a **Producer-Cons
   - Manages installation metadata and version tracking
   - Provides update checking and installation workflows
 
+- **Return channel (command.ts)**: The one request that travels companion → plugin
+  - Carries "open this session" clicks from the companion back to a TUI window
+  - Single-use: claiming is an atomic rename, so exactly one window handles it
+  - Prefers the window showing the requesting project, then falls back to any
+    window after a short grace period
+  - Never touches `companion-state.json`, which stays plugin-owned so the
+    original and Tauri companions can run side by side
+
 ### Key Interfaces
 
 ```typescript
@@ -80,6 +88,28 @@ OpenCode Session → CompanionManager.onSessionStatus() → Updates state → Sp
    - Writes to `companion-state.json` with atomic rename
    - Includes session configuration for display preferences
 
+### Click-to-Session Flow
+
+```
+Click on companion → Rust writes companion-command.json → TUI polls and claims it → routes.navigate("session", { sessionID })
+```
+
+1. **Click** (`ui/main.js`): a primary click that is not a drag calls the
+   `navigate_to_session` command with the session the overlay is showing
+2. **Request** (`src-tauri/src/command.rs`): writes the request atomically to
+   `companion-command.json`, so a polling reader never sees a partial file
+3. **Poll** (`startCompanionNavigation` in `src/tui.ts`): every 250 ms, cheap
+   because the file usually does not exist
+4. **Claim** (`claimNavigation` in `src/companion/command.ts`): the window
+   showing the requesting project takes it; another project waits out a 400 ms
+   grace period, after which any window may take it rather than leaving the
+   click unanswered
+5. **Navigate**: the TUI routes to the session through its own router
+
+A request is discarded after 3 s, so a click is never answered much later by a
+window that happened to start afterwards. If no TUI window is running, the
+request simply expires.
+
 ### Binary Installation Flow
 
 ```
@@ -109,6 +139,8 @@ ensureCompanionVersion() → installCompanionArchive() → extract → validate 
 ### Consumed By
 
 - **Main plugin** (`src/index.ts`): Initializes `CompanionManager` for each session
+- **TUI** (`src/tui.ts`): Polls the command file and routes companion clicks to
+  its router, on both the v1 (`api.route`) and v2 (`ctx.ui.router`) hosts
 - **User configuration** (`src/config/schema.ts`): Validates companion config schema
 
 ### Dependencies
@@ -142,6 +174,9 @@ interface CompanionConfig {
 ### Storage Locations
 
 - **State file**: `~/.local/share/opencode/storage/mechanicus/companion-state.json`
+  (plugin → companion; the companion only reads it)
+- **Command file**: `~/.local/share/opencode/storage/mechanicus/companion-command.json`
+  (companion → plugin; written by the companion, consumed by one TUI window)
 - **Binary**: `~/.local/share/opencode/storage/mechanicus/bin/mechanicus-companion[.exe]`
 - **Metadata**: `~/.local/share/opencode/storage/mechanicus/bin/mechanicus-companion.json`
 

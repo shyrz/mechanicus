@@ -75,8 +75,6 @@ const label = document.getElementById('label');
 /** @type {{ el: HTMLElement, lastFrame: number }[]} */
 let tiles = [];
 let payload = null;
-/** Latest snap state from Rust. */
-let snap = { snapped: false, target: null, progress: 0, content: [0, 0, 120, 120], expanded: true };
 
 // ── Rendering ──────────────────────────────────────────────────────────────
 function render(p) {
@@ -109,7 +107,10 @@ function render(p) {
   }
 
   // The collapsed handle has no animation to read, so colour is the only cue.
-  root.style.setProperty('--status-color', STATUS_COLORS[status] ?? STATUS_COLORS.idle);
+  root.style.setProperty(
+    '--status-color',
+    STATUS_COLORS[status] ?? STATUS_COLORS.idle,
+  );
 
   label.textContent = p.session ? `${p.session.project} · ${status}` : '';
   document.title = p.session?.project ?? 'mechanicus-companion';
@@ -131,8 +132,6 @@ function radiusFor(target, progress) {
 }
 
 function applySnap(s) {
-  snap = s;
-
   const [x, y, w, h] = s.content;
   root.style.setProperty('--content-x', `${x}px`);
   root.style.setProperty('--content-y', `${y}px`);
@@ -152,7 +151,11 @@ function tick(now) {
   if (payload) {
     const seconds = now / 1000;
     for (const tile of tiles) {
-      const index = frameIndex(seconds, payload.config.speed, payload.config.loop_style);
+      const index = frameIndex(
+        seconds,
+        payload.config.speed,
+        payload.config.loop_style,
+      );
       if (index === tile.lastFrame) continue;
       tile.lastFrame = index;
       const { col, row } = frameCell(index);
@@ -202,21 +205,33 @@ content.addEventListener('pointermove', async (event) => {
   }
 });
 
-content.addEventListener('pointerup', (event) => {
+content.addEventListener('pointerup', async (event) => {
   const wasDragging = dragging;
   pressOrigin = null;
   dragging = false;
   if (wasDragging || event.button !== 0) return;
 
-  // ── Hook point: "jump to session" ──────────────────────────────────────
-  // Needs a companion → plugin return channel before it can navigate; until
-  // then a click is only reported so the wiring can be exercised.
-  console.log('[companion] click', payload?.session?.session_id ?? 'none');
+  // A click asks the OpenCode TUI to open the session being shown. There is no
+  // direct channel, so this becomes a file the plugin polls; if no window is
+  // showing this project, nothing happens and the click is simply inert.
+  const session = payload?.session;
+  if (!session?.session_id) return;
+  try {
+    await window.__TAURI__?.core?.invoke('navigate_to_session', {
+      sessionId: session.session_id,
+      cwd: session.cwd,
+    });
+  } catch (err) {
+    console.error('[companion] navigate request failed', err);
+  }
 });
 
 content.addEventListener('contextmenu', (event) => {
   event.preventDefault();
-  console.log('[companion] context menu', payload?.session?.session_id ?? 'none');
+  console.log(
+    '[companion] context menu',
+    payload?.session?.session_id ?? 'none',
+  );
 });
 
 // ── Debug keys (testing only) ──────────────────────────────────────────────
@@ -240,7 +255,9 @@ window.addEventListener('keydown', (event) => {
 (async () => {
   const api = window.__TAURI__;
   if (!api) {
-    console.error('[companion] Tauri API unavailable; rendering static fallback');
+    console.error(
+      '[companion] Tauri API unavailable; rendering static fallback',
+    );
     render({
       session: {
         session_id: 'preview',
@@ -249,7 +266,12 @@ window.addEventListener('keydown', (event) => {
         status: 'busy',
         agents: ['orchestrator'],
       },
-      config: { position: 'bottom-right', size: 'medium', speed: 1, loop_style: 'classic' },
+      config: {
+        position: 'bottom-right',
+        size: 'medium',
+        speed: 1,
+        loop_style: 'classic',
+      },
       cell: 120,
       cols: 1,
       rows: 1,
@@ -258,7 +280,9 @@ window.addEventListener('keydown', (event) => {
   }
 
   await api.event.listen('companion://state', (event) => render(event.payload));
-  await api.event.listen('companion://snap', (event) => applySnap(event.payload));
+  await api.event.listen('companion://snap', (event) =>
+    applySnap(event.payload),
+  );
 
   try {
     render(await api.core.invoke('get_state'));

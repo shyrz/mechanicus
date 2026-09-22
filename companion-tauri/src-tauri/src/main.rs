@@ -7,6 +7,7 @@
 //! original Rust companion can run side by side. Point
 //! `companion.binaryPath` at this binary to try it.
 
+mod command;
 mod hit_test;
 mod pointer;
 mod singleton;
@@ -233,6 +234,16 @@ fn get_state() -> Payload {
     build_payload(&st, owner.as_deref())
 }
 
+/// Asks a TUI window to open the session the overlay is showing.
+///
+/// The companion has no channel to the plugin, so a click becomes a file that
+/// whichever window is showing this project picks up. Best-effort: a click that
+/// no window answers leaves the overlay exactly as it was.
+#[tauri::command]
+fn navigate_to_session(session_id: String, cwd: String) -> Result<(), String> {
+    command::request_navigation(&session_id, &cwd).map_err(|e| e.to_string())
+}
+
 /// Toggles window-level mouse pass-through. Used while validating whether a
 /// circular overlay can keep its corners click-through.
 #[tauri::command]
@@ -343,13 +354,15 @@ fn test_cursor_file() -> std::path::PathBuf {
 
 /// Runs a queued drag command written to [`test_drop_file`].
 ///
-/// Three command forms:
+/// Command forms:
 ///
 /// - `x,y` — emulate "dragged here and released": moves the window and lets the
 ///   settle watcher evaluate the snap.
 /// - `hold x,y` — emulate an in-flight drag that never ends on its own, so the
 ///   dim overlay and its markers can be observed.
 /// - `release` — end a drag opened by `hold`.
+/// - `click` / `click <sessionId>` — emulate a click on the overlay, which
+///   asks the plugin to open a session.
 ///
 /// The file is removed once consumed so each write triggers exactly one command.
 /// This exists because Tauri's IPC is only reachable from inside the webview,
@@ -368,6 +381,38 @@ fn poll_test_hook(window: &tauri::WebviewWindow, controller: &Arc<snap::SnapCont
     if raw == "release" {
         eprintln!("[test-hook] release");
         controller.release_drag();
+        return;
+    }
+    if let Some(rest) = raw.strip_prefix("click") {
+        // Stands in for a click on the overlay, which cannot be synthesised
+        // without Accessibility permission. `click` uses the session the
+        // overlay is showing; `click <sessionId>` targets a specific one, which
+        // is what makes the request assertable from a script.
+        let st = state::read_state(&state::state_file_path());
+        let owner = std::env::var("MECHANICUS_COMPANION_SESSION_ID").ok();
+        let showing = state::choose_session(&st.sessions, owner.as_deref())
+            .map(|idx| st.sessions[idx].clone());
+
+        let target = if rest.trim().is_empty() {
+            showing.map(|s| (s.session_id, s.cwd))
+        } else {
+            let session_id = rest.trim().to_string();
+            st.sessions
+                .iter()
+                .find(|s| s.session_id == session_id)
+                .map(|s| (s.session_id.clone(), s.cwd.clone()))
+                .or_else(|| Some((session_id, String::new())))
+        };
+
+        match target {
+            Some((session_id, cwd)) => {
+                match command::request_navigation(&session_id, &cwd) {
+                    Ok(()) => eprintln!("[test-hook] click -> {session_id} ({cwd})"),
+                    Err(err) => eprintln!("[test-hook] click failed: {err}"),
+                }
+            }
+            None => eprintln!("[test-hook] click: no session to target"),
+        }
         return;
     }
 
@@ -494,6 +539,7 @@ fn main() {
         .manage(Arc::clone(&snap_controller))
         .invoke_handler(tauri::generate_handler![
             get_state,
+            navigate_to_session,
             set_click_through,
             set_snap_enabled,
             set_dragging,

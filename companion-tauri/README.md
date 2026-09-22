@@ -13,9 +13,13 @@ The plugin ↔ companion boundary was already clean:
 
 | Contract | Value |
 | --- | --- |
-| State file | `~/.local/share/opencode/storage/mechanicus/companion-state.json` |
+| State file (read) | `~/.local/share/opencode/storage/mechanicus/companion-state.json` |
+| Command file (write) | `~/.local/share/opencode/storage/mechanicus/companion-command.json` |
 | Env | `MECHANICUS_COMPANION_SESSION_ID`, `MECHANICUS_COMPANION_DEBUG` |
 | Pid files | `companion.pid`, `companion.<sessionId>.pid` |
+
+`companion-state.json` is read-only from here; the command file is this
+process's only write, and it carries clicks rather than state.
 
 Nothing in `src/companion/manager.ts` needs to change to run this binary, which
 is what makes the replacement safe to trial and easy to roll back.
@@ -28,8 +32,10 @@ companion-tauri/
 │   ├── src/main.rs     # setup, poll loop, payload shaping, commands
 │   ├── src/snap.rs     # snap targets, envelope geometry, drag settling
 │   ├── src/workarea.rs # display/work-area measurement (AppKit)
+│   ├── src/pointer.rs  # physical mouse-button state (AppKit)
 │   ├── src/hit_test.rs # click-through regions
 │   ├── src/state.rs    # companion-state.json contract + session selection
+│   ├── src/command.rs  # companion → plugin navigation requests
 │   ├── src/singleton.rs
 │   ├── tauri.conf.json
 │   └── capabilities/   # Tauri v2 permissions for the frontend
@@ -82,6 +88,8 @@ it to take effect.
   `unknown` fallback
 - Native window drag with a click/drag threshold
 - Per-project window position restore
+- Click to open the session being shown, through a file-based channel to the
+  plugin (see [Clicking the overlay](#clicking-the-overlay))
 
 ## Snapping
 
@@ -132,30 +140,66 @@ only be delivered after the drop, when the overlay is already gone.
 
 ### Detecting the end of a drag
 
-`performWindowDragWithEvent` does not block: it returns as soon as the
-compositor takes over, so the frontend cannot report when a drag ends, and any
-position read at that moment is the position the drag *started* from. The snap
-loop therefore watches the window position stop changing and evaluates the snap
-at the position the drag actually finished at. The frontend's "pointer up" call
-only shortens the settle window; it cannot trigger a snap on its own.
+A compositor drag cannot report its own end. `startDragging` only posts a request
+to the main thread and returns immediately, and the nested drag loop that follows
+swallows the mouse events, so the webview never sees a `pointerup` either.
+
+Watching the window position is not enough to stand in for a release: the
+position also stops changing whenever the user pauses mid-drag, so treating that
+as the end would settle the snap and clear the overlay while the button is still
+down. The loop therefore reads the physical mouse button
+(`NSEvent.pressedMouseButtons`), which is a state query rather than an event tap
+and so needs no Accessibility permission. Only when the button is up does the
+position decide where the snap lands. Platforms that cannot answer fall back to
+the position heuristic alone.
+
+## Clicking the overlay
+
+A primary click that is not a drag asks the OpenCode TUI to open the session the
+overlay is showing. The companion is a detached process with no channel to the
+plugin, so the click becomes a file and the plugin polls for it.
+
+```
+Click → navigate_to_session → companion-command.json → TUI claims it → routes to the session
+```
+
+- `src-tauri/src/command.rs` writes the request atomically (temp file + rename),
+  so a polling reader never sees a half-written file.
+- Each TUI window polls every 250 ms. The file usually does not exist, so the
+  check is close to free.
+- Claiming is an atomic rename, which makes a request single-use: with several
+  windows polling, exactly one wins and the rest see it gone.
+- The window showing the requesting project takes it. Another project waits out
+  a 400 ms grace period, after which any window may take it, because landing in
+  the right project still beats a click that silently does nothing.
+- A request expires after 3 s, so a click is never answered much later by a
+  window that happened to start afterwards. With no TUI window running, the
+  request simply expires and nothing happens.
+
+This channel never writes `companion-state.json`. That file belongs to the
+plugin, and the companion's read-only contract with it is what lets both
+implementations run side by side.
 
 ## Test hooks
 
-Driving a real drag or a real cursor from a script needs Accessibility
-permission for synthetic events, which otherwise makes the snap pipeline
-untestable. `MECHANICUS_COMPANION_TAURI_TEST_HOOKS=1` enables two file-driven
-stand-ins that run through the same code paths:
+Driving a real drag, a real cursor or a real click from a script needs
+Accessibility permission for synthetic events, which otherwise makes the snap
+and navigation pipelines untestable. `MECHANICUS_COMPANION_TAURI_TEST_HOOKS=1`
+enables file-driven stand-ins that run through the same code paths:
 
 | File (beside `companion-state.json`) | Content | Effect |
 | --- | --- | --- |
 | `companion-tauri-test-drop` | `x,y` in logical px | Emulates "dragged and released here": moves the window, then lets the settle watcher evaluate the snap |
 | `companion-tauri-test-drop` | `hold x,y` | Emulates a drag still in flight: the settle watcher is suppressed so the dim overlay and its markers can be observed |
 | `companion-tauri-test-drop` | `release` | Ends a `hold`, handing back to the normal settle path |
+| `companion-tauri-test-drop` | `click` | Emulates a click on the overlay, requesting navigation to the session it is showing |
+| `companion-tauri-test-drop` | `click <sessionId>` | Same, but targeting a specific session so the request is assertable |
 | `companion-tauri-test-cursor` | `x,y` in logical px | Overrides the polled global cursor, for hover/expand testing |
 
-Files are consumed once. The drop hook only *moves the window* — the snap
-decision is still made by the production settle-detection path, so the test
-exercises real behaviour rather than a shortcut.
+Files are consumed once. The hooks only *nudge*: the drop hook moves the window
+and leaves the snap decision to the production settle watcher, and the click
+hook writes a real request onto the real channel, so both exercise the shipping
+behaviour rather than a shortcut.
 
 Coordinates are logical (points). On a 2x display, mixing logical and physical
 pixels silently places the cursor off-window.
@@ -175,9 +219,6 @@ expected to be removed or moved behind a config flag:
 These are the parts of the plan that are framework-independent, so they are not
 blocked on this spike:
 
-- **Return channel.** Click currently only logs. Jumping to a session needs the
-  plugin to expose `route.navigate("session", { sessionID })`, which requires a
-  companion → plugin channel that does not exist yet.
 - **Attention states.** The plugin only publishes `idle` / `busy` /
   `waiting-input`. Rich permission/question state needs the plugin to read
   `session.permission(sessionID)` / `session.question(sessionID)` and write it
