@@ -82,8 +82,9 @@ it to take effect.
   activation policy), never steals focus
 - Reads the plugin state file on the same 250 ms cadence as the original
 - Session selection ported from the original so both pick the same session
-- Agent → icon mapping including `councillor-*` → council, `intro`, `input`,
-  `unknown` fallback. Icons are inline SVG, so nothing is copied into `ui/` and the
+- Agent → icon mapping, one Nucleo `sharp` outline body per role: `councillor-*`
+  → councillor, plus `intro`, `input`, and `sharp/bot` as the fallback for an
+  unknown agent. Icons are inline SVG, so nothing is copied into `ui/` and the
   bundle carries no sprite sheets.
 - Native window drag with a click/drag threshold
 - Per-project window position restore
