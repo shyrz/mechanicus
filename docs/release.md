@@ -21,6 +21,14 @@ git diff --stat v2.0.0..HEAD
 git diff --name-only v2.0.0..HEAD
 ```
 
+The first mechanicus release has no previous plugin tag, so use the last
+pre-rename commit as the base instead:
+
+```bash
+git log --oneline --decorate 3685293..HEAD
+git diff --stat 3685293..HEAD
+```
+
 Use that diff to write the GitHub release body. Do not rely on memory.
 
 Recommended release note sections:
@@ -38,11 +46,11 @@ Recommended release note sections:
 Pick versions independently:
 
 ```text
-plugin: 2.0.3
-plugin tag: v2.0.3
+plugin: 0.9.0
+plugin tag: v0.9.0
 
-companion: 0.1.3
-companion tag: companion-v0.1.3
+companion: 0.9.0
+companion tag: companion-v0.9.0
 ```
 
 Use a plugin patch release for ordinary bug fixes and release-process fixes.
@@ -56,11 +64,11 @@ When releasing a new companion binary, update the packaged companion manifest:
 ```json
 // src/companion/companion-manifest.json
 {
-  "version": "0.1.3",
-  "tag": "companion-v0.1.3",
+  "version": "0.9.0",
+  "tag": "companion-v0.9.0",
   "repo": "shyrz/mechanicus",
   "checksums": {
-    "mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz": "..."
+    "mechanicus-companion-v0.9.0-aarch64-apple-darwin.tar.gz": "..."
   }
 }
 ```
@@ -73,7 +81,7 @@ Also update the Rust crate version:
 
 ```toml
 # companion/Cargo.toml
-version = "0.1.3"
+version = "0.9.0"
 ```
 
 Regenerate or update `companion/Cargo.lock` so the package entry matches.
@@ -93,15 +101,14 @@ linux-arm64
 windows-x64
 ```
 
-Expected release asset names for companion `0.1.3`:
+Expected release asset name for companion `0.9.0`:
 
 ```text
-mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz
-mechanicus-companion-v0.1.3-x86_64-apple-darwin.tar.gz
-mechanicus-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz
-mechanicus-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz
-mechanicus-companion-v0.1.3-x86_64-pc-windows-msvc.zip
+mechanicus-companion-v0.9.0-aarch64-apple-darwin.tar.gz
 ```
+
+Other targets follow the same
+`mechanicus-companion-v<version>-<target>.<ext>` pattern when they are built.
 
 ## 4. Build and publish companion assets
 
@@ -109,7 +116,7 @@ Trigger the manual workflow:
 
 ```bash
 gh workflow run companion-release.yml \
-  -f version=0.1.3 \
+  -f version=0.9.0 \
   -f targets=macos-arm64,macos-x64,linux-x64,linux-arm64,windows-x64
 ```
 
@@ -123,15 +130,15 @@ gh run watch <run-id>
 Verify the companion release:
 
 ```bash
-gh release view companion-v0.1.3
+gh release view companion-v0.9.0
 ```
 
 Download assets for a local sanity check:
 
 ```bash
-mkdir -p /tmp/companion-v0.1.3-assets
-gh release download companion-v0.1.3 \
-  --dir /tmp/companion-v0.1.3-assets
+mkdir -p /tmp/companion-v0.9.0-assets
+gh release download companion-v0.9.0 \
+  --dir /tmp/companion-v0.9.0-assets
 ```
 
 Confirm the asset list matches the installer targets before publishing the
@@ -149,26 +156,26 @@ download the workflow artifacts and upload them manually:
 
 ```bash
 gh run download <run-id> \
-  --dir /tmp/companion-v0.1.3-assets
+  --dir /tmp/companion-v0.9.0-assets
 
-gh release create companion-v0.1.3 \
-  --title "Companion v0.1.3" \
+gh release create companion-v0.9.0 \
+  --title "Companion v0.9.0" \
   --notes "Manual companion binary release for mechanicus." \
-  /tmp/companion-v0.1.3-assets/*
+  /tmp/companion-v0.9.0-assets/*
 ```
 
 If the release already exists, upload with clobber:
 
 ```bash
-gh release upload companion-v0.1.3 \
-  /tmp/companion-v0.1.3-assets/* \
+gh release upload companion-v0.9.0 \
+  /tmp/companion-v0.9.0-assets/* \
   --clobber
 ```
 
 Then verify:
 
 ```bash
-gh release view companion-v0.1.3
+gh release view companion-v0.9.0
 ```
 
 ## 5. Bump the plugin package
@@ -177,7 +184,7 @@ For a stable patch, update `package.json`:
 
 ```json
 {
-  "version": "2.0.3"
+  "version": "0.9.0"
 }
 ```
 
@@ -241,7 +248,7 @@ Commit and push:
 
 ```bash
 git add <intended-files>
-git commit -m "chore: prepare companion 0.1.3 release"
+git commit -m "chore: prepare companion 0.9.0 release"
 git push
 ```
 
@@ -256,14 +263,14 @@ git push --follow-tags
 If the package version was edited manually, create and push the tag yourself:
 
 ```bash
-git tag -a v2.0.3 -m "v2.0.3"
-git push origin v2.0.3
+git tag -a v0.9.0 -m "v0.9.0"
+git push origin v0.9.0
 ```
 
 Verify the tag exists remotely:
 
 ```bash
-git ls-remote --tags origin v2.0.3
+git ls-remote --tags origin v0.9.0
 ```
 
 ## 9. Create the GitHub plugin release
@@ -271,23 +278,23 @@ git ls-remote --tags origin v2.0.3
 Use release notes based on the actual git diff.
 
 ```bash
-gh release create v2.0.3 \
-  --title "v2.0.3" \
-  --notes-file /tmp/mechanicus-v2.0.3-notes.md
+gh release create v0.9.0 \
+  --title "v0.9.0" \
+  --notes-file /tmp/mechanicus-v0.9.0-notes.md
 ```
 
 If a release already exists, update it:
 
 ```bash
-gh release edit v2.0.3 \
-  --title "v2.0.3" \
-  --notes-file /tmp/mechanicus-v2.0.3-notes.md
+gh release edit v0.9.0 \
+  --title "v0.9.0" \
+  --notes-file /tmp/mechanicus-v0.9.0-notes.md
 ```
 
 Verify:
 
 ```bash
-gh release view v2.0.3
+gh release view v0.9.0
 ```
 
 ## 10. Publish npm
@@ -305,15 +312,16 @@ After publishing, verify the package version:
 npm view mechanicus version
 ```
 
-## 11. Current v2.0.3 release checklist
+## 11. Current v0.9.0 release checklist
 
-For the `2.0.3` / `companion-v0.1.3` release, the completed state should be:
+For the `0.9.0` / `companion-v0.9.0` release, the completed state should be:
 
-- `package.json` version is `2.0.3`.
-- `src/companion/companion-manifest.json` points to `companion-v0.1.3`.
-- Git tag `v2.0.3` exists on origin.
-- GitHub release `v2.0.3` exists.
-- GitHub release `companion-v0.1.3` exists with the expected assets.
+- `package.json` version is `0.9.0`.
+- `src/companion/companion-manifest.json` points to `companion-v0.9.0`.
+- Git tag `v0.9.0` exists on origin.
+- GitHub release `v0.9.0` exists.
+- GitHub release `companion-v0.9.0` exists with the macOS arm64 asset.
+- npm package `mechanicus@0.9.0` exists — the first publish under this name.
 - Working tree is clean.
 - `bun run check:ci`, `bun run typecheck`, `bun test`, and `bun run build` pass.
 - npm publish is run only after the GitHub release and companion assets are ready.
