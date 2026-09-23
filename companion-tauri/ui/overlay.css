@@ -31,8 +31,13 @@ body {
 }
 
 /*
- * Landing markers. Each one previews the collapsed handle's exact footprint, so
- * the marker is where the overlay will really sit rather than an approximation.
+ * Landing markers. Each one previews the collapsed handle's footprint, so the
+ * marker is where the overlay will really sit rather than an approximation.
+ *
+ * It is held a few pixels inside the work area rather than flush with it (see
+ * PILL_MARGIN in snap.rs): the overlay window ends at the work area, so a marker
+ * sitting on the handle's flush position would be clipped there and lose its
+ * rounded end.
  */
 .pill {
   position: absolute;
@@ -42,9 +47,6 @@ body {
   box-shadow:
     0 2px 10px rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.28);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   /* Grows into place when the drag starts. */
   transform: scale(0.72);
   opacity: 0;
@@ -59,24 +61,16 @@ body {
   opacity: 1;
 }
 
-/* The marker the overlay would dock to if released right now. */
+/*
+ * The marker the overlay would dock to if released right now.
+ *
+ * Full white against the resting 0.82, plus a 12% scale-up and a ring: that reads
+ * on its own, which is why the marker no longer carries a dot in the middle.
+ */
 .pill.active {
   background: #ffffff;
   transform: scale(1.12);
   box-shadow:
     0 4px 18px rgba(0, 0, 0, 0.34),
     0 0 0 4px rgba(255, 255, 255, 0.22);
-}
-
-.pill-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(28, 28, 32, 0.9);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-}
-
-.pill.active .pill-dot {
-  opacity: 1;
 }

@@ -43,18 +43,15 @@ companion-tauri/
 │   ├── tauri.conf.json
 │   └── capabilities/   # Tauri v2 permissions for the frontend
 ├── ui/                 # Static frontend (no build step)
-│   ├── main.js         # port of gifs.rs frame math + drag/click handling
+│   ├── main.js         # layout, drag/click handling, hover painting
+│   ├── icons.js        # agent → inline SVG
 │   └── overlay.js      # dim layer + landing markers
-└── scripts/sync-assets.sh
 ```
 
 ## Running it
 
 ```bash
-# 1. Copy the sprite sheets the webview loads.
-./scripts/sync-assets.sh
-
-# 2. Build and run. The session id is required — without it the process exits,
+# 1. Build and run. The session id is required — without it the process exits,
 #    exactly like the original companion.
 cd src-tauri
 MECHANICUS_COMPANION_SESSION_ID=dev cargo run
@@ -85,10 +82,9 @@ it to take effect.
   activation policy), never steals focus
 - Reads the plugin state file on the same 250 ms cadence as the original
 - Session selection ported from the original so both pick the same session
-- Sprite-sheet animation: `frameIndex` / `frameCell` are direct ports of
-  `gifs.rs`, so the same sheet shows the same frame at the same instant
-- Agent → sheet mapping including `councillor-*` → council, `intro`, `input`,
-  `unknown` fallback
+- Agent → icon mapping including `councillor-*` → council, `intro`, `input`,
+  `unknown` fallback. Icons are inline SVG, so nothing is copied into `ui/` and the
+  bundle carries no sprite sheets.
 - Native window drag with a click/drag threshold
 - Per-project window position restore
 - Click to reveal the session being shown, as far as the host allows: opened on
@@ -106,11 +102,25 @@ against the screen edge.
   box of both the expanded overlay and the collapsed handle. Only the content
   inside it animates afterwards, because resizing a native window every frame is
   janky on macOS.
+- The move itself is animated: a drop starts a ~320 ms eased glide from where the
+  window was released to the envelope's position, so the button travels to the edge
+  rather than cutting to it. Only the *position* is animated; the envelope's size is
+  applied once, and the collapse runs inside it on the way.
+- The glide starts from where the *content* is, not from the raw window position.
+  During a drag the window keeps the geometry the last docked frame gave it and the
+  content is drawn *inside* it at `content_rect(progress)`, so the content's origin
+  is not the window's. The drop frame re-renders it expanded, and the window absorbs
+  the difference; without that the button jumps by it on the single frame the glide
+  cannot hide. When the content was already expanded before the press the two rects
+  agree and the window does not move at all -- the normal case, and the one to check
+  first if a jump ever comes back.
 - The envelope is also the full set of positions the handle could occupy, so
-  both states sit flush against the edge and the overlay only ever travels
-  *along* it while animating.
-- Docked, it collapses to a slim handle (22 px thick) hugging the edge, with
-  rounded inner corners, a grip line, and a status colour.
+  both states sit flush against the edge and, once docked, the overlay only ever
+  travels *along* it while animating.
+- Docked, it collapses to a slim handle (16 px thick) hugging the edge: a rounded
+  pill carrying the same hairline edge as the buttons and a 4 x 48 bar through the
+  middle. The bar is where a status shows while collapsed — the buttons that carry
+  the status ring are faded out — and it falls back to the edge colour when idle.
 - Hovering the handle expands it back to the animated overlay; moving away
   re-collapses it (90 ms open delay, 420 ms close delay). Opening animates in
   about 80 ms, closing in about 176 ms: opening answers the cursor directly, so
@@ -127,8 +137,15 @@ defaults to 160 px and is tunable with `MECHANICUS_COMPANION_TAURI_SNAP_PX`;
 releasing further than that from every target leaves the overlay where the drag
 ended.
 
-The markers preview the handle's exact footprint and are placed from the same
-geometry the drop uses, so what is shown and where it lands cannot drift apart.
+The markers preview the handle's footprint and are placed from the same geometry
+the drop uses, so what is shown and where it lands cannot drift apart. They are
+held 4 px inside the work area rather than sitting on the handle's flush position:
+the overlay window ends at the work area, so a marker placed flush would be clipped
+there and lose the rounded end of its capsule. The only consequence is that at an
+edge the marker is a few pixels off the exact landing spot.
+
+The marker the drop would land on is drawn solid white, 12% larger and with a ring,
+which is the whole of the active cue — there is no dot inside it.
 
 ### The dim overlay
 

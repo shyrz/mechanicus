@@ -24,8 +24,11 @@ use tauri::{LogicalPosition, LogicalSize, WebviewWindow};
 use crate::pointer;
 use crate::workarea::{Rect, ScreenInfo};
 
-/// Thickness of the collapsed handle, perpendicular to the docked edge.
-pub const HANDLE_THICK: f64 = 22.0;
+/// Thickness of the collapsed handle, perpendicular to the docked edge. Mirrored by
+/// `.handle-grip`'s width in `ui/style.css` -- the pill is drawn there, this only
+/// sizes the box it is centred in -- and pinned by
+/// `src/companion/handle-geometry.test.ts` so the two cannot drift apart.
+pub const HANDLE_THICK: f64 = 16.0;
 /// Length of the collapsed handle, along the docked edge.
 pub const HANDLE_LONG: f64 = 84.0;
 /// How close a drop must land to a target for it to dock there. Beyond this the
@@ -33,6 +36,14 @@ pub const HANDLE_LONG: f64 = 84.0;
 pub const SNAP_RADIUS_DEFAULT: f64 = 160.0;
 /// Size of the pill markers, which preview the collapsed handle footprint.
 const PILL_PAD: f64 = 5.0;
+/// Gap the pill markers keep from the work-area edge.
+///
+/// The handle they preview is flush with the edge, so padding it outward would put
+/// that padding past the edge — and the overlay window ends exactly there, so the
+/// capsule would be clipped and lose its rounded end. The marker is held inside by
+/// this gap instead. It costs a few pixels of positional accuracy at the edges and
+/// buys a shape that reads as a capsule rather than a cut-off bar.
+const PILL_MARGIN: f64 = 4.0;
 /// Delay before expanding after the cursor reaches the handle.
 const HOVER_OPEN_DELAY: Duration = Duration::from_millis(90);
 /// Delay before collapsing after the cursor leaves the expanded overlay.
@@ -54,6 +65,12 @@ const ANIM_SPEED_CLOSE: f32 = 6.0;
 const DRAG_SETTLE: Duration = Duration::from_millis(250);
 /// Settle window once the release is known, so only the final frame has to land.
 const DRAG_SETTLE_RELEASE: Duration = Duration::from_millis(120);
+/// How long the window takes to glide onto the envelope it docked to.
+///
+/// Deliberately longer than the collapse, which `ANIM_SPEED_CLOSE` finishes in
+/// about 170 ms: the fold happens on the way, and the travel stays legible after it
+/// is done, so the move is seen rather than inferred.
+const SNAP_TRAVEL: Duration = Duration::from_millis(320);
 /// Slack around the interactive content, in logical pixels.
 const HIT_SLACK: f64 = 2.0;
 
@@ -102,7 +119,6 @@ impl SnapTarget {
     }
 
     /// Inverse of [`SnapTarget::as_u8`], for decoding the atomic target flag.
-    #[allow(dead_code)]
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             1 => Some(SnapTarget::Left),
@@ -197,17 +213,29 @@ impl SnapTarget {
 
     /// Marker shown on the dim overlay while dragging, in screen coordinates.
     ///
-    /// It previews the collapsed handle's footprint, so the marker is exactly
-    /// where the overlay will land rather than an approximation of it.
+    /// It previews the collapsed handle's footprint, padded so the capsule is
+    /// visible around it. Where the handle sits flush with the work-area edge that
+    /// padding is held inside instead of overflowing, because the overlay window
+    /// ends at the edge and anything past it is clipped.
     pub fn pill_rect(self, work: Rect, content: (f64, f64)) -> Rect {
         let size = self.window_size(content);
         let pos = self.window_pos(work, size);
         let handle = self.handle_rect(size);
+        let w = handle.w + PILL_PAD * 2.0;
+        let h = handle.h + PILL_PAD * 2.0;
         Rect {
-            x: pos.0 + handle.x - PILL_PAD,
-            y: pos.1 + handle.y - PILL_PAD,
-            w: handle.w + PILL_PAD * 2.0,
-            h: handle.h + PILL_PAD * 2.0,
+            x: clamp(
+                pos.0 + handle.x - PILL_PAD,
+                work.x + PILL_MARGIN,
+                work.x + work.w - PILL_MARGIN - w,
+            ),
+            y: clamp(
+                pos.1 + handle.y - PILL_PAD,
+                work.y + PILL_MARGIN,
+                work.y + work.h - PILL_MARGIN - h,
+            ),
+            w,
+            h,
         }
     }
 
@@ -263,6 +291,61 @@ fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a + (b - a) * t
 }
 
+/// Where a dock travel has reached at `t`, in linear time 0..=1.
+///
+/// Eased, so the window leaves the drop point at speed and settles onto the edge
+/// rather than stopping dead on it.
+fn travel_position(from: (f64, f64), goal: (f64, f64), t: f32) -> (f64, f64) {
+    let e = ease(t) as f64;
+    (lerp(from.0, goal.0, e), lerp(from.1, goal.1, e))
+}
+
+/// Window position that puts the content's origin at `content_origin`.
+///
+/// The envelope is not always the content's size: a bottom dock's envelope is at
+/// least the handle's length, which is wider than a one-button row, so the content
+/// sits inset inside it. Starting a travel from the raw window position would
+/// therefore make the button jump sideways by that inset on the very frame the
+/// envelope is applied — before the glide has moved anything. Deriving the start
+/// from the content instead keeps it continuous.
+/// A measured size within this much of the envelope is not drift.
+const ENVELOPE_SIZE_TOLERANCE: f64 = 0.5;
+
+/// Whether the envelope has to be applied this tick.
+///
+/// The measured size is part of the test, not just the last envelope recorded as
+/// applied: the poll loop sizes the window too, and if it lands between the snap
+/// loop's read of the target and its write, the window keeps the floating footprint
+/// while `applied` says otherwise -- leaving it the wrong size, with the content rect
+/// describing a window that is not there, until the target or the agent set changes.
+fn needs_envelope(applied: Option<Rect>, env: Rect, win: Rect) -> bool {
+    applied != Some(env)
+        || (win.w - env.w).abs() > ENVELOPE_SIZE_TOLERANCE
+        || (win.h - env.h).abs() > ENVELOPE_SIZE_TOLERANCE
+}
+
+/// Where the window must sit so the content does not move across a drop.
+///
+/// During a drag the window keeps the geometry the last docked frame gave it, and
+/// the content is drawn *inside* it at `content_rect(progress)` — not at its
+/// origin. The drop frame re-renders the content expanded, so the window has to
+/// absorb the difference; without that the button jumps by it on the frame before
+/// the glide starts, which is the one frame the glide cannot hide.
+///
+/// When the drag began with the content already expanded the two rects agree and
+/// this is the identity — the common case, and the one to check first if a jump
+/// ever comes back.
+fn travel_start(
+    window: (f64, f64),
+    content_before: (f64, f64),
+    content_after: (f64, f64),
+) -> (f64, f64) {
+    (
+        window.0 + content_before.0 - content_after.0,
+        window.1 + content_before.1 - content_after.1,
+    )
+}
+
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {
     if hi < lo {
         lo
@@ -308,6 +391,11 @@ pub struct SnapPayload {
     /// Window-local content rect, in logical pixels.
     pub content: [f64; 4],
     pub expanded: bool,
+    /// Window-local pointer position while it is inside the interactive area, in
+    /// logical pixels. `None` outside it, so a moving pointer elsewhere in the
+    /// screen does not emit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<[f64; 2]>,
 }
 
 /// One landing-spot marker, in overlay-local coordinates.
@@ -352,6 +440,29 @@ struct Inner {
     screen: Option<ScreenInfo>,
     /// Nearest target for the current drag position.
     drag_nearest: Option<SnapTarget>,
+    /// Glide towards the docked envelope, started by a drop.
+    travel: Option<Travel>,
+}
+
+/// A window moving from where it was dropped onto the envelope it docked to.
+///
+/// Without it the window is teleported on the frame after release: the drop lands
+/// on the target, `applied` is cleared, and the next tick pins the window to the
+/// edge. The button then appears to cut to the edge and only afterwards collapse,
+/// so the one part the user is watching — it travelling to where it will live — is
+/// the part with no motion.
+///
+/// Only the position is animated. The envelope is never resized per frame (see the
+/// module docs); its size is applied once, and the collapse animation inside it runs
+/// concurrently, so the button arrives already folded into a handle.
+///
+/// Always cleared before the state it describes goes away -- on a drag, on a drop
+/// that finds no target, and on disable. Leaving one set happens to be harmless
+/// (its elapsed time is long past `SNAP_TRAVEL`, so it lands and clears in a single
+/// frame), but that is a property of the clock rather than of this state.
+struct Travel {
+    from: (f64, f64),
+    started: Instant,
 }
 
 pub struct SnapController {
@@ -378,6 +489,7 @@ impl SnapController {
                 drag_start_pos: None,
                 screen: None,
                 drag_nearest: None,
+                travel: None,
             }),
             enabled: AtomicBool::new(true),
             target_bits: AtomicU8::new(0),
@@ -407,6 +519,7 @@ impl SnapController {
             inner.progress = 0.0;
             inner.applied = None;
             inner.drag_nearest = None;
+            inner.travel = None;
             self.target_bits.store(0, Ordering::Relaxed);
         }
     }
@@ -432,6 +545,7 @@ impl SnapController {
         inner.last_drag_change = Instant::now();
         inner.drag_start_pos = None;
         inner.drag_nearest = None;
+        inner.travel = None;
 
         if trace_enabled() {
             // A drag can only have started from a pressed button, so anything
@@ -469,6 +583,14 @@ impl SnapController {
 
     pub fn is_snapped(&self) -> bool {
         self.target_bits.load(Ordering::Relaxed) != 0
+    }
+
+    /// The edge the overlay is docked to, if any.
+    ///
+    /// The state poller reads this to lay the buttons out along that edge: a
+    /// side dock stacks them in one column, the bottom dock in one row.
+    pub fn target(&self) -> Option<SnapTarget> {
+        SnapTarget::from_u8(self.target_bits.load(Ordering::Relaxed))
     }
 
     /// Whether a drag is in flight. The state poller must not resize the window
@@ -563,7 +685,7 @@ pub fn spawn(
                 (cursor_y - pos.y as f64) / scale,
             );
 
-            let (payload_snapshot, desired_ignore, env_to_apply);
+            let (payload_snapshot, desired_ignore, env_to_apply, pos_to_apply);
 
             {
                 let mut inner = controller.inner.lock().unwrap();
@@ -606,7 +728,38 @@ pub fn spawn(
                                 // recompute and re-apply so it lands on target.
                                 inner.applied = None;
                                 inner.hover_expanded = false;
+                                // The content is about to be re-rendered expanded.
+                                // Where it was drawn a moment ago is what the travel
+                                // has to start from, so read it before the reset.
+                                let dims = target.window_size(inner.content);
+                                let content_before =
+                                    content_rect(target, dims, inner.content, ease(inner.progress));
                                 inner.progress = 0.0;
+                                let content_after = target.expanded_rect(dims, inner.content);
+                                inner.travel = Some(Travel {
+                                    from: travel_start(
+                                        (win.x, win.y),
+                                        (content_before.x, content_before.y),
+                                        (content_after.x, content_after.y),
+                                    ),
+                                    started: Instant::now(),
+                                });
+                                if trace_enabled() {
+                                    // Continuity is a claim about the content, and the
+                                    // window moving is expected -- only this line shows
+                                    // both, which is what makes a jump diagnosable
+                                    // rather than a matter of opinion.
+                                    eprintln!(
+                                        "[drop] target={target:?} win=({:.1},{:.1}) content_before=({:.1},{:.1}) content_after=({:.1},{:.1}) from={:?}",
+                                        win.x,
+                                        win.y,
+                                        content_before.x,
+                                        content_before.y,
+                                        content_after.x,
+                                        content_after.y,
+                                        inner.travel.as_ref().map(|t| t.from),
+                                    );
+                                }
                                 controller
                                     .target_bits
                                     .store(target.as_u8(), Ordering::Relaxed);
@@ -614,6 +767,7 @@ pub fn spawn(
                             None => {
                                 inner.target = None;
                                 inner.applied = None;
+                                inner.travel = None;
                                 controller.target_bits.store(0, Ordering::Relaxed);
                             }
                         }
@@ -665,6 +819,18 @@ pub fn spawn(
                         progress: 0.0,
                         content: [0.0, 0.0, win.w, win.h],
                         expanded: true,
+                        // Floating, the whole window is interactive.
+                        cursor: point_in(
+                            cursor_local,
+                            Rect {
+                                x: 0.0,
+                                y: 0.0,
+                                w: win.w,
+                                h: win.h,
+                            },
+                            0.0,
+                        )
+                        .then_some([cursor_local.0, cursor_local.1]),
                     };
                     if last_emitted.as_ref() != Some(&payload) {
                         on_change(payload.clone());
@@ -691,14 +857,29 @@ pub fn spawn(
                     h: dims.1,
                 };
 
-                // Apply the envelope only when it changes: this is what moves
-                // the overlay onto the target after a drop, or when the work
-                // area (and therefore the target) shifts.
-                env_to_apply = if inner.applied != Some(env) {
+                // Apply the envelope only when it changes: this is what moves the
+                // overlay onto the target after a drop, or when the work area (and
+                // therefore the target) shifts.
+                env_to_apply = if needs_envelope(inner.applied, env, win) {
                     inner.applied = Some(env);
                     Some(env)
                 } else {
                     None
+                };
+
+                // Position: owned by the travel while one is running, otherwise
+                // pinned to the envelope and only touched when it changes.
+                pos_to_apply = match inner.travel.as_mut() {
+                    Some(travel) => {
+                        let elapsed = travel.started.elapsed().as_secs_f64();
+                        let t = (elapsed / SNAP_TRAVEL.as_secs_f64()).min(1.0) as f32;
+                        let at = travel_position(travel.from, (env.x, env.y), t);
+                        if t >= 1.0 {
+                            inner.travel = None;
+                        }
+                        Some(at)
+                    }
+                    None => env_to_apply.map(|e| (e.x, e.y)),
                 };
 
                 let handle = target.handle_rect(dims);
@@ -764,12 +945,23 @@ pub fn spawn(
                     progress: inner.progress,
                     content: [content.x, content.y, content.w, content.h],
                     expanded: inner.hover_expanded,
+                    // Published only while the pointer is inside: the frontend paints
+                    // the hover from this, and sending it constantly would emit on
+                    // every frame the mouse moves anywhere on the screen.
+                    cursor: if point_in(cursor_local, interactive, 0.0) {
+                        Some([cursor_local.0, cursor_local.1])
+                    } else {
+                        None
+                    },
                 };
             }
 
             if let Some(env) = env_to_apply {
                 let _ = window.set_size(LogicalSize::new(env.w, env.h));
-                let _ = window.set_position(LogicalPosition::new(env.x, env.y));
+            }
+
+            if let Some((x, y)) = pos_to_apply {
+                let _ = window.set_position(LogicalPosition::new(x, y));
             }
 
             if last_ignore != Some(desired_ignore) {
@@ -905,18 +1097,57 @@ mod tests {
     }
 
     #[test]
-    fn pill_previews_the_exact_landing_footprint() {
+    fn the_pill_marker_stays_whole_inside_the_work_area() {
+        // The overlay window ends at the work area, so any part of the marker past
+        // that is clipped: an edge target's handle is flush with the edge, and
+        // padding it outward there used to cut the capsule's rounded end off.
+        for target in SnapTarget::ALL {
+            let pill = target.pill_rect(WORK, CONTENT);
+            let margin = PILL_MARGIN - 0.001;
+            assert!(
+                pill.x >= WORK.x + margin,
+                "{target:?} marker overflows the left edge: {pill:?}"
+            );
+            assert!(
+                pill.y >= WORK.y + margin,
+                "{target:?} marker overflows the top edge: {pill:?}"
+            );
+            assert!(
+                pill.x + pill.w <= WORK.x + WORK.w - margin,
+                "{target:?} marker overflows the right edge: {pill:?}"
+            );
+            assert!(
+                pill.y + pill.h <= WORK.y + WORK.h - margin,
+                "{target:?} marker overflows the bottom edge: {pill:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_pill_marker_still_previews_the_handle() {
         for target in SnapTarget::ALL {
             let size = target.window_size(CONTENT);
             let (wx, wy) = target.window_pos(WORK, size);
             let handle = target.handle_rect(size);
             let pill = target.pill_rect(WORK, CONTENT);
-            // The pill is the handle footprint, padded for visibility.
+
+            // The handle footprint, padded for visibility.
             assert!((pill.w - (handle.w + PILL_PAD * 2.0)).abs() < 0.001);
             assert!((pill.h - (handle.h + PILL_PAD * 2.0)).abs() < 0.001);
-            // Centred on where the handle will actually sit.
-            assert!((pill.x + pill.w / 2.0 - (wx + handle.x + handle.w / 2.0)).abs() < 0.001);
-            assert!((pill.y + pill.h / 2.0 - (wy + handle.y + handle.h / 2.0)).abs() < 0.001);
+
+            // Held inside the work area, the marker is nudged off the handle, so the
+            // promise is overlap rather than a shared centre: it still shows where the
+            // overlay will land, just not to the pixel.
+            let hx = wx + handle.x;
+            let hy = wy + handle.y;
+            assert!(
+                pill.x < hx + handle.w && hx < pill.x + pill.w,
+                "{target:?} marker drifted sideways off its handle: {pill:?}"
+            );
+            assert!(
+                pill.y < hy + handle.h && hy < pill.y + pill.h,
+                "{target:?} marker drifted vertically off its handle: {pill:?}"
+            );
         }
     }
 
@@ -1078,6 +1309,145 @@ mod tests {
             let v = ease(i as f32 / 20.0);
             assert!(v >= prev, "ease must not go backwards");
             prev = v;
+        }
+    }
+
+    #[test]
+    fn a_travel_starts_at_the_drop_point_and_lands_on_the_envelope() {
+        let from = (900.0, 500.0);
+        let goal = (1872.0, 540.0);
+        assert_eq!(travel_position(from, goal, 0.0), from);
+        let (x, y) = travel_position(from, goal, 1.0);
+        assert!(
+            (x - goal.0).abs() < 0.001,
+            "landed at {x}, wanted {}",
+            goal.0
+        );
+        assert!(
+            (y - goal.1).abs() < 0.001,
+            "landed at {y}, wanted {}",
+            goal.1
+        );
+    }
+
+    #[test]
+    fn a_drop_leaves_the_content_where_it_was_drawn() {
+        // The window during a drag is whatever the last docked frame left behind,
+        // and the content sits *inside* it rather than at its origin. Whatever the
+        // content was drawn at before the drop, it has to be in the same place on
+        // the first frame of the glide: that frame is the one the glide cannot hide.
+        let drop = (900.0, 500.0);
+        let goal = (1872.0, 498.0);
+        for target in SnapTarget::ALL {
+            let dims = target.window_size(CONTENT);
+            let after = target.expanded_rect(dims, CONTENT);
+            for progress_before in [0.0_f32, 0.5, 1.0] {
+                let before = content_rect(target, dims, CONTENT, ease(progress_before));
+                let from = travel_start(drop, (before.x, before.y), (after.x, after.y));
+                let (wx, wy) = travel_position(from, goal, 0.0);
+                assert!(
+                    (wx + after.x - (drop.0 + before.x)).abs() < 0.001,
+                    "{target:?} at progress {progress_before}: content moved {} -> {}",
+                    drop.0 + before.x,
+                    wx + after.x
+                );
+                assert!(
+                    (wy + after.y - (drop.1 + before.y)).abs() < 0.001,
+                    "{target:?} at progress {progress_before}: content moved {} -> {}",
+                    drop.1 + before.y,
+                    wy + after.y
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_drop_after_an_expanded_drag_does_not_move_the_window() {
+        // With the content already expanded before the press -- the normal case,
+        // since hovering is what opens it -- the two rects agree and the window must
+        // not move at all. An earlier version subtracted the content's inset here
+        // and so produced a jump exactly that wide.
+        let drop = (900.0, 500.0);
+        for target in SnapTarget::ALL {
+            let dims = target.window_size(CONTENT);
+            let before = content_rect(target, dims, CONTENT, ease(0.0));
+            let after = target.expanded_rect(dims, CONTENT);
+            let from = travel_start(drop, (before.x, before.y), (after.x, after.y));
+            // Keeps the assertion from going vacuous: if the envelope ever stopped
+            // insetting the content, the subtraction this guards against would be a
+            // no-op and the bug would return unnoticed.
+            assert!(
+                after.x != 0.0 || after.y != 0.0,
+                "{target:?} envelope no longer insets the content"
+            );
+            assert!(
+                (from.0 - drop.0).abs() < 0.001 && (from.1 - drop.1).abs() < 0.001,
+                "{target:?} moved the window on an expanded drop: {from:?} != {drop:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_envelope_is_reapplied_when_the_window_size_drifted() {
+        // The poll loop can resize the window between the snap loop's read of the
+        // target and its write, leaving a window the wrong size while the envelope is
+        // still believed applied. Comparing the measured size catches that;
+        // comparing only the remembered envelope cannot see it at all.
+        let env = Rect {
+            x: 1872.0,
+            y: 480.0,
+            w: 48.0,
+            h: 90.0,
+        };
+        let drifted = Rect {
+            x: 100.0,
+            y: 100.0,
+            w: 132.0,
+            h: 110.0,
+        };
+        assert!(needs_envelope(Some(env), env, drifted));
+        assert!(!needs_envelope(Some(env), env, env));
+
+        // Sub-pixel differences are not drift: reacting to them would re-apply the
+        // size on every tick.
+        let near = Rect {
+            x: env.x,
+            y: env.y,
+            w: env.w + 0.4,
+            h: env.h - 0.4,
+        };
+        assert!(!needs_envelope(Some(env), env, near));
+
+        // A different envelope is applied whatever the measurement says.
+        let other = Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 16.0,
+            h: 84.0,
+        };
+        assert!(needs_envelope(Some(env), other, other));
+        assert!(needs_envelope(None, other, other));
+    }
+
+    #[test]
+    fn a_travel_leaves_early_and_settles_late() {
+        // Eased rather than linear: half way through it is already most of the way
+        // there, which is what makes the move read as a glide onto the edge instead
+        // of a constant-speed slide.
+        let from = (0.0, 0.0);
+        let goal = (100.0, 0.0);
+        let (mid, _) = travel_position(from, goal, 0.5);
+        assert!(mid > 50.0, "expected ease-out past the midpoint, got {mid}");
+        assert!(mid < 100.0, "but not arrived yet, got {mid}");
+
+        let mut prev = -1.0;
+        for step in 0..=20 {
+            let (x, _) = travel_position(from, goal, step as f32 / 20.0);
+            assert!(
+                x >= prev,
+                "travel went backwards at step {step}: {x} < {prev}"
+            );
+            prev = x;
         }
     }
 

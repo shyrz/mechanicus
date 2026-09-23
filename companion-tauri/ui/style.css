@@ -1,3 +1,21 @@
+/*
+ * The status palette: the only definitions of these colours. The status is a
+ * session-level fact, so it is mapped once here, on the container, and both the
+ * buttons' rings and the collapsed handle's bar inherit it.
+ */
+:root {
+  --status-waiting-input: rgba(255, 176, 32, 0.95);
+  --status-busy: rgba(64, 200, 120, 0.85);
+}
+
+.content[data-status="waiting-input"] {
+  --status-color: var(--status-waiting-input);
+}
+
+.content[data-status="busy"] {
+  --status-color: var(--status-busy);
+}
+
 /* The window surface is fully transparent; only the content rect paints. */
 html,
 body {
@@ -17,6 +35,9 @@ body {
  * Geometry (left/top/width/height/border-radius) is driven from Rust at frame
  * rate via CSS custom properties, so the animation stays in lockstep with the
  * hit region. Nothing here transitions on its own.
+ *
+ * The surface is transparent, not black: once docked, the window is a column of
+ * separate circular buttons, so the space between them must show the desktop.
  */
 .content {
   position: absolute;
@@ -26,46 +47,176 @@ body {
   height: var(--content-h, 100vh);
   box-sizing: border-box;
   overflow: hidden;
-  background: #000;
+  background: transparent;
   border-radius: var(--radius, 0px);
   display: flex;
   flex-direction: column;
 }
 
-/* Tiles fade out as the handle takes over. */
+/*
+ * Agent buttons. One circle per running agent, laid out along the docked edge:
+ * a side dock stacks them in a column, the bottom dock in a row, and a floating
+ * overlay keeps a compact grid.
+ *
+ * The container carries the geometry; each button paints its own circle, which
+ * is what lets a docked column read as separate controls rather than one slab.
+ *
+ * The tracks are sized to the button rather than to a fraction of the window:
+ * the button is a fixed 36px disc (Rust computes the window from it), so the
+ * tracks are `auto` and `place-content` centres whatever is left over. Sizing
+ * tracks to a fraction is what previously stretched the discs into ellipses,
+ * because the caption's strip left the grid shorter than it was wide.
+ */
 .grid {
   flex: 1 1 auto;
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(var(--cols, 1), auto);
+  grid-template-rows: repeat(var(--rows, 1), auto);
+  place-content: center;
+  justify-items: center;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  box-sizing: border-box;
   min-height: 0;
   opacity: var(--tiles-opacity, 1);
 }
 
+/*
+ * A circular button, matching the reference's raised disc: near-black fill plus
+ * a lighter hairline edge, so it separates from a dark desktop without needing a
+ * bright fill.
+ *
+ * The fill alone cannot do that job: the desktop behind this overlay measured
+ * (13,13,13) on the test machine, so a near-black disc is invisible against it.
+ * The edge is what makes the control findable, which is why it is painted even
+ * in the idle state and never traded away.
+ *
+ * The drop shadow is deliberately small: its reach (blur + y-offset) has to stay
+ * inside the grid's 6px padding, or the window edge clips it. A clipped shadow
+ * stops fading and ends in a hard straight line, and since that line follows the
+ * window on both sides it reads as a square drawn around the button. It is
+ * invisible against a wallpaper and obvious during a drag, when the snap overlay
+ * flattens the backdrop into one flat grey. Keep blur + offset <= 6px; a softer
+ * shadow needs more room, which means raising GRID_PAD in main.rs.
+ */
 .tile {
   position: relative;
-  width: 100%;
-  height: 100%;
-  background-repeat: no-repeat;
-  background-color: transparent;
-}
-
-/* Status ring: a single-channel colour cue that survives being collapsed. */
-.tile.state-waiting-input {
-  box-shadow: inset 0 0 0 3px rgba(255, 176, 32, 0.95);
-}
-
-.tile.state-busy {
-  box-shadow: inset 0 0 0 3px rgba(64, 200, 120, 0.75);
-}
-
-.tile.state-idle {
-  box-shadow: inset 0 0 0 3px rgba(120, 120, 128, 0.45);
+  /* The button's own size, not a share of the cell: an explicit width and
+     height of the same value is what guarantees a circle. Relying on
+     `aspect-ratio` against a stretched height made an ellipse. */
+  width: var(--button-size, 36px);
+  height: var(--button-size, 36px);
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #161616;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  transition:
+    background-color 140ms ease-out,
+    box-shadow 140ms ease-out;
 }
 
 /*
- * Collapsed handle: a single slim grip flush against the screen edge, mirroring
- * the reference. One line only — it doubles as the status indicator, so its
- * colour carries agent state instead of adding a second strip.
+ * The hairline edge, sampled from OpenCode's own surfaces.
+ *
+ * Resting fill is the "jump to latest" button; the hover fill below is the prompt
+ * box. The edge is per-side on purpose: measured off both references, the top
+ * hairline is about twice the alpha of the sides and the bottom is absent
+ * entirely -- the bottom row reads as the fill and nothing else. That asymmetry is
+ * what makes the top edge catch the light; a single uniform ring loses it.
+ *
+ * Painted as an overlay rather than a real `border` so the icon keeps the content
+ * box it was sized against: `box-sizing: border-box` would shrink it from 36px to
+ * 34px and take the icon down with it.
+ */
+.tile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  border-top-color: #434343;
+  border-left-color: #2d2d2d;
+  border-right-color: #2d2d2d;
+  pointer-events: none;
+}
+
+/*
+ * Status is a ring layered *inside* the edge rather than a replacement for it.
+ *
+ * Painting status into `box-shadow` would drop the hairline edge in exactly the
+ * states that matter, which is how the button became a bare coloured ring on a
+ * dark desktop. A pseudo-element keeps the two independent, and hover then
+ * cannot wash the status colour out either.
+ *
+ * Inset by the hairline's own width for that same reason: at `inset: 0` the 1.5px
+ * ring covers the 1px edge completely and paints after it, so the per-side edge
+ * above -- the cue that makes the button findable on a dark desktop -- vanishes
+ * precisely in the states that carry meaning.
+ */
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--status-color, transparent);
+  opacity: var(--status-ring, 0);
+  transition: opacity 140ms ease-out;
+  pointer-events: none;
+}
+
+/* Hover lifts the fill only: both references carry the same edge, so the hairline
+   stays put and the surface is what changes. Two selectors, one state: `:hover`
+   when the webview delivers the move, `.cursor-over` when the Rust cursor poll
+   supplies it (the overlay is never the key window, so it cannot rely on the
+   former). Keeping them in one rule is what stops the two from disagreeing. */
+.tile:hover,
+.tile.cursor-over {
+  background: #242424;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* The icon follows the button's colour via currentColor. */
+.tile svg {
+  width: 58%;
+  height: 58%;
+  display: block;
+  color: rgba(255, 255, 255, 0.92);
+  transition: color 140ms ease-out;
+}
+
+.tile:hover svg {
+  color: #fff;
+}
+
+/*
+ * Status states carry a ring; every other aspect of the button is unchanged.
+ *
+ * `busy` is deliberately quiet: it is a session-level fact painted on every
+ * button, so a saturated ring would shout the same word five times and drown out
+ * the per-button icons, which are the things that differ. `waiting-input` is the
+ * one state that asks the user to do something, so it keeps full strength.
+ */
+.tile.state-waiting-input {
+  --status-ring: 1;
+}
+
+.tile.state-busy {
+  --status-ring: 0.55;
+}
+
+/*
+ * Collapsed handle: the docked element itself, styled like the reference — a
+ * narrow rounded near-black pill with a lighter hairline edge so it reads against
+ * a dark desktop, a bar in the middle that says it can be dragged, and a hover
+ * state that lights it up.
+ *
+ * The grip is sized to the handle's footprint (16 x 84, matching Rust's
+ * HANDLE_THICK / HANDLE_LONG, which `handle-geometry.test.ts` pins) rather than a
+ * thin line: the edge is what makes the control visible, so the element has to be
+ * the size of the control.
  */
 .handle {
   position: absolute;
@@ -74,35 +225,102 @@ body {
   align-items: center;
   justify-content: center;
   opacity: var(--handle-opacity, 0);
+  /* Events belong to `.content`, which is what carries the drag handlers. */
   pointer-events: none;
 }
 
 .handle-grip {
-  background: var(--status-color, rgba(255, 255, 255, 0.55));
-  border-radius: 1px;
+  position: relative;
+  box-sizing: border-box;
+  background: #161616;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition:
+    background-color 140ms ease-out,
+    box-shadow 140ms ease-out;
 }
 
-/* The grip runs along the edge: vertical edges get a vertical line. */
+/*
+ * The same edge as the buttons, because it is the same surface seen collapsed. An
+ * overlay for the same reason as `.tile::before`: a real border would eat into the
+ * box the pill is centred in.
+ */
+.handle-grip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+  border-top-color: #434343;
+  border-left-color: #2d2d2d;
+  border-right-color: #2d2d2d;
+  pointer-events: none;
+}
+
+/*
+ * The bar is the affordance: it is what says the pill can be dragged. By default it
+ * carries the edge's brighter colour rather than the fill's, so it stays legible on
+ * a `#161616` pill -- and it is where a status shows while collapsed, because the
+ * buttons that normally carry the status ring are faded out. Idle falls back to the
+ * edge colour, so an ordinary docked handle looks unchanged.
+ */
+.handle-grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+  background: var(--status-color, #434343);
+  border-radius: 2px;
+}
+
+/* The grip runs along the edge: vertical edges get a vertical pill. */
 .content.target-left .handle-grip,
 .content.target-right .handle-grip {
-  width: 3px;
-  height: 42%;
+  width: 16px;
+  height: 84px;
 }
 
 .content.target-bottom .handle-grip {
-  width: 42%;
-  height: 3px;
+  width: 84px;
+  height: 16px;
 }
 
+/* The bar runs with the edge, so it turns on its side for a bottom dock. */
+.content.target-bottom .handle-grip::after {
+  width: 48px;
+  height: 4px;
+}
+
+/*
+ * Hover lights the docked pill up. The rule hangs off `.content` rather than
+ * the grip because the grip is `pointer-events: none`; once collapsed the
+ * window is exactly the handle, so hovering the window is hovering the pill.
+ * The second selector is the same state arriving from Rust's cursor poll.
+ */
+.content.collapsed:hover .handle-grip,
+.content.collapsed.cursor-over .handle-grip {
+  background: #242424;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * A compact pill, not a full-width band: the text is a caption for the buttons,
+ * and a band spanning the window reads as a titlebar for a surface that is
+ * otherwise invisible.
+ */
 .label {
   flex: 0 0 auto;
+  width: fit-content;
+  max-width: calc(100% - 8px);
+  margin: 0 auto 4px;
   height: 16px;
   display: block;
   line-height: 16px;
   text-align: center;
-  /* Horizontal padding keeps the text inside the circle's silhouette at this
-     height; without it the rounded corners clip the first and last glyph. */
-  padding: 0 22%;
+  padding: 0 8px;
   box-sizing: border-box;
   /* Longhands, not the `font` shorthand: the shorthand resets line-height even
      when it omits one, which would undo the 16px above and top-align the text. */
@@ -111,6 +329,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #fff;
   background: rgba(0, 0, 0, 0.72);
+  border-radius: 8px;
   letter-spacing: 0.02em;
   white-space: nowrap;
   overflow: hidden;
@@ -120,5 +339,16 @@ body {
 
 /* The handle owns the whole surface once collapsed. */
 .content.collapsed .label {
+  display: none;
+}
+
+/*
+ * A side dock cannot carry the caption. One column of buttons is barely wider
+ * than a single button, so the text would render as an ellipsis and read as
+ * broken; Rust drops its height from the footprint and publishes `caption: false`,
+ * and this is only the rendering of that decision rather than a second copy of it.
+ * Status is unaffected: it is on the ring.
+ */
+.label.is-hidden {
   display: none;
 }

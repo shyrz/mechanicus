@@ -22,9 +22,6 @@ function ensurePill(target) {
     el = document.createElement('div');
     el.className = 'pill';
     el.dataset.target = target;
-    const dot = document.createElement('span');
-    dot.className = 'pill-dot';
-    el.appendChild(dot);
     pillsRoot.appendChild(el);
     pills.set(target, el);
   }

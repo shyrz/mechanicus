@@ -62,33 +62,96 @@ impl Default for ConfigPayload {
 struct Payload {
     session: Option<SessionPayload>,
     config: ConfigPayload,
-    cell: f32,
+    /// Diameter of one agent button, in logical pixels.
+    button: f32,
     cols: usize,
     rows: usize,
+    /// Whether the caption strip is part of the footprint. False on a side dock,
+    /// where the column is too narrow to show a readable caption.
+    caption: bool,
 }
 
-/// Grid shape for `n` agents, matching the original companion's layout.
-fn grid_dims(n: usize) -> (usize, usize) {
+/// Space between buttons, mirroring the stylesheet's grid gap.
+const BUTTON_GAP: f32 = 6.0;
+/// Padding around the button grid, mirroring the stylesheet's grid padding.
+const GRID_PAD: f32 = 6.0;
+/// Caption strip below the grid: the label's height plus its bottom margin.
+const LABEL_H: f32 = 20.0;
+
+/// Grid shape for `n` agents docked to `target`.
+///
+/// A docked overlay lays its buttons out along the edge it is attached to, so
+/// the strip reads as part of that edge rather than as a block that happens to
+/// sit there: a side dock is a single column, the bottom dock a single row.
+/// Free floating has no edge to follow, so it keeps the compact grid.
+fn grid_dims(n: usize, target: Option<snap::SnapTarget>) -> (usize, usize) {
     let n = n.max(1);
-    let cols = match n {
-        0 | 1 => 1,
-        2..=4 => 2,
-        _ => 3,
-    };
-    let rows = n.div_ceil(cols);
-    (cols, rows)
-}
-
-fn cell_size(size: &str) -> f32 {
-    match size {
-        "small" => 80.0,
-        "large" => 160.0,
-        "xl" | "xlarge" => 200.0,
-        _ => 120.0,
+    match target {
+        Some(snap::SnapTarget::Left | snap::SnapTarget::Right) => (1, n),
+        Some(snap::SnapTarget::Bottom) => (n, 1),
+        None => {
+            let cols = match n {
+                1 => 1,
+                2..=4 => 2,
+                _ => 3,
+            };
+            (cols, n.div_ceil(cols))
+        }
     }
 }
 
-fn build_payload(st: &state::CompanionState, owner: Option<&str>) -> Payload {
+/// Diameter of one agent button, from the configured size tier.
+///
+/// The button is a fixed size rather than a fraction of the window: the layout
+/// is a row or column of equal discs, so the button is the unit the window is
+/// built from, not the other way round. Tiers step by 8px, which keeps
+/// `companion.size` meaningful without producing buttons too large to read as
+/// controls.
+///
+/// Note the tiers a plugin actually asks for: `companion.size` defaults to
+/// `medium` (44), so this 36px arm is the fallback for an unrecognised value, not
+/// the default a user sees.
+fn button_size(size: &str) -> f32 {
+    match size {
+        "medium" => 44.0,
+        "large" => 52.0,
+        "xl" | "xlarge" => 60.0,
+        // `small`, the default, and anything unrecognised.
+        _ => 36.0,
+    }
+}
+
+/// Expanded content footprint for a `cols` x `rows` grid of `button` discs.
+///
+/// The caption is added to the height rather than taken out of the grid: the
+/// buttons are a fixed size, so the window has to be tall enough for both. This
+/// is the one place the footprint is computed, so the native window and the
+/// click-through region cannot disagree about it.
+///
+/// `caption` is false for a side dock. One column of buttons is about 48px wide,
+/// which cannot show a caption: the label renders as an ellipsis ("ma…") and
+/// reads as broken text. The status it would carry is already on the ring, so the
+/// strip is dropped rather than squeezed, and the window is that much shorter.
+fn content_size(button: f32, cols: usize, rows: usize, caption: bool) -> (f32, f32) {
+    let span =
+        |n: usize| n as f32 * button + n.saturating_sub(1) as f32 * BUTTON_GAP + GRID_PAD * 2.0;
+    let label = if caption { LABEL_H } else { 0.0 };
+    (span(cols), span(rows) + label)
+}
+
+/// Whether a dock has room for the caption strip.
+fn shows_caption(target: Option<snap::SnapTarget>) -> bool {
+    !matches!(
+        target,
+        Some(snap::SnapTarget::Left | snap::SnapTarget::Right)
+    )
+}
+
+fn build_payload(
+    st: &state::CompanionState,
+    owner: Option<&str>,
+    target: Option<snap::SnapTarget>,
+) -> Payload {
     let config = st
         .config
         .as_ref()
@@ -120,23 +183,30 @@ fn build_payload(st: &state::CompanionState, owner: Option<&str>) -> Payload {
     });
 
     let agent_count = session.as_ref().map(|s| s.agents.len().max(1)).unwrap_or(1);
-    let (cols, rows) = grid_dims(agent_count);
-    let cell = cell_size(&config.size);
+    let (cols, rows) = grid_dims(agent_count, target);
+    let button = button_size(&config.size);
 
     Payload {
         session,
         config,
-        cell,
+        button,
         cols,
         rows,
+        caption: shows_caption(target),
+    }
+}
+
+impl Payload {
+    /// Expanded content footprint, in logical pixels.
+    fn content(&self) -> (f32, f32) {
+        content_size(self.button, self.cols, self.rows, self.caption)
     }
 }
 
 /// Applies window geometry: size from the grid, position from the saved
 /// per-project position when available, otherwise the configured anchor.
 fn apply_geometry(window: &tauri::WebviewWindow, payload: &Payload, saved: Option<(f32, f32)>) {
-    let width = payload.cell * payload.cols as f32;
-    let height = payload.cell * payload.rows as f32;
+    let (width, height) = payload.content();
 
     let _ = window.set_size(LogicalSize::new(width, height));
 
@@ -174,13 +244,13 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
 
     loop {
         let st = state::read_state(&path);
-        let payload = build_payload(&st, owner.as_deref());
+        // Layout follows the docked edge, so the payload is rebuilt whenever the
+        // target changes, not only when the agent set does.
+        let target = snap.target();
+        let payload = build_payload(&st, owner.as_deref(), target);
 
-        let target = (
-            payload.cell * payload.cols as f32,
-            payload.cell * payload.rows as f32,
-        );
-        snap.set_content_size(target.0 as f64, target.1 as f64);
+        let target_size = payload.content();
+        snap.set_content_size(target_size.0 as f64, target_size.1 as f64);
 
         if let Some(window) = handle.get_webview_window("main") {
             if !positioned {
@@ -212,7 +282,7 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
                 // only the content inside changes size) and while dragging (the
                 // compositor owns the geometry; resizing mid-drag would fight
                 // it). A size change is picked up on the next idle poll.
-                let _ = window.set_size(LogicalSize::new(target.0, target.1));
+                let _ = window.set_size(LogicalSize::new(target_size.0, target_size.1));
             }
 
             poll_test_hook(&window, &snap);
@@ -229,10 +299,10 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
 
 /// Initial state for the first paint, so the window is never blank.
 #[tauri::command]
-fn get_state() -> Payload {
+fn get_state(controller: tauri::State<'_, Arc<snap::SnapController>>) -> Payload {
     let owner = std::env::var("MECHANICUS_COMPANION_SESSION_ID").ok();
     let st = state::read_state(&state::state_file_path());
-    build_payload(&st, owner.as_deref())
+    build_payload(&st, owner.as_deref(), controller.target())
 }
 
 /// Handles a click on the overlay, revealing the session it is showing as far
@@ -590,6 +660,9 @@ fn main() {
             if let Some(window) = app.get_webview_window("main") {
                 let emitter = window.clone();
                 let overlay = app.get_webview_window(OVERLAY_LABEL);
+                // The companion is also needed by the visibility callback, which
+                // has to lift it above the markers once they are on screen.
+                let companion = window.clone();
                 let controller = Arc::clone(&snap_controller);
                 snap::spawn(
                     window,
@@ -598,7 +671,12 @@ fn main() {
                     move |payload| {
                         let _ = emitter.emit(SNAP_EVENT, payload);
                     },
-                    move |dragging| set_overlay_visible(&overlay, dragging),
+                    move |dragging| {
+                        set_overlay_visible(&overlay, dragging);
+                        if dragging {
+                            raise_above_markers(&companion);
+                        }
+                    },
                 );
             }
 
@@ -659,5 +737,157 @@ fn set_overlay_visible(overlay: &Option<tauri::WebviewWindow>, visible: bool) {
         let _ = overlay.show();
     } else {
         let _ = overlay.hide();
+    }
+}
+
+/// Lifts the companion above the snap overlay's landing markers.
+///
+/// Both windows are always-on-top, and the overlay is created after the companion,
+/// so showing it puts its markers in front: dragging the overlay across a marker
+/// tucks the button behind the white pill. `orderFrontRegardless` moves the
+/// companion to the front of its own level, and unlike `makeKeyAndOrderFront` it
+/// neither activates the app nor takes focus — which is the whole point, since the
+/// companion is an accessory app that must never steal focus from what the user is
+/// working in.
+///
+/// Runs on the main thread: AppKit requires it for window ordering, and queueing it
+/// after `show` is also what makes the order deterministic.
+#[cfg(target_os = "macos")]
+fn raise_above_markers(window: &tauri::WebviewWindow) {
+    use objc2_app_kit::NSWindow;
+
+    // Two handles: `queue` is borrowed to post the work, `target` is moved into the
+    // closure. One binding cannot do both.
+    let queue = window.clone();
+    let target = window.clone();
+    let _ = queue.run_on_main_thread(move || {
+        let Ok(ptr) = target.ns_window() else {
+            return;
+        };
+        if ptr.is_null() {
+            return;
+        }
+        // SAFETY: `ns_window` hands back this window's live `NSWindow`, and the
+        // closure runs on the main thread, which is what AppKit requires here.
+        let ns_window: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+        ns_window.orderFrontRegardless();
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn raise_above_markers(_window: &tauri::WebviewWindow) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_side_dock_is_one_column() {
+        // Buttons follow the edge they are attached to, so a side dock stacks
+        // vertically however many agents there are.
+        for n in 1..=9 {
+            let (cols, rows) = grid_dims(n, Some(snap::SnapTarget::Left));
+            assert_eq!((cols, rows), (1, n), "left dock with {n} agents");
+            let (cols, rows) = grid_dims(n, Some(snap::SnapTarget::Right));
+            assert_eq!((cols, rows), (1, n), "right dock with {n} agents");
+        }
+    }
+
+    #[test]
+    fn the_bottom_dock_is_one_row() {
+        for n in 1..=9 {
+            let (cols, rows) = grid_dims(n, Some(snap::SnapTarget::Bottom));
+            assert_eq!((cols, rows), (n, 1), "bottom dock with {n} agents");
+        }
+    }
+
+    #[test]
+    fn a_floating_overlay_keeps_the_compact_grid() {
+        // No edge to follow, so it stays as square as it can.
+        assert_eq!(grid_dims(1, None), (1, 1));
+        assert_eq!(grid_dims(3, None), (2, 2));
+        assert_eq!(grid_dims(4, None), (2, 2));
+        assert_eq!(grid_dims(9, None), (3, 3));
+    }
+
+    #[test]
+    fn an_unrecognised_size_falls_back_to_36px() {
+        // 44px is what a user sees by default (`companion.size` defaults to
+        // `medium`); 36 is the floor for a value this code does not recognise.
+        // The distinction matters: mislabelling 36 as the default invites someone
+        // to "correct" the geometry around the wrong tier.
+        assert_eq!(button_size("small"), 36.0);
+        assert_eq!(button_size("unknown"), 36.0);
+        assert_eq!(button_size("medium"), 44.0);
+        assert!(button_size("large") > button_size("medium"));
+        assert!(button_size("xl") > button_size("large"));
+    }
+
+    #[test]
+    fn a_captioned_side_dock_is_not_square_but_an_uncaptioned_one_is() {
+        // Captionless (a side dock): the content must be exactly as wide as it is
+        // tall, or the disc would be drawn as an ellipse.
+        let (w, h) = content_size(36.0, 1, 1, false);
+        assert_eq!(w, 36.0 + GRID_PAD * 2.0);
+        assert_eq!(h, 36.0 + GRID_PAD * 2.0);
+
+        // With a caption the strip adds height, which is expected.
+        let (w, h) = content_size(36.0, 1, 1, true);
+        assert_eq!(w, 36.0 + GRID_PAD * 2.0);
+        assert_eq!(h, 36.0 + GRID_PAD * 2.0 + LABEL_H);
+    }
+
+    #[test]
+    fn a_side_dock_drops_the_caption() {
+        // One column is too narrow for a readable caption, so the strip must not
+        // be part of the footprint. Otherwise the window reserves height for text
+        // that renders as an ellipsis.
+        for target in [snap::SnapTarget::Left, snap::SnapTarget::Right] {
+            assert!(
+                !shows_caption(Some(target)),
+                "{target:?} must not reserve caption height"
+            );
+        }
+        // The bottom dock is wide, and a floating overlay has room, so both keep
+        // the caption.
+        assert!(shows_caption(Some(snap::SnapTarget::Bottom)));
+        assert!(shows_caption(None));
+    }
+
+    #[test]
+    fn the_caption_only_changes_height_when_shown() {
+        let captionless = content_size(36.0, 1, 3, false);
+        let captioned = content_size(36.0, 1, 3, true);
+        assert_eq!(captionless.0, captioned.0);
+        assert!((captioned.1 - captionless.1 - LABEL_H).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_column_is_taller_than_it_is_wide() {
+        let (w, h) = content_size(36.0, 1, 3, false);
+        assert!(h > w, "a column of three must be tall: {w}x{h}");
+    }
+
+    #[test]
+    fn a_row_is_wider_than_it_is_tall() {
+        let (w, h) = content_size(36.0, 3, 1, true);
+        assert!(w > h, "a row of three must be wide: {w}x{h}");
+    }
+
+    #[test]
+    fn a_bigger_button_tier_widens_the_footprint() {
+        let small = content_size(button_size("small"), 3, 1, true);
+        let large = content_size(button_size("large"), 3, 1, true);
+        assert!(large.0 > small.0);
+    }
+
+    #[test]
+    fn the_caption_is_counted_once() {
+        // The label is a single strip under the grid, so it is added once
+        // whatever the shape -- not per row.
+        let (_, one_row) = content_size(36.0, 3, 1, true);
+        let (_, two_rows) = content_size(36.0, 3, 2, true);
+        let grid_growth = 36.0 + BUTTON_GAP;
+        assert!((two_rows - one_row - grid_growth).abs() < f32::EPSILON);
     }
 }
