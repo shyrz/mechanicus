@@ -66,8 +66,8 @@ describe('companion updater', () => {
     writeFileSync(
       `${bin}.json`,
       JSON.stringify({
-        version: '0.1.3',
-        tag: 'companion-v0.1.3',
+        version: COMPANION_MANIFEST.version,
+        tag: COMPANION_MANIFEST.tag,
         target: getCompanionTarget(),
         installedAt: new Date().toISOString(),
         archiveName: 'archive.tar.gz',
@@ -81,7 +81,7 @@ describe('companion updater', () => {
     expect(result).toMatchObject({
       status: 'current',
       binaryPath: bin,
-      version: '0.1.3',
+      version: COMPANION_MANIFEST.version,
     });
   });
 
@@ -94,7 +94,7 @@ describe('companion updater', () => {
     expect(result).toMatchObject({
       status: 'installed',
       binaryPath: getCompanionBinaryPath(),
-      version: '0.1.3',
+      version: COMPANION_MANIFEST.version,
     });
   });
 

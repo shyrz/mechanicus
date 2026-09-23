@@ -47,20 +47,14 @@ const STALE_LOCK_MS = 5 * 60_000;
 const FIRST_METADATA_VERSION = '0.1.2';
 
 export const COMPANION_MANIFEST: CompanionManifest = {
-  version: '0.1.3',
-  tag: 'companion-v0.1.3',
+  version: '0.9.0',
+  tag: 'companion-v0.9.0',
   repo: 'shyrz/mechanicus',
   checksums: {
-    'mechanicus-companion-v0.1.3-aarch64-apple-darwin.tar.gz':
-      'b4885f9b1900c02376e5f8f5ae6f3b8a89d26f7514b03f836d7e3d618164a0ed',
-    'mechanicus-companion-v0.1.3-aarch64-unknown-linux-gnu.tar.gz':
-      'ed7cffc583e1eaa78c9bea702e6b6aa3bbc5bb4d881713fb2050237ba6b7aca5',
-    'mechanicus-companion-v0.1.3-x86_64-apple-darwin.tar.gz':
-      '98d8ea7c7bc4415b18e0d4c524adb4eb9a84c872919840fdc021f0f50c61f808',
-    'mechanicus-companion-v0.1.3-x86_64-pc-windows-msvc.zip':
-      '9316a49bf01f3b4fb1ce2d62edfc46094e73bb153d6ce023fb7df085afcf77bd',
-    'mechanicus-companion-v0.1.3-x86_64-unknown-linux-gnu.tar.gz':
-      '33f5fd4b6c80155a019391e5efb13904ca9531ba8dd8c6cba30a161f1b07b764',
+    // Only macOS arm64 is built for 0.9.0; other targets are added here as
+    // their archives are published.
+    'mechanicus-companion-v0.9.0-aarch64-apple-darwin.tar.gz':
+      'f0587a52f71415f1c35ee9e26402fbba0917d89dbe6e3ef8e07ea4d2a6d427b6',
   },
 };
 

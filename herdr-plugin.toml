@@ -1,6 +1,6 @@
 id = "mechanicus"
 name = "mechanicus"
-version = "2.2.14"
+version = "0.9.0"
 description = "OpenCode agent orchestration plugin with a Herdr multiplexer adapter"
 repository = "https://github.com/shyrz/mechanicus"
 min_herdr_version = "0.8.0"
