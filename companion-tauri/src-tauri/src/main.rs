@@ -244,6 +244,14 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
 
     loop {
         let st = state::read_state(&path);
+        if owner
+            .as_deref()
+            .is_some_and(|owner| state::should_exit(&st, owner))
+        {
+            handle.exit(0);
+            return;
+        }
+
         // Layout follows the docked edge, so the payload is rebuilt whenever the
         // target changes, not only when the agent set does.
         let target = snap.target();
@@ -620,6 +628,14 @@ fn main() {
         eprintln!("[companion-tauri] missing MECHANICUS_COMPANION_SESSION_ID; exiting");
         return;
     };
+
+    if state::should_exit(
+        &state::read_state(&state::state_file_path()),
+        &owner_session_id,
+    ) {
+        eprintln!("[companion-tauri] owner session {owner_session_id} is not running; exiting");
+        return;
+    }
 
     if !singleton::acquire(&owner_session_id) {
         eprintln!("[companion-tauri] another instance owns {owner_session_id}; exiting");

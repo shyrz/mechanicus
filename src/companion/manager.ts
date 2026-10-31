@@ -380,9 +380,13 @@ export class CompanionManager {
       state.sessions = state.sessions.filter((s) => s.session_id !== this.id);
     });
     if (this.wasSpawner && this.removeOwnedPidFileIfNoSessionsRemain()) {
-      if (this.companionProcess) {
+      const companionProcess = this.companionProcess;
+      if (
+        companionProcess?.pid != null &&
+        companionProcess.pid === this.spawnedCompanionPid
+      ) {
         try {
-          this.companionProcess.kill();
+          companionProcess.kill();
         } catch (err) {
           log('[companion] kill failed', String(err));
         }

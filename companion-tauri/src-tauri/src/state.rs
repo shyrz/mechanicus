@@ -110,6 +110,40 @@ pub fn read_state(path: &std::path::Path) -> CompanionState {
         .unwrap_or_default()
 }
 
+/// A removed owner exits immediately; a dead recorded owner also exits so an
+/// abrupt host shutdown cannot leave this detached process behind.
+pub fn should_exit(state: &CompanionState, owner_session_id: &str) -> bool {
+    let Some(owner) = state
+        .sessions
+        .iter()
+        .find(|session| session.session_id == owner_session_id)
+    else {
+        return true;
+    };
+
+    owner.pid.is_some_and(|pid| !process_alive(pid))
+}
+
+#[cfg(unix)]
+fn process_alive(pid: u32) -> bool {
+    // Unlike kill(pid, 0), the state distinguishes an unreaped zombie from a
+    // running host. Use the same ps spelling on macOS and Linux.
+    std::process::Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "stat="])
+        .output()
+        .is_ok_and(|output| {
+            output.status.success()
+                && !String::from_utf8_lossy(&output.stdout)
+                    .trim_start()
+                    .starts_with('Z')
+        })
+}
+
+#[cfg(not(unix))]
+fn process_alive(_pid: u32) -> bool {
+    true
+}
+
 /// Picks which session the overlay should display.
 ///
 /// Ported from the original companion so both implementations show the same
@@ -244,5 +278,68 @@ mod tests {
     fn unknown_owner_falls_back_to_heuristics() {
         let sessions = vec![session("a", "idle", &["intro"])];
         assert_eq!(choose_session(&sessions, Some("missing")), Some(0));
+    }
+
+    #[test]
+    fn exits_after_the_owner_is_removed() {
+        assert!(should_exit(
+            &CompanionState {
+                sessions: vec![session("other", "idle", &["intro"])],
+                ..CompanionState::default()
+            },
+            "owner"
+        ));
+    }
+
+    #[test]
+    fn stays_alive_for_a_recorded_live_owner() {
+        let mut owner = session("owner", "idle", &["intro"]);
+        owner.pid = Some(std::process::id());
+        assert!(!should_exit(
+            &CompanionState {
+                sessions: vec![owner],
+                ..CompanionState::default()
+            },
+            "owner"
+        ));
+    }
+
+    #[test]
+    fn exits_after_the_recorded_owner_dies() {
+        let mut owner = session("owner", "idle", &["intro"]);
+        owner.pid = Some(999_999_999);
+        assert!(should_exit(
+            &CompanionState {
+                sessions: vec![owner],
+                ..CompanionState::default()
+            },
+            "owner"
+        ));
+    }
+
+    #[test]
+    fn does_not_mistake_a_zombie_for_a_live_owner() {
+        #[cfg(unix)]
+        {
+            // SAFETY: the child immediately exits and the parent reaps it below.
+            let pid = unsafe { libc::fork() };
+            assert!(pid >= 0, "fork failed");
+            if pid == 0 {
+                // SAFETY: _exit cannot run destructors inherited from the test process.
+                unsafe { libc::_exit(0) }
+            }
+
+            let mut exited = false;
+            for _ in 0..100 {
+                if !process_alive(pid as u32) {
+                    exited = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            // SAFETY: pid is the still-unreaped child created above.
+            unsafe { libc::waitpid(pid, std::ptr::null_mut(), 0) };
+            assert!(exited, "zombie child still reported as alive");
+        }
     }
 }

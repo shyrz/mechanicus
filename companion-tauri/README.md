@@ -23,6 +23,10 @@ process's only write, and it carries clicks rather than state. The state file
 also publishes `host`, which is what tells the companion whether a click can
 open a session or only raise the app.
 
+The companion exits when its owning session is removed. It also checks the
+host PID recorded in that session so an abrupt TUI or desktop shutdown does
+not leave the detached companion running.
+
 Nothing in `src/companion/manager.ts` needs to change to run this binary, which
 is what makes the replacement safe to trial and easy to roll back.
 

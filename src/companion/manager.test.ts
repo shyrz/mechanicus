@@ -51,9 +51,10 @@ function attachFakeChild(manager: CompanionManager): { killed: () => boolean } {
   let killed = false;
   (
     manager as unknown as {
-      companionProcess: { kill: () => void } | null;
+      companionProcess: { pid: number; kill: () => void } | null;
     }
   ).companionProcess = {
+    pid: process.pid,
     kill: () => {
       killed = true;
     },
@@ -64,9 +65,10 @@ function attachFakeChild(manager: CompanionManager): { killed: () => boolean } {
 function attachFailingChild(manager: CompanionManager): void {
   (
     manager as unknown as {
-      companionProcess: { kill: () => void } | null;
+      companionProcess: { pid: number; kill: () => void } | null;
     }
   ).companionProcess = {
+    pid: process.pid,
     kill: () => {
       throw new Error('mock kill failure');
     },
@@ -615,6 +617,20 @@ describe('CompanionManager', () => {
     m.onExit();
 
     expect(readFileSync(pidFile, 'utf8')).toBe('222222222');
+  });
+
+  it('does not kill a child when its PID file has been replaced', () => {
+    mkdirSync(path.dirname(companionPidFile()), { recursive: true });
+    const m = make('test-pid-replaced-child');
+    const child = attachFakeChild(m);
+    writeFileSync(companionPidFile(), '222222222');
+    (m as unknown as { wasSpawner: boolean }).wasSpawner = true;
+    (m as unknown as { spawnedCompanionPid: number }).spawnedCompanionPid =
+      111111111;
+
+    m.onExit();
+
+    expect(child.killed()).toBe(false);
   });
 
   it('does not kill the singleton when another session remains in state', () => {
