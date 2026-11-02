@@ -25,6 +25,7 @@ import {
   PRIMARY_AGENT_NAME,
   TOAST_DURATION_MS,
 } from './config/constants';
+import { tryResolvePreset } from './config/presets';
 import { RuntimeConfig } from './config/runtime';
 import { applyOrchestratorModelConfig } from './config/strip-orchestrator-model';
 import { HEALTH_CHECK, minimumExpectedToolCount } from './health-check';
@@ -377,7 +378,16 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
   let sessionLifecycle: SessionLifecycle;
 
   let chatHeadersHook: ReturnType<typeof createChatHeadersHook>;
-  let foregroundFallback: ForegroundFallbackManager;
+  let foregroundFallback: ForegroundFallbackManager | undefined;
+  let sessionTeamResolver:
+    | ((sessionID: string) => {
+        chains: Record<string, string[]>;
+        profiles: Record<
+          string,
+          { inheritModelFrom?: 'session' | 'orchestrator' }
+        >;
+      })
+    | undefined;
   let deepworkCommandHook: ReturnType<typeof createDeepworkCommandHook>;
   let reflectCommandHook: ReturnType<typeof createReflectCommandHook>;
   let loopCommandHook: ReturnType<typeof createLoopCommandHook>;
@@ -462,13 +472,16 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     // Reapply that persisted preset so each fresh generation creates agents
     // with the correct models.
     const runtimePreset = RuntimeConfig.get(ctx.directory).getRuntimePreset();
-    if (runtimePreset && config.presets?.[runtimePreset]) {
+    const runtimePresetAgents = tryResolvePreset(
+      runtimePreset ?? undefined,
+      config.presets,
+    );
+    if (runtimePreset && runtimePresetAgents) {
       config.preset = runtimePreset;
       // Re-merge runtime preset into config.agents (loadPluginConfig
       // already merged the config-file preset, not the runtime one).
       // Runtime preset is override so it wins over config-file preset.
-      const presetAgents = config.presets[runtimePreset];
-      config.agents = deepMerge(config.agents, presetAgents);
+      config.agents = deepMerge(config.agents, runtimePresetAgents);
     } else if (runtimePreset) {
       // Preset was deleted from config since last switch - clear stale state
       RuntimeConfig.get(ctx.directory).setRuntimePreset(null);
@@ -695,43 +708,47 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
     // gate before the await, admit() enrolls the run tracker after host
     // acceptance, reject() withdraws on failure; see
     // fallback-observation-transfer.ts.
-    const backgroundFallbackHandoff = createBackgroundFallbackHandoff({
-      backgroundJobBoard: backgroundJobCoordinator,
-      revivedRunTracker,
-    });
-    foregroundFallback = new ForegroundFallbackManager(
-      runtime.runtimeChains,
-      runtime.fallback.enabled !== false,
-      ctx,
-      runtime.fallback.maxRetries,
-      sessionLifecycle,
-      // A managed background-task session switching models mid-flight must
-      // move its admission accounting (provider/model caps) to the new
-      // model. No-op for unknown/non-task sessions; idempotent per model.
-      (sessionID, model) =>
-        backgroundTaskConcurrency.migrateTask(sessionID, model),
-      runtime.fallback.initialRetryDelayMs,
-      runtime.fallback.retryDelayMs,
-      backgroundFallbackHandoff,
-      // Generation fence captured BEFORE any await in the fallback
-      // preparation, and ONLY for confirmed BACKGROUND children:
-      // undefined for foreground/unmanaged sessions means "observation
-      // handoff not applicable" — never a wildcard — so a stale-
-      // generation rejection can be distinguished from a legitimate
-      // foreground fallback.
-      (sessionID) => {
-        const record = backgroundJobCoordinator.get(sessionID);
-        return record?.state === 'running' && record.background === true
-          ? record.generation
-          : undefined;
-      },
-    );
+    if (runtime.fallback.enabled !== false) {
+      const backgroundFallbackHandoff = createBackgroundFallbackHandoff({
+        backgroundJobBoard: backgroundJobCoordinator,
+        revivedRunTracker,
+      });
+      foregroundFallback = new ForegroundFallbackManager(
+        runtime.runtimeChains,
+        true,
+        ctx,
+        runtime.fallback.maxRetries,
+        sessionLifecycle,
+        // A managed background-task session switching models mid-flight must
+        // move its admission accounting (provider/model caps) to the new
+        // model. No-op for unknown/non-task sessions; idempotent per model.
+        (sessionID, model) =>
+          backgroundTaskConcurrency.migrateTask(sessionID, model),
+        runtime.fallback.initialRetryDelayMs,
+        runtime.fallback.retryDelayMs,
+        backgroundFallbackHandoff,
+        // Generation fence captured BEFORE any await in the fallback
+        // preparation, and ONLY for confirmed BACKGROUND children:
+        // undefined for foreground/unmanaged sessions means "observation
+        // handoff not applicable" — never a wildcard — so a stale-
+        // generation rejection can be distinguished from a legitimate
+        // foreground fallback.
+        (sessionID) => {
+          const record = backgroundJobCoordinator.get(sessionID);
+          return record?.state === 'running' && record.background === true
+            ? record.generation
+            : undefined;
+        },
+        (sessionID) => sessionTeamResolver?.(sessionID)?.chains,
+      );
+    }
 
     deepworkCommandHook = createDeepworkCommandHook();
     reflectCommandHook = createReflectCommandHook();
     loopCommandHook = createLoopCommandHook();
     taskSessionManagerHook = createTaskSessionManagerHook(ctx, {
       terminalGate,
+      hostFlavor,
       strategy: runtime.backgroundJobs.strategy,
       maxSessionsPerAgent: runtime.backgroundJobs.maxSessionsPerAgent,
       maxRetainedSnapshots: runtime.backgroundJobs.maxRetainedSnapshots,
@@ -761,9 +778,9 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
         sessionMetadata.markTaskManaged(sessionID);
       },
       isFallbackInProgress: (sessionID) =>
-        foregroundFallback.isFallbackInProgress(sessionID),
+        foregroundFallback?.isFallbackInProgress(sessionID) ?? false,
       willAttemptFallback: (sessionID) =>
-        foregroundFallback.willAttemptFallback(sessionID),
+        foregroundFallback?.willAttemptFallback(sessionID) ?? false,
       coordinator: sessionLifecycle,
       revivedRunTracker,
     });
@@ -779,7 +796,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       hasInputWait: (sessionID) =>
         taskSessionManagerHook.hasInputWait(sessionID),
       isFallbackInProgress: (sessionID) =>
-        foregroundFallback.isFallbackInProgress(sessionID),
+        foregroundFallback?.isFallbackInProgress(sessionID) ?? false,
       resolveSelection: lifecycleSelectionResolver,
       isStoppedJobRecoveryCurrent: (taskID, generation) => {
         const record = backgroundJobCoordinator.get(taskID);
@@ -849,14 +866,12 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       };
     };
 
-    // Both message transforms share this gate so a rejected nudge cannot be
-    // followed by a phase reminder in the same outgoing turn.
+    // Only the pending file-tool nudge depends on the current session agent.
+    // Historical phase reminders derive eligibility from each message.
     const shouldInjectOrchestratorReminder = (sessionID: string) =>
       isPrimaryAgentName(sessionMetadata.getAgent(sessionID));
 
-    phaseReminder = createPhaseReminderHook({
-      shouldInject: shouldInjectOrchestratorReminder,
-    });
+    phaseReminder = createPhaseReminderHook();
 
     filterAvailableSkills = createFilterAvailableSkillsHook(ctx, runtime);
 
@@ -1134,7 +1149,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
               runtime.everModelSwitched(name);
             }
             if (runtime.hasModelSwitched(name)) {
-              foregroundFallback.disableChain(name);
+              foregroundFallback?.disableChain(name);
             }
           }
           if (existing) {
@@ -1206,8 +1221,11 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       // preset data may persist. Apply that persisted selection after normal
       // model resolution for the current generation.
       const runtimePresetName = runtime.getRuntimePreset();
-      if (runtimePresetName && config.presets?.[runtimePresetName]) {
-        const runtimePreset = config.presets[runtimePresetName];
+      const runtimePreset = tryResolvePreset(
+        runtimePresetName ?? undefined,
+        config.presets,
+      );
+      if (runtimePresetName && runtimePreset) {
         for (const [agentName, override] of Object.entries(runtimePreset)) {
           // Resolve legacy alias keys (e.g. "explore" → "explorer")
           // so presets using aliases work in this path.
@@ -1265,6 +1283,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       // configured model rather than a fallback or "default".
       const tuiAgentModels: Record<string, string> = {};
       const tuiAgentVariants: Record<string, string> = {};
+      const runtimeChains = runtime.runtimeChains;
       for (const agentDef of agentDefs) {
         if (
           agentDef.name === 'council' ||
@@ -1279,8 +1298,8 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
         const resolvedModel =
           typeof entry?.model === 'string'
             ? entry.model
-            : runtime.runtimeChains[agentDef.name]?.[0]
-              ? runtime.runtimeChains[agentDef.name][0]
+            : runtimeChains[agentDef.name]?.[0]
+              ? runtimeChains[agentDef.name][0]
               : typeof agentDef.config.model === 'string'
                 ? agentDef.config.model
                 : undefined;
@@ -1543,12 +1562,17 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
         if (typeof info?.agent === 'string' && providerID && modelID) {
           const agentName = resolveRuntimeAgentName(runtime, info.agent);
           const model = `${providerID}/${modelID}`;
-          const variant = resolveTuiVariantForModel(agentName, model);
+          const observedVariant = (info as { variant?: unknown }).variant;
           recordTuiAgentModel(
             {
               agentName,
               model,
-              variant: variant ?? null,
+              ...(typeof observedVariant === 'string'
+                ? { variant: observedVariant }
+                : {
+                    fallbackVariant:
+                      resolveTuiVariantForModel(agentName, model) ?? null,
+                  }),
             },
             (info?.sessionID && sessionMetadata.getDirectory(info.sessionID)) ??
               ctx.directory,
@@ -1617,7 +1641,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       );
 
       // Runtime model fallback for foreground agents (rate-limit detection)
-      await foregroundFallback.handleEvent(input.event);
+      await foregroundFallback?.handleEvent(input.event);
 
       // Handle auto-update checking
       await autoUpdateChecker.event(input);
@@ -1686,7 +1710,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
       terminalGate?.dispose();
       // Cancel pending initial-delay fallback timers so a reloaded
       // generation cannot observe one stale fallback call.
-      foregroundFallback.dispose();
+      foregroundFallback?.dispose();
       await taskSessionManagerHook.event({
         event: { type: 'server.instance.disposed' },
       });
@@ -1781,6 +1805,27 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
 
     'chat.headers': chatHeadersHook['chat.headers'],
 
+    'v2.setSessionTeamResolver': (
+      resolver: NonNullable<typeof sessionTeamResolver>,
+    ) => {
+      sessionTeamResolver = resolver;
+    },
+
+    'v2.resolveDelegatedModel': (input: {
+      agentType: string;
+      parentSessionID: string;
+      inheritModelFrom?: 'session' | 'orchestrator';
+    }) => {
+      const record = agents?.[input.agentType];
+      const configured = resolvePrimaryModelValue(record?.model);
+      if (configured) return configured;
+      if (input.inheritModelFrom === 'session') return undefined;
+      return (
+        resolvePrimaryModelFromFinalHostConfig(input.agentType) ??
+        sessionMetadata.getModel(input.parentSessionID)
+      );
+    },
+
     // Track which agent each session uses (needed for serve-mode prompt
     // injection)
     'chat.message': async (
@@ -1853,7 +1898,7 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
           isInternalAdmission(input.sessionID, messageID));
 
       if (agent) {
-        foregroundFallback.registerSessionAgent(input.sessionID, agent);
+        foregroundFallback?.registerSessionAgent(input.sessionID, agent);
         if (!internalAdmission) {
           sessionMetadata.setAgent(input.sessionID, agent);
         }
@@ -1892,6 +1937,17 @@ export const OhMyOpenCodeLite: Plugin = async (ctx) => {
         const model = `${messageModel.providerID}/${messageModel.modelID}`;
         if (!internalAdmission) {
           sessionMetadata.setModel(input.sessionID, model);
+          if (agent) {
+            recordTuiAgentModel(
+              {
+                agentName: agent,
+                model,
+                variant:
+                  input.variant ?? output?.message?.model?.variant ?? null,
+              },
+              tuiActivityDirectory(input.sessionID),
+            );
+          }
         }
         // v2 synthesizes message.updated without provider/model; publish
         // the observed model here so sessionDetails is not empty for the

@@ -1,20 +1,15 @@
 /**
- * End-to-end verification for the fallback attachment-preservation fix
- * (PR #1111 / commit 4a5a553).
+ * Fallback integration through the real manager and v2 client shim.
  *
  * Drives the PRODUCTION chain — real `ForegroundFallbackManager` → real
  * `getClient` → real v2 client shim (`buildPluginInput`) — with only the
- * v2 host context mocked. Asserts that a rate-limit failover after an
- * attachment-bearing user message replays the attachment through the v2
- * prompt `files` field instead of dropping it:
- *
- *   transcript (`session.context`) → shim `messages` mapping →
- *   `isReplayableUserMessage` → `partsFromReplayMessage` → v1 promptBody
- *   assembly → shim `promptAsync` (switchModel + steer) → v2 prompt.
+ * v2 host context mocked. Original text and attachments stay in the
+ * transcript; the retry adds only an internal reminder after switching.
  */
 import { describe, expect, mock, test } from 'bun:test';
 import { ForegroundFallbackManager } from '../hooks/foreground-fallback';
 import { buildPluginInput } from './client-shim';
+import { isInternalAdmission } from './internal-admissions';
 import type { V2Context } from './types';
 
 // The foreground-fallback suite (which runs earlier in the single-process
@@ -137,7 +132,8 @@ async function triggerFailover(
 }
 
 describe('v2 fallback replay attachment preservation (e2e)', () => {
-  test('rate-limit failover replays attachments through prompt files', async () => {
+  test('rate-limit failover retains original attachments without uploading them again', async () => {
+    const original = structuredClone(ATTACHMENT_TRANSCRIPT);
     const { ctx, seq } = makeCtx({
       context: async () => ATTACHMENT_TRANSCRIPT,
     });
@@ -148,13 +144,12 @@ describe('v2 fallback replay attachment preservation (e2e)', () => {
       throw new Error('no v2 prompt call captured — fallback did not fire');
     }
     const pi = promptCall.i as Record<string, unknown>;
-    expect(pi.files).toEqual([
-      { uri: 'data:image/png;base64,BBBB', name: 'att.png' },
-    ]);
+    expect(pi.files).toBeUndefined();
     expect(pi.delivery).toBe('steer');
     expect(pi.sessionID).toBe('ses_e2e');
-    expect(pi.text).toContain('analyze the chart');
+    expect(pi.text).not.toContain('analyze the chart');
     expect(pi.text).toContain('system-reminder');
+    expect(ATTACHMENT_TRANSCRIPT).toEqual(original);
 
     const switchIdx = seq.findIndex((e) => e.m === 'switchModel');
     const promptIdx = seq.indexOf(promptCall);
@@ -184,7 +179,46 @@ describe('v2 fallback replay attachment preservation (e2e)', () => {
     }
     const pi = promptCall.i as Record<string, unknown>;
     expect(pi.files).toBeUndefined();
-    expect(pi.text).toContain('plain retry');
+    expect(pi.text).not.toContain('plain retry');
+    expect(pi.text).toContain('system-reminder');
+  });
+
+  test('a synthetic-capable host switches before admitting only the internal reminder', async () => {
+    const original = structuredClone(ATTACHMENT_TRANSCRIPT);
+    const { ctx, seq } = makeCtx({
+      context: async () => ATTACHMENT_TRANSCRIPT,
+      synthetic: async (i: Record<string, unknown>) => {
+        if (typeof i.sessionID !== 'string' || typeof i.id !== 'string') {
+          throw new Error('synthetic admission needs session and message IDs');
+        }
+        expect(isInternalAdmission(i.sessionID, i.id)).toBe(true);
+        seq.push({ m: 'synthetic', i });
+        return {};
+      },
+    });
+    const onModelChanged = mock();
+    const manager = await triggerFailover(ctx, {
+      onSessionModelChanged: onModelChanged,
+    });
+    try {
+      expect(seq.map((call) => call.m)).toEqual(['switchModel', 'synthetic']);
+      expect(seq[1]?.i).toMatchObject({
+        sessionID: 'ses_e2e',
+        delivery: 'steer',
+        resume: true,
+      });
+      const admission = seq[1]?.i as Record<string, unknown>;
+      expect(admission.text).toContain('system-reminder');
+      expect(admission.text).not.toContain('analyze the chart');
+      expect(admission.files).toBeUndefined();
+      expect(onModelChanged).toHaveBeenCalledWith(
+        'ses_e2e',
+        'anthropic/claude-b',
+      );
+      expect(ATTACHMENT_TRANSCRIPT).toEqual(original);
+    } finally {
+      manager.dispose();
+    }
   });
 });
 
@@ -219,7 +253,8 @@ describe('v2 fallback model-switch hardening (e2e, upstream #1125)', () => {
     }
     const pi = promptCall.i as Record<string, unknown>;
     expect(pi.delivery).toBe('steer');
-    expect(pi.text).toContain('analyze the chart');
+    expect(pi.text).not.toContain('analyze the chart');
+    expect(pi.text).toContain('system-reminder');
     // No busy-session abort dance around the degraded delivery.
     expect(seq.filter((e) => e.m === 'interrupt')).toHaveLength(0);
     expect(seq.filter((e) => e.m === 'prompt')).toHaveLength(1);

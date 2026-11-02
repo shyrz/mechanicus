@@ -291,6 +291,30 @@ test('untracked quiescent session still requires a terminal assistant segment', 
   } as never);
   await expect(h.execute()).rejects.toThrow('no terminal evidence');
 });
+test('v2 result reads migrated v1 completions and errors', async () => {
+  for (const error of [undefined, 'provider failed']) {
+    const h = harness(false);
+    (h.input as { hostFlavor?: string }).hostFlavor = 'v2';
+    h.messages.mockResolvedValue({
+      data: [
+        {
+          info: {
+            role: 'assistant',
+            finish: 'stop',
+            time: { completed: 10 },
+            ...(error ? { error } : {}),
+          },
+          parts: error ? [] : [{ type: 'text', text: 'migrated result' }],
+        },
+      ],
+    } as never);
+    if (error) {
+      await expect(h.execute()).rejects.toThrow(error);
+    } else {
+      expect(await h.execute()).toBe('migrated result');
+    }
+  }
+});
 test('unknown alias and empty task id are rejected', async () => {
   const h = harness();
   await expect(h.execute('exp-99')).rejects.toThrow('Unknown task ID');

@@ -24,6 +24,7 @@ import {
 import { fetchChildTranscript } from '../../utils/child-transcript';
 import { isRecord as isObjectRecord } from '../../utils/guards';
 import { getClient } from '../../utils/opencode-client';
+import { getRuntimeSessionStatusSnapshot } from '../../utils/session-runtime-status';
 import { isGenuineOperatorMessage } from '../orchestrator-wake/index';
 import type { SessionLifecycle } from '../session-lifecycle';
 import { isMessageWithParts, isUserMessageWithParts } from '../types';
@@ -180,6 +181,7 @@ export function createTaskSessionManagerHook(
     readContextMaxFiles?: number;
     backgroundJobBoard?: BackgroundJobStore;
     terminalGate?: BackgroundJobTerminalGate;
+    hostFlavor?: string;
     hostOutcomeClock?: 'shared-unix-ms';
     backgroundJobSupervisor?: BackgroundJobSupervisor;
     backgroundTaskConcurrency?: BackgroundTaskConcurrency;
@@ -215,6 +217,8 @@ export function createTaskSessionManagerHook(
     idleReconcileDelayMs?: number;
     /** Test seam only; production uses the runtime reconciliation delay. */
     runtimeStatusReconcileDelayMs?: number;
+    /** Bound for direct runtime evidence reads; production uses the default. */
+    runtimeStatusTimeoutMs?: number;
     revivedRunTracker?: RevivedRunTracker;
   },
 ) {
@@ -244,6 +248,24 @@ export function createTaskSessionManagerHook(
         fetchChildTranscript(getClient(_ctx), taskID, _ctx.directory).catch(
           () => undefined,
         ),
+      readRuntime: async (run, readStartedAt) => {
+        const snapshot = await getRuntimeSessionStatusSnapshot(_ctx, {
+          timeoutMs: options.runtimeStatusTimeoutMs,
+        });
+        const status = snapshot.statuses.get(run.taskID);
+        return {
+          kind:
+            snapshot.error || snapshot.malformedSessionIDs.has(run.taskID)
+              ? 'unknown'
+              : status === 'busy' || status === 'retry'
+                ? status
+                : 'quiescent',
+          origin: 'session.status',
+          readStartedAt,
+          diagnostic: snapshot.error,
+          retryAfter: snapshot.retryAfter,
+        };
+      },
       baselineFor: (taskID, generation) =>
         options.revivedRunTracker?.baselineFor(taskID, generation),
       attemptStartedAtFor: (taskID, generation) =>
@@ -460,6 +482,7 @@ export function createTaskSessionManagerHook(
       pendingInjectedTerminalJobsByParent.delete(sessionId);
       injectionState.retainedBoardSnapshots.delete(sessionId);
       injectionState.retainedTailBoards.delete(sessionId);
+      injectionState.observedNativeDeliveries?.delete(sessionId);
       taskContextTracker.clearSession(sessionId);
       taskContextTracker.prune(backgroundJobBoard);
       pendingCallTracker.clearSession(sessionId);
@@ -467,6 +490,7 @@ export function createTaskSessionManagerHook(
   }
 
   const injectionState: InjectionState = {
+    hostFlavor: options.hostFlavor,
     backgroundJobBoard,
     terminalGate,
     maxRetainedSnapshots: options.maxRetainedSnapshots,

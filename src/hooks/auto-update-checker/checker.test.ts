@@ -1,5 +1,17 @@
-import { describe, expect, mock, spyOn, test } from 'bun:test';
+import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import * as fs from 'node:fs';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
+
+const originalTuiConfig = process.env.OPENCODE_TUI_CONFIG;
+
+afterEach(() => {
+  if (originalTuiConfig === undefined) {
+    delete process.env.OPENCODE_TUI_CONFIG;
+  } else {
+    process.env.OPENCODE_TUI_CONFIG = originalTuiConfig;
+  }
+});
 
 // Mock logger to avoid noise
 mock.module('../../utils/logger', () => ({
@@ -261,6 +273,110 @@ describe('auto-update-checker/checker', () => {
   });
 
   describe('updateInstallerManagedVersions', () => {
+    test('rolls back a symlink target when a later config update fails', async () => {
+      const root = fs.mkdtempSync(path.join(tmpdir(), 'managed-rollback-'));
+      const configDir = path.join(root, '.opencode');
+      fs.mkdirSync(configDir);
+      const target = path.join(root, 'dotfiles.json');
+      const link = path.join(configDir, 'opencode.json');
+      const second = path.join(configDir, 'opencode.jsonc');
+      const original =
+        '{"plugin":[["mechanicus@1.2.3",{"__mechanicusManagedByInstaller":true}]]}';
+      fs.writeFileSync(target, original);
+      fs.symlinkSync('../dotfiles.json', link);
+      fs.writeFileSync(second, original);
+      const secondRealPath = fs.realpathSync(second);
+      const rename = fs.renameSync;
+      const spy = spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(to) === secondRealPath) throw new Error('rename failed');
+        return rename(from, to);
+      });
+      try {
+        const { updateInstallerManagedVersions } = await import(
+          `./checker?test=${importCounter++}`
+        );
+        expect(updateInstallerManagedVersions(root, '1.2.4')).toBe(false);
+        expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+        expect(fs.readFileSync(target, 'utf8')).toBe(original);
+        expect(fs.readFileSync(second, 'utf8')).toBe(original);
+        expect(
+          fs
+            .readdirSync(root)
+            .some((name) => name.endsWith('.tmp') || name.endsWith('.restore')),
+        ).toBe(false);
+        expect(
+          fs
+            .readdirSync(configDir)
+            .some((name) => name.endsWith('.tmp') || name.endsWith('.restore')),
+        ).toBe(false);
+      } finally {
+        spy.mockRestore();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test('keeps the recovery copy when a rollback rename fails', async () => {
+      const root = fs.mkdtempSync(path.join(tmpdir(), 'managed-restore-'));
+      const configDir = path.join(root, '.opencode');
+      fs.mkdirSync(configDir);
+      const first = path.join(configDir, 'opencode.json');
+      const second = path.join(configDir, 'opencode.jsonc');
+      const original =
+        '{"plugin":[["mechanicus@1.2.3",{"__mechanicusManagedByInstaller":true}]]}';
+      fs.writeFileSync(first, original);
+      fs.writeFileSync(second, original);
+      const secondRealPath = fs.realpathSync(second);
+      const rename = fs.renameSync;
+      const spy = spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(to) === secondRealPath) throw new Error('rename failed');
+        if (String(from).endsWith('.restore')) {
+          throw new Error('restore failed');
+        }
+        return rename(from, to);
+      });
+      try {
+        const { updateInstallerManagedVersions } = await import(
+          `./checker?test=${importCounter++}`
+        );
+        expect(updateInstallerManagedVersions(root, '1.2.4')).toBe(false);
+        const restore = fs
+          .readdirSync(configDir)
+          .filter((name) => name.endsWith('.restore'));
+        expect(restore).toHaveLength(1);
+        expect(
+          fs.readFileSync(path.join(configDir, restore[0] as string), 'utf8'),
+        ).toBe(original);
+      } finally {
+        spy.mockRestore();
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    test('updates a symlink target and refuses a dangling link', async () => {
+      const root = fs.mkdtempSync(path.join(tmpdir(), 'managed-config-'));
+      const configDir = path.join(root, '.opencode');
+      fs.mkdirSync(configDir);
+      const target = path.join(root, 'dotfiles.json');
+      const link = path.join(configDir, 'opencode.json');
+      const original =
+        '{ "plugin": [["mechanicus@1.2.3", { "__mechanicusManagedByInstaller": true }]] }';
+      fs.writeFileSync(target, original);
+      fs.symlinkSync('../dotfiles.json', link);
+      try {
+        const { updateInstallerManagedVersions } = await import(
+          `./checker?test=${importCounter++}`
+        );
+        expect(updateInstallerManagedVersions(root, '1.2.4')).toBe(true);
+        expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+        expect(fs.readFileSync(target, 'utf8')).toContain('mechanicus@1.2.4');
+        fs.rmSync(target);
+        expect(updateInstallerManagedVersions(root, '1.2.5')).toBe(false);
+        expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    });
+
     test('structurally rewrites managed tuples in OpenCode and TUI configs only', async () => {
       const files = new Map<string, string>([
         [

@@ -17,7 +17,7 @@ manage, and close panes for child OpenCode agent sessions.
   - `HerdrMultiplexer`: herdr-specific implementation using `herdr` CLI commands
   - `KittyMultiplexer`: kitty-specific implementation using `kitten @` CLI commands
   - `CmuxMultiplexer`: cmux UUID surface implementation using the cmux CLI
-- **Shared Utilities** (`shared.ts`): `quoteShellArg`, `buildOpencodeAttachCommand`, and `findBinary` — extracted from the three adapters to eliminate copy-paste duplication.
+- **Shared Utilities** (`shared.ts`): shell-aware argument quoting, `buildOpencodeAttachCommand`, `findBinary`, and graceful close helpers. PowerShell panes double apostrophes and use its call operator; other backends retain POSIX quoting. tmux treats only its exact missing-target response as an already closed pane; transport failures retain tracking for retry.
 - **Tmux pane registry** (`tmux-pane-registry.ts`): Session-scoped,
   expiring TUI pane registrations used to route child panes to the attached
   root session that created them.

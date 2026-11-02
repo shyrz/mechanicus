@@ -105,7 +105,8 @@ describe('gracefulClosePane', () => {
 
 describe('buildOpencodeAttachCommand', () => {
   test('quotes an absolute executable containing spaces and apostrophes', async () => {
-    const { buildOpencodeAttachCommand } = await importShared();
+    const { buildOpencodeAttachCommand, resolvePaneShell } =
+      await importShared();
     const cmd = buildOpencodeAttachCommand(
       'sess',
       'url',
@@ -113,6 +114,21 @@ describe('buildOpencodeAttachCommand', () => {
       "/Users/King's Tools/opencode",
     );
     expect(cmd).toStartWith("'/Users/King'\\''s Tools/opencode' attach");
+  });
+
+  test('uses PowerShell apostrophe escaping for a PowerShell pane', async () => {
+    const { buildOpencodeAttachCommand, resolvePaneShell } =
+      await importShared();
+    const cmd = buildOpencodeAttachCommand(
+      "ses'x",
+      "http://x/o'brien",
+      "/repo/O'Brien",
+      "/opt/King's/opencode",
+      resolvePaneShell('C:\\Program Files\\PowerShell\\7\\pwsh.EXE'),
+    );
+    expect(cmd).toBe(
+      "& '/opt/King''s/opencode' attach 'http://x/o''brien' --session 'ses''x' --dir '/repo/O''Brien'",
+    );
   });
 
   test('resolves host executable with env, process, and bare fallbacks', async () => {

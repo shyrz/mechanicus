@@ -1,7 +1,13 @@
 {
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "files": {
-    "includes": ["**", "!mechanicus.schema.json"]
+    "includes": ["**", "!mechanicus.schema.json", "!.workspace"]
   },
   "vcs": {
     "enabled": true,

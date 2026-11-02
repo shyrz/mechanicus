@@ -1,9 +1,83 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import type { PluginInput } from '@opencode-ai/plugin';
 import {
+  classifyMigratedV1Round,
+  classifyTerminalEvidence,
+  diagnosticExcerptOf,
+  diagnosticTail,
   extractChildTerminalEvidence,
   fetchChildTranscript,
 } from './child-transcript';
+
+describe('diagnostic excerpts', () => {
+  test('trims UTF-8 bytes once without splitting surrogate pairs', () => {
+    const encode = spyOn(TextEncoder.prototype, 'encode');
+    try {
+      expect(diagnosticTail(`${'界'.repeat(3000)}😀x`, 1024)).toBe(
+        `${'界'.repeat(339)}😀x`,
+      );
+      expect(encode.mock.calls.length).toBeLessThanOrEqual(1);
+      expect(diagnosticTail('\ud800x\udc00y', 7)).toBe('x\udc00y');
+      expect(diagnosticTail('a\udc00\udc00b', 5)).toBe('\udc00b');
+      expect(diagnosticTail('abc\ud800\ud800', 5)).toBe('bc');
+    } finally {
+      encode.mockRestore();
+    }
+  });
+
+  test('bounds assistant text and error evidence without tool input or output', () => {
+    const result = diagnosticExcerptOf({
+      data: [
+        { info: { role: 'user' }, parts: [] },
+        {
+          info: {
+            role: 'assistant',
+            error: { data: { message: 'provider broke' } },
+          },
+          parts: [
+            {
+              type: 'tool',
+              state: {
+                status: 'completed',
+                input: 'PRIVATE INPUT',
+                output: 'PRIVATE OUTPUT',
+              },
+            },
+            {
+              type: 'tool',
+              state: { status: 'error', error: 'failed command' },
+            },
+            { type: 'text', text: 'partial answer' },
+          ],
+        },
+      ],
+    });
+    expect(result).toMatchObject({ truncated: 'none', omittedMessages: 0 });
+    if (!('text' in result)) throw new Error('expected excerpt');
+    expect(result.text).toContain('assistant_error: provider broke');
+    expect(result.text).toContain('tool_error: failed command');
+    expect(result.text).toContain('partial answer');
+    expect(result.text).not.toContain('PRIVATE');
+  });
+
+  test('bounds messages and UTF-8 bytes in a large transcript', () => {
+    const result = diagnosticExcerptOf({
+      data: [
+        { info: { role: 'user' }, parts: [] },
+        ...Array.from({ length: 100 }, (_, index) => ({
+          info: { role: 'assistant' },
+          parts: [{ type: 'text', text: `${index}: ${'界'.repeat(10_000)}` }],
+        })),
+      ],
+    });
+    if (!('text' in result)) throw new Error('expected excerpt');
+    expect(
+      new TextEncoder().encode(result.text).byteLength,
+    ).toBeLessThanOrEqual(6144);
+    expect(result.truncated).toBe('messages,chars');
+    expect(result.omittedMessages).toBeGreaterThanOrEqual(60);
+  });
+});
 
 function message(overrides: {
   id?: string;
@@ -28,11 +102,51 @@ function message(overrides: {
 }
 
 describe('extractChildTerminalEvidence', () => {
+  test('recognizes a completed v1 assistant history without v2 lifecycle fields', () => {
+    const transcript = {
+      data: [
+        message({ id: 'user', role: 'user', completed: null, parts: [] }),
+        message({ id: 'answer', completed: 5, finish: 'stop' }),
+      ],
+    };
+    expect(classifyMigratedV1Round(transcript)).toEqual({
+      verdict: 'completed',
+      text: 'the answer',
+    });
+  });
+
+  test('keeps migrated pending history open and rejects v2 lifecycle evidence', () => {
+    expect(
+      classifyMigratedV1Round({
+        data: [message({ id: 'answer', completed: 5, finish: 'unknown' })],
+      }),
+    ).toEqual({ verdict: 'retry', reason: 'pending' });
+    const transcript = {
+      data: [
+        message({ id: 'answer', completed: 5 }),
+        {
+          info: { id: 'idle', role: 'idle', rawFinish: 'stop' },
+          parts: [],
+        },
+      ],
+    };
+    expect(classifyMigratedV1Round(transcript)).toBeUndefined();
+  });
+
   test('trailing assistant with text is ready', () => {
     const evidence = extractChildTerminalEvidence({
       data: [message({ id: 'base' }), message({ id: 'last', completed: 5 })],
     });
     expect(evidence).toEqual({ kind: 'ready', text: 'the answer' });
+  });
+
+  test('a transcript with only user input has no assistant evidence', () => {
+    expect(
+      classifyTerminalEvidence({
+        data: [message({ id: 'input', role: 'user', parts: [] })],
+      }),
+    ).toEqual({ verdict: 'absent' });
+    expect(classifyTerminalEvidence({ data: [] }).verdict).toBe('absent');
   });
 
   test('trailing assistant without text is textless', () => {
@@ -111,7 +225,7 @@ describe('extractChildTerminalEvidence', () => {
         requireCompletionTime: true,
       }),
     ).toEqual({ kind: 'pending' });
-    // v2 shim shape: info carries no time at all — tolerated when the
+    // Legacy v2 shim shape: info carries no time at all — tolerated when the
     // strictness flag is off (the host outcome gate already confirmed
     // terminal upstream).
     expect(

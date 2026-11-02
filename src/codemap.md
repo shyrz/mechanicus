@@ -21,6 +21,7 @@ This directory serves as the primary entry point for the plugin's runtime behavi
 - **Facade Pattern**: `index.ts` acts as a facade that composes multiple subsystems (agents, tools, MCPs, hooks, multiplexer)
 - **Observer Pattern**: Event-driven architecture using OpenCode's event system for session lifecycle, message updates, and tool execution
 - **Strategy Pattern**: Runtime model selection and fallback via `ForegroundFallbackManager`
+- **Disabled Fallback**: `fallback.enabled: false` skips manager construction and event/tracking/disposal paths. Companion initialization is retained because its disabled path also releases superseded process ownership.
 - **Singleton Pattern**: `MultiplexerSessionManager` maintains single instance for task session management
 - **Admission runtime lease**: `admission-runtime.ts` scopes the background
   scheduler and pending-call tracker per directory, retaining them across
@@ -49,7 +50,7 @@ OpenCode Core → Plugin Initialization (index.ts)
 | `admission-runtime.ts` | Per-directory scheduler/pending-call runtime lease | Background task concurrency, task-session pending calls |
 | `tui.ts` | TUI sidebar plugin for agent model display | tui-state.ts, config constants, tmux-pane-registry |
 | `tui-state.ts` | Persistent state management for TUI | Node.js fs/promises, os module |
-| `tui-preset.ts` | Three-level `/preset` manager (preset list → agents → agent edit) using `api.ui` dialogs | preset-switch.ts, config loader/constants |
+| `tui-preset.ts` | Three-level `/preset` manager with base selection, read-only inherited agents and user-only local edits; protects newer disk changes | preset-switch.ts, config loader/constants |
 | `plugin-entry.ts` | Installer-managed plugin entry marker and `PluginEntry` type | none |
 | `health-check.ts` | Init health-check thresholds and disabled-tool-aware minimum tool count | none (kept internal, not re-exported) |
 
@@ -99,7 +100,8 @@ OpenCode Core → Plugin Initialization (index.ts)
      runs of the same agent remain visible until all runs finish
    - `clearTuiAgentActivities()`: Removes stale activity during startup
 3. **Atomic Writes**: Cross-process file locking serializes each read → mutate →
-   atomic rename transaction, with dead-owner and aged-lock recovery
+   atomic rename transaction, with dead-owner and aged-lock recovery. Parent
+   pruning preserves the ancestry of active and reusable sessions.
 4. **Error Handling**: All operations are best-effort; failures don't crash plugin
 5. **Instance Cleanup**: On shutdown, each plugin instance removes only sessions
    it marked active, preserving activity owned by other running instances

@@ -177,4 +177,58 @@ describe('smartfetch/tool', () => {
     );
     expect(result).toContain('Extracted answer');
   });
+
+  test('does not share credentialed content through a public canonical cache alias', async () => {
+    const fetchMock = mock(async (input: string | URL | Request) => {
+      const privateRequest = new URL(String(input)).username !== '';
+      return new Response(
+        `<html><head><link rel="canonical" href="https://example.com/private"></head><body>${privateRequest ? 'private account' : 'public page'}</body></html>`,
+        { headers: { 'content-type': 'text/html' } },
+      );
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const webfetch = createWebfetchTool({ client: {} } as any);
+    const args = {
+      format: 'text' as const,
+      extract_main: false,
+      prefer_llms_txt: 'never' as const,
+      include_metadata: true,
+      save_binary: false,
+    };
+    const privateResult = await webfetch.execute(
+      { ...args, url: 'https://private-user@example.com/private' },
+      createExecutionContext(),
+    );
+    const publicResult = await webfetch.execute(
+      { ...args, url: 'https://example.com/private' },
+      createExecutionContext(),
+    );
+    expect(privateResult).toContain('private account');
+    expect(publicResult).toContain('public page');
+    expect(publicResult).not.toContain('private account');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects a pre-aborted request after permission without network I/O', async () => {
+    const fetchMock = mock(async () => new Response('unexpected request'));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const webfetch = createWebfetchTool({ client: {} } as any);
+    const context = createExecutionContext();
+    context.abort = AbortSignal.abort(new Error('cancelled before permission'));
+    await expect(
+      webfetch.execute(
+        {
+          url: 'https://example.com/aborted',
+          format: 'text',
+          extract_main: false,
+          prefer_llms_txt: 'never',
+          include_metadata: false,
+          save_binary: false,
+        },
+        context,
+      ),
+    ).rejects.toThrow('cancelled before permission');
+    expect(context.ask).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

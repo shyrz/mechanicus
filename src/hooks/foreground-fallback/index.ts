@@ -28,7 +28,7 @@ import {
   parseModelReference,
 } from '../../utils/session';
 import type { SessionLifecycle } from '../session-lifecycle';
-import { isReplayableUserMessage, partsFromReplayMessage } from '../types';
+import { isReplayableUserMessage } from '../types';
 
 // ---------------------------------------------------------------------------
 // Retryable error detection
@@ -85,6 +85,12 @@ const RETRYABLE_ERROR_PATTERNS = [
 ];
 
 const OUTAGE_STATUS_CODES = new Set([500, 502, 503, 504]);
+const FAILOVER_ERROR_TYPES = new Set([
+  'provider.rate-limit',
+  'provider.quota',
+  'provider.auth',
+  'provider.internal',
+]);
 // (ponytail) validated against real OpenCode error shapes
 const TRANSPORT_CODES = new Set([
   'ECONNREFUSED',
@@ -139,12 +145,50 @@ const PROVIDER_OUTAGE_PATTERNS = [
   /\bstatus.?410\b/i,
 ];
 
-function extractStatusCode(error: {
-  statusCode?: unknown;
-  data?: { statusCode?: unknown };
-}): number | undefined {
-  const value = error.statusCode ?? error.data?.statusCode;
-  return typeof value === 'number' ? value : undefined;
+function asHttpStatus(value: unknown): number | undefined {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\d{3}$/.test(value)
+        ? Number(value)
+        : undefined;
+  return parsed !== undefined &&
+    Number.isInteger(parsed) &&
+    parsed >= 100 &&
+    parsed <= 599
+    ? parsed
+    : undefined;
+}
+
+function nestedField(source: unknown, key: string): unknown {
+  return isRecord(source) ? source[key] : undefined;
+}
+
+function extractStatusCode(error: Record<string, unknown>): number | undefined {
+  const { data, cause, response } = error;
+  const candidates = [
+    error.statusCode,
+    nestedField(data, 'statusCode'),
+    nestedField(cause, 'statusCode'),
+    error.status,
+    nestedField(response, 'status'),
+    nestedField(response, 'statusCode'),
+    nestedField(data, 'status'),
+    nestedField(nestedField(data, 'response'), 'status'),
+    nestedField(cause, 'status'),
+    nestedField(nestedField(cause, 'response'), 'status'),
+  ];
+  return candidates.map(asHttpStatus).find((status) => status !== undefined);
+}
+
+function errorMessages(error: Record<string, unknown>): string[] {
+  return [
+    error.message,
+    nestedField(error.data, 'message'),
+    nestedField(error.data, 'responseBody'),
+    nestedField(error.cause, 'message'),
+    error.responseBody,
+  ].filter((value): value is string => typeof value === 'string');
 }
 
 function eventSessionID(props: {
@@ -163,42 +207,29 @@ export function isFailoverError(error: unknown): boolean {
       TRANSPORT_MESSAGE_PATTERNS.some((pattern) => pattern.test(error))
     );
   }
-  if (typeof error !== 'object') return false;
-  const err = error as {
-    code?: unknown;
-    cause?: { code?: unknown };
-    message?: string;
-    statusCode?: number;
-    data?: {
-      code?: unknown;
-      statusCode?: number;
-      message?: string;
-      responseBody?: string;
-    };
-  };
-  const statusCode = extractStatusCode(err);
+  if (!isRecord(error)) return false;
+  const statusCode = extractStatusCode(error);
   if (
     statusCode === 429 ||
     statusCode === 401 ||
     statusCode === 403 ||
     statusCode === 410 ||
-    (statusCode !== undefined && OUTAGE_STATUS_CODES.has(statusCode))
+    (statusCode !== undefined && OUTAGE_STATUS_CODES.has(statusCode)) ||
+    (typeof error.type === 'string' && FAILOVER_ERROR_TYPES.has(error.type))
   ) {
     return true;
   }
   if (
-    [err.code, err.cause?.code, err.data?.code].some(
-      (code) => typeof code === 'string' && TRANSPORT_CODES.has(code),
-    )
+    [
+      error.code,
+      nestedField(error.cause, 'code'),
+      nestedField(error.data, 'code'),
+    ].some((code) => typeof code === 'string' && TRANSPORT_CODES.has(code))
   ) {
     return true;
   }
 
-  const messages = [
-    err.message ?? '',
-    err.data?.message ?? '',
-    err.data?.responseBody ?? '',
-  ];
+  const messages = errorMessages(error);
   if (
     messages.some((message) =>
       TRANSPORT_MESSAGE_PATTERNS.some((p) => p.test(message)),
@@ -207,11 +238,7 @@ export function isFailoverError(error: unknown): boolean {
     return true;
   }
 
-  const text = [
-    err.message ?? '',
-    err.data?.message ?? '',
-    err.data?.responseBody ?? '',
-  ].join(' ');
+  const text = messages.join(' ');
   const hasFailoverReason =
     RETRYABLE_ERROR_PATTERNS.some((p) => p.test(text)) ||
     PROVIDER_OUTAGE_PATTERNS.some((p) => p.test(text));
@@ -242,21 +269,12 @@ export function isInlineFailoverError(error: unknown): boolean {
       /\bno longer available\b/i.test(error)
     );
   }
-  if (typeof error !== 'object') return false;
-  const err = error as {
-    statusCode?: unknown;
-    data?: { statusCode?: unknown; responseBody?: string; message?: string };
-    message?: string;
-  };
-  const statusCode = extractStatusCode(err);
+  if (!isRecord(error)) return false;
+  const statusCode = extractStatusCode(error);
   if (statusCode !== undefined && INLINE_STATUS_CODES.has(statusCode)) {
     return true;
   }
-  const text = [
-    err.message ?? '',
-    err.data?.message ?? '',
-    err.data?.responseBody ?? '',
-  ].join(' ');
+  const text = errorMessages(error).join(' ');
   return (
     /(?:^|\s)Gone(?:$|\s)/i.test(text) ||
     /\b401\b/i.test(text) ||
@@ -389,6 +407,9 @@ export class ForegroundFallbackManager {
   private readonly readBackgroundGeneration?: (
     sessionID: string,
   ) => number | undefined;
+  private readonly sessionChains?: (
+    sessionID: string,
+  ) => Record<string, string[]> | undefined;
 
   /** Exposed for task-session-manager: prevents idle reconciliation
    *  while a fallback abort/re-prompt is in flight for this session. */
@@ -510,7 +531,10 @@ export class ForegroundFallbackManager {
      *  unmanaged — the handoff is not applicable, never a wildcard).
      *  Captured before ANY await in the fallback preparation. */
     readBackgroundGeneration?: (sessionID: string) => number | undefined,
+    /** Per-child snapshot; v1 callers omit it and retain shared chains. */
+    sessionChains?: (sessionID: string) => Record<string, string[]> | undefined,
   ) {
+    this.sessionChains = sessionChains;
     this.onSessionModelChanged = onSessionModelChanged;
     this.backgroundFallbackHandoff = backgroundFallbackHandoff;
     this.readBackgroundGeneration = readBackgroundGeneration;
@@ -969,7 +993,7 @@ export class ForegroundFallbackManager {
       const observedModel = this.sessionModel.get(sessionID);
       let currentModel = observedModel;
       const agentName = this.sessionAgent.get(sessionID);
-      const chain = this.resolveChain(agentName, currentModel);
+      const chain = this.resolveChain(agentName, currentModel, sessionID);
       // Callers pre-check via hasFallbackChain; keep as defensive guard only.
       if (!chain.length) return;
 
@@ -1151,11 +1175,6 @@ export class ForegroundFallbackManager {
         args: Record<string, unknown> & { modelSwitch?: 'required' },
       ) => Promise<unknown>;
 
-      const replayParts = partsFromReplayMessage(lastUser) as Array<{
-        type: 'text';
-        text: string;
-      }>;
-
       // v2-only flag (consumed by the client shim): the replay's model is
       // the fallback TARGET, so a v2 host without session.switchModel must
       // reject the replay (typed error) instead of silently replaying on
@@ -1166,8 +1185,9 @@ export class ForegroundFallbackManager {
       const promptBody = {
         path: { id: sessionID },
         body: {
+          // Stored parts already belong to the original message. Reusing
+          // their IDs can upsert those rows and re-expand attachments.
           parts: [
-            ...replayParts,
             createInternalAgentTextPart(
               "<system-reminder>\nThe previous model request failed and is being retried with a fallback model. Continue processing the user's original request above. Do not respond to this reminder.\n</system-reminder>",
             ),
@@ -1363,6 +1383,7 @@ export class ForegroundFallbackManager {
       this.resolveChain(
         this.sessionAgent.get(sessionID),
         this.sessionModel.get(sessionID),
+        sessionID,
       ).length > 0
     );
   }
@@ -1382,9 +1403,11 @@ export class ForegroundFallbackManager {
   private resolveChain(
     agentName: string | undefined,
     currentModel: string | undefined,
+    sessionID?: string,
   ): string[] {
+    const chains = this.sessionChains?.(sessionID ?? '') ?? this.chains;
     if (agentName) {
-      const chain = this.chains[agentName];
+      const chain = chains[agentName];
       if (chain) return chain;
       // Any known agent without a configured chain: no fallback.
       // Don't bleed into other agents' chains via model-matching —
@@ -1395,7 +1418,7 @@ export class ForegroundFallbackManager {
 
     // Agent unknown: try to infer from the current model.
     if (currentModel) {
-      for (const chain of Object.values(this.chains)) {
+      for (const chain of Object.values(chains)) {
         if (chain.includes(currentModel)) return chain;
       }
     }
@@ -1404,7 +1427,7 @@ export class ForegroundFallbackManager {
     // Only reached when both agent name and current model are unavailable.
     const all: string[] = [];
     const seen = new Set<string>();
-    for (const chain of Object.values(this.chains)) {
+    for (const chain of Object.values(chains)) {
       for (const m of chain) {
         if (!seen.has(m)) {
           seen.add(m);

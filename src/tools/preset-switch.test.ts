@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { PluginConfig } from '../config';
+import { parseJsonConfigText } from '../config/json-file';
 import {
   buildPresetSummary,
   deletePreset,
@@ -16,6 +17,15 @@ let previousXdgDataHome: string | undefined;
 let previousXdgConfigHome: string | undefined;
 let previousOpenCodeConfigDir: string | undefined;
 let tempDir: string;
+
+function useUserConfig(contents = '{}'): string {
+  const configDir = path.join(tempDir, 'opencode-config');
+  fs.mkdirSync(configDir, { recursive: true });
+  process.env.OPENCODE_CONFIG_DIR = configDir;
+  const configPath = path.join(configDir, 'mechanicus.json');
+  fs.writeFileSync(configPath, contents);
+  return configPath;
+}
 
 beforeEach(() => {
   previousXdgDataHome = process.env.XDG_DATA_HOME;
@@ -91,6 +101,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('switches preset and reports a reload-to-apply message', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         cheap: {
@@ -140,7 +151,9 @@ describe('switchPresetOnDisk', () => {
 
     switchPresetOnDisk(tempDir, 'cheap', config);
 
-    const persisted = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as {
+    const persisted = parseJsonConfigText(
+      fs.readFileSync(configPath, 'utf-8'),
+    ) as {
       preset?: string;
       agents?: Record<string, unknown>;
     };
@@ -173,9 +186,13 @@ describe('switchPresetOnDisk', () => {
     const result = switchPresetOnDisk(tempDir, 'cheap', config);
     expect(result.ok).toBe(true);
 
-    // The BOM is stripped on read, so the preset name is persisted; the
-    // rewritten file is plain JSON that parses cleanly.
-    const persisted = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as {
+    // The BOM and original file formatting survive the targeted edit.
+    expect(fs.readFileSync(configPath, 'utf-8').startsWith('\uFEFF')).toBe(
+      true,
+    );
+    const persisted = parseJsonConfigText(
+      fs.readFileSync(configPath, 'utf-8'),
+    ) as {
       preset?: string;
       agents?: Record<string, unknown>;
     };
@@ -184,6 +201,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('resolves legacy alias keys (explore → magos)', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         scout: { explore: { model: 'openai/gpt-5.6-luna' } },
@@ -197,6 +215,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('skips agents with empty overrides in a mixed preset', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         mixed: {
@@ -217,6 +236,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('resolves array-form model to the first string entry', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         fallback: {
@@ -236,6 +256,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('resolves array-form model with object entries and inline variant', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         thinker: {
@@ -258,6 +279,7 @@ describe('switchPresetOnDisk', () => {
   });
 
   test('includes temperature and options in the summary', () => {
+    useUserConfig();
     const config: PluginConfig = {
       presets: {
         precise: {
@@ -278,15 +300,16 @@ describe('switchPresetOnDisk', () => {
     );
   });
 
-  test('does not throw when the user config file is missing', () => {
-    // No config file on disk; persistPresetName is best-effort.
+  test('does not report success when the user config file is missing', () => {
     const config: PluginConfig = {
       presets: {
         cheap: { orchestrator: { model: 'anthropic/claude-3.5-haiku' } },
       },
     };
 
-    expect(() => switchPresetOnDisk(tempDir, 'cheap', config)).not.toThrow();
+    const result = switchPresetOnDisk(tempDir, 'cheap', config);
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('was not saved');
   });
 });
 
@@ -333,7 +356,9 @@ describe('writePreset', () => {
     });
 
     expect(ok).toBe(true);
-    const persisted = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as {
+    const persisted = parseJsonConfigText(
+      fs.readFileSync(configPath, 'utf-8'),
+    ) as {
       preset?: string;
       presets?: Record<string, unknown>;
     };
@@ -381,6 +406,23 @@ describe('writePreset', () => {
       fs.readFileSync(path.join(configDir, 'mechanicus.json'), 'utf-8'),
     ) as { presets?: Record<string, unknown> };
     expect(persisted.presets?.solo).toEqual({ orchestrator: { model: 'x' } });
+  });
+
+  test('does not replace an unreadable user config with an empty one', () => {
+    const original = '{"preset":"old", broken';
+    const configPath = useUserConfig(original);
+
+    expect(
+      writePreset(tempDir, 'scout', { orchestrator: { model: 'new' } }),
+    ).toBe(false);
+    expect(fs.readFileSync(configPath, 'utf8')).toBe(original);
+  });
+
+  test('does not invent a user config when none exists', () => {
+    expect(
+      writePreset(tempDir, 'scout', { orchestrator: { model: 'new' } }),
+    ).toBe(false);
+    expect(fs.existsSync(path.join(tempDir, 'mechanicus.json'))).toBe(false);
   });
 });
 

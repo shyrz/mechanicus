@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test';
 import { isInternalInitiatorPart } from '../../utils';
 import { SessionLifecycle } from '../session-lifecycle';
-import { ForegroundFallbackManager, isFailoverError } from './index';
+import {
+  ForegroundFallbackManager,
+  isFailoverError,
+  isInlineFailoverError,
+} from './index';
 
 // ACCEPTANCE GAP: config() hook behaviour is not covered by CI — verify live.
 
@@ -101,6 +105,50 @@ function makeChains(
 // ---------------------------------------------------------------------------
 
 describe('isFailoverError', () => {
+  test.each([
+    { statusCode: '429' },
+    { status: 503 },
+    { response: { status: '502' } },
+    { data: { response: { status: 504 } } },
+    { cause: { statusCode: '401' } },
+    { type: 'provider.internal', message: 'request failed' },
+    { type: 'provider.rate-limit', message: 'request failed' },
+    { type: 'provider.quota', message: 'request failed' },
+    { type: 'provider.auth', message: 'request failed' },
+  ])('recognizes structured provider failure %j', (error) => {
+    expect(isFailoverError(error)).toBe(true);
+  });
+
+  test.each([99, 600, 100.5, '0100', '401 extra', '', null])(
+    'skips invalid outer status %j and reads the nested HTTP status',
+    (statusCode) => {
+      const error = { statusCode, data: { statusCode: '401' } };
+      expect(isFailoverError(error)).toBe(true);
+      expect(isInlineFailoverError(error)).toBe(true);
+    },
+  );
+
+  test.each([100, 101, 598, 599, '100', '599'])(
+    'keeps valid outer HTTP status %j ahead of nested status',
+    (statusCode) => {
+      const error = { statusCode, data: { statusCode: 401 } };
+      expect(isFailoverError(error)).toBe(false);
+      expect(isInlineFailoverError(error)).toBe(false);
+    },
+  );
+
+  test('ignores malformed error fields and preserves ordinary request failures', () => {
+    for (const error of [
+      { status: 400, message: { toString: null }, data: ['invalid'] },
+      { type: 'request.invalid', status: '400' },
+      { message: false, data: { responseBody: {} } },
+    ]) {
+      expect(() => isFailoverError(error)).not.toThrow();
+      expect(isFailoverError(error)).toBe(false);
+      expect(isInlineFailoverError(error)).toBe(false);
+    }
+  });
+
   test('classifies recoverable HTTP 400 response bodies as failover errors', () => {
     expect(
       isFailoverError({
@@ -445,6 +493,34 @@ describe('ForegroundFallbackManager session.error', () => {
     } as any);
   });
 
+  test('uses the configured fallback chain for a v2 typed provider error', async () => {
+    await mgr.handleEvent({
+      type: 'message.updated',
+      properties: {
+        info: {
+          sessionID: 'sess-typed',
+          agent: 'orchestrator',
+          role: 'assistant',
+          providerID: 'anthropic',
+          modelID: 'claude-opus-4-5',
+        },
+      },
+    });
+    await mgr.handleEvent({
+      type: 'session.error',
+      properties: {
+        sessionID: 'sess-typed',
+        error: { type: 'provider.internal', message: 'request failed' },
+      },
+    });
+
+    expect(mocks.promptAsync).toHaveBeenCalledTimes(1);
+    expect(mocks.promptAsync.mock.calls[0]?.[0]).toMatchObject({
+      path: { id: 'sess-typed' },
+      body: { model: { providerID: 'openai', modelID: 'gpt-4o' } },
+    });
+  });
+
   test('triggers fallback on rate-limit session.error', async () => {
     // First teach the manager which model is in use for this session
     await mgr.handleEvent({
@@ -667,7 +743,7 @@ describe('ForegroundFallbackManager session.error', () => {
     expect(call[0].body.model.modelID).toBe('gpt-4o');
   });
 
-  test('marks the replayed user prompt as an internal initiator', async () => {
+  test('marks the retry reminder as an internal initiator', async () => {
     await mgr.handleEvent({
       type: 'message.updated',
       properties: {
@@ -692,10 +768,53 @@ describe('ForegroundFallbackManager session.error', () => {
     expect(call[0].body.parts.some(isInternalInitiatorPart)).toBe(true);
   });
 
+  test('retries without resubmitting stored user part IDs or attachments', async () => {
+    const history = [
+      {
+        info: { id: 'msg_user', role: 'user' },
+        parts: [
+          { id: 'prt_text', type: 'text', text: 'analyze this chart' },
+          {
+            id: 'prt_file',
+            type: 'file',
+            mime: 'image/png',
+            url: 'data:image/png;base64,AA==',
+          },
+        ],
+      },
+    ];
+    const original = structuredClone(history);
+    ({ mocks } = createMockClient({ messagesData: history }));
+    mgr = new ForegroundFallbackManager(makeChains(), true, {
+      directory: '/test',
+    } as any);
+    mgr.registerSessionAgent('sess-1', 'orchestrator');
+
+    await mgr.handleEvent({
+      type: 'session.error',
+      properties: {
+        sessionID: 'sess-1',
+        error: { statusCode: 429 },
+      },
+    });
+
+    expect(mocks.promptAsync).toHaveBeenCalledTimes(1);
+    const call = mocks.promptAsync.mock.calls[0] as [
+      { body: { parts: Array<{ id?: string; text?: string }> } },
+    ];
+    expect(call[0].body.parts).toHaveLength(1);
+    expect(isInternalInitiatorPart(call[0].body.parts[0])).toBe(true);
+    expect(call[0].body.parts[0]?.id).toBeUndefined();
+    expect(call[0].body.parts[0]?.text).toContain(
+      "Continue processing the user's original request above.",
+    );
+    expect(history).toEqual(original);
+  });
+
   test('skips malformed messages without info when locating the last user message', async () => {
     // OpenCode may return partial/streaming messages whose `info` is undefined;
-    // the fallback must ignore those rather than crash, and still re-submit the
-    // real last user message.
+    // the fallback must ignore those rather than crash, and still locate
+    // the user's request before sending the retry reminder.
     ({ mocks } = createMockClient({
       messagesData: [
         {},
@@ -735,7 +854,8 @@ describe('ForegroundFallbackManager session.error', () => {
     const call = mocks.promptAsync.mock.calls[0] as [
       { parts: Array<{ text?: string }> },
     ];
-    expect(call[0].body.parts[0]?.text).toBe('real prompt');
+    expect(call[0].body.parts).toHaveLength(1);
+    expect(isInternalInitiatorPart(call[0].body.parts[0])).toBe(true);
   });
 
   function handoffMock() {
@@ -958,11 +1078,11 @@ describe('ForegroundFallbackManager session.error', () => {
     expect(generation).toBe(8);
   });
 
-  test('replays the last user message from v2-shaped session.messages data', async () => {
+  test('retries after a user turn in v2-shaped session.messages data', async () => {
     // OpenCode 1.18+ session.messages() returns v2 SessionMessage objects
     // ({ type, text }) instead of the v1 { info, parts } shape. The fallback
-    // must locate and re-submit the v2 user text even when an assistant
-    // message appears after it.
+    // must still recognize the user turn even when an assistant message
+    // appears after it.
     ({ mocks } = createMockClient({
       messagesData: [
         { id: 'm1', type: 'user', text: 'v2 prompt' },
@@ -1001,10 +1121,11 @@ describe('ForegroundFallbackManager session.error', () => {
     const call = mocks.promptAsync.mock.calls[0] as [
       { parts: Array<{ text?: string }> },
     ];
-    expect(call[0].body.parts[0]?.text).toBe('v2 prompt');
+    expect(call[0].body.parts).toHaveLength(1);
+    expect(isInternalInitiatorPart(call[0].body.parts[0])).toBe(true);
   });
 
-  test('prefers the latest user message across mixed v1/v2 shapes', async () => {
+  test('retries without duplicating user text across mixed v1/v2 shapes', async () => {
     ({ mocks } = createMockClient({
       messagesData: [
         {
@@ -1042,7 +1163,10 @@ describe('ForegroundFallbackManager session.error', () => {
     const call = mocks.promptAsync.mock.calls[0] as [
       { parts: Array<{ text?: string }> },
     ];
-    expect(call[0].body.parts[0]?.text).toBe('v2 prompt');
+    expect(call[0].body.parts).toHaveLength(1);
+    expect(isInternalInitiatorPart(call[0].body.parts[0])).toBe(true);
+    expect(call[0].body.parts[0]?.text).not.toContain('v2 prompt');
+    expect(call[0].body.parts[0]?.text).not.toContain('legacy prompt');
   });
 
   test('does nothing when error is not a rate limit', async () => {

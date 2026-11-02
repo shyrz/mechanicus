@@ -1,9 +1,9 @@
 /**
- * Phase reminder to append after each latest user message.
+ * Rebuild a phase reminder on every eligible primary-agent user message.
  *
- * Keeping this at the tail preserves immediate workflow guidance without
- * mutating the cached system prompt or prepending request-local content ahead
- * of the user's actual turn.
+ * Eligibility comes from each message's agent, so switching agents cannot
+ * remove reminders from historical turns. Keep the per-message behavior to
+ * reconstruct reminders previously added by post-file-tool-nudge as well.
  */
 import { isPrimaryAgentName, PHASE_REMINDER } from '../../config/constants';
 import { isInternalInitiatorPart } from '../../utils';
@@ -25,16 +25,12 @@ export function hasPhaseReminder(part: MessagePart): boolean {
   return isTaggedPart(part, PHASE_REMINDER_METADATA_KEY);
 }
 
-interface PhaseReminderOptions {
-  shouldInject?: (sessionID: string) => boolean;
-}
-
 /**
  * Creates the experimental.chat.messages.transform hook for phase reminder injection.
  * This hook runs right before sending to API, so it doesn't affect UI display.
  * Only injects for the orchestrator agent.
  */
-export function createPhaseReminderHook(options: PhaseReminderOptions = {}) {
+export function createPhaseReminderHook() {
   return {
     'experimental.chat.messages.transform': async (
       _input: Record<string, never>,
@@ -47,12 +43,8 @@ export function createPhaseReminderHook(options: PhaseReminderOptions = {}) {
         return;
       }
 
-      const { agent, sessionID } = lastUserMessage.info;
-      if (
-        !isPrimaryAgentName(agent) ||
-        !sessionID ||
-        (options.shouldInject && !options.shouldInject(sessionID))
-      ) {
+      const { sessionID } = lastUserMessage.info;
+      if (!sessionID) {
         return;
       }
 
@@ -63,7 +55,7 @@ export function createPhaseReminderHook(options: PhaseReminderOptions = {}) {
       for (const message of messages) {
         if (
           !isUserMessageWithParts(message) ||
-          message.info.agent !== 'orchestrator' ||
+          !isPrimaryAgentName(message.info.agent) ||
           message.info.sessionID !== sessionID
         ) {
           continue;

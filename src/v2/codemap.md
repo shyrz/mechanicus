@@ -6,9 +6,40 @@ OpenCode v2 (`opencode2`) host adapter. Bridges the existing v1 plugin factory
 into v2's promise-plugin transform/runtime-hook API so a single published
 package runs on both hosts.
 
+The context bridge places one ephemeral cache breakpoint on the last stable
+content part after phase-reminder or board injection. Historical injected
+parts and the volatile trailing board do not each receive cache hints. The
+target part is copied, and breakpoint placement has no shared request state.
+
+Missing user-message agent attribution is reconstructed from durable
+`agent-switched` history markers, preserving historical reminders through
+agent switches and plugin restarts. Host-provided agent fields take precedence.
+One stored-history read also serves native-delivery timestamp projection; it
+is skipped when both enrichments are unnecessary. Failed reads or unmapped
+history segments fall back to the current event or prompt-bridge agent.
+
+The v2 interview bridge uses the frozen `RuntimeConfig` snapshot loaded by the
+shared plugin factory, avoiding a second configuration file read during setup.
+
+Foreground fallback sends only an internal retry reminder after confirming
+the user request exists in history. The client shim switches models first,
+then uses `session.synthetic` where available; reduced hosts retain the prompt
+route. Original user text, attachment parts and their IDs are not resubmitted.
+
 v2 loads `default.setup(ctx)` (v1 loads `default.server`). `setup` wraps the v1
 factory to reuse all build logic, then translates the returned v1 `Hooks` into
 v2 registrations. v1 behavior is unchanged.
+
+Capable v2 hosts also persist versioned per-session preset snapshots in Host
+KV. `/preset <name>` affects only future native child inference. A creation
+barrier binds the child before its first prompt; request options use the
+context hook's `options` surface. Existing children retain their execution
+snapshot and fallback chain, while v1 and global TUI disk switching stay
+unchanged. Agentless native resumes bypass managed-board relaunch guards and
+retain the existing child's inference rather than consuming a launch
+admission. This guard is only reachable on hosts whose tool schema admits
+that input; OpenCode v2.2.5 requires `agent` and `description` for native
+resumes and rejects the agentless form before plugin hooks.
 
 ## Entry Points
 
@@ -21,11 +52,13 @@ v2 registrations. v1 behavior is unchanged.
 | `client-shim.ts` | `buildPluginInput`: constructs a v1-shaped `PluginInput` with a **real-delegation** client — v1 SDK call shapes translate to v2 flat session calls (`get`, `interrupt` — abort sends `resume: false`, `context`, `prompt` with `delivery:"steer"`, `update` for renames — `{sessionID, title}`), with honest degradation (log or omit) where the host lacks the method. `resolveV2Directory` prefers `ctx.location.directory` (#45403+) with a `process.cwd()` fallback. `promptAsync` encapsulates the v2 model-switch semantics (`switchModel` before the prompt) and accepts an optional `delivery` argument (default `"steer"` for the foreground-fallback replay; the orchestrator-wake scheduler passes `"queue"` to match v1's queued prompt_async) plus an optional `modelSwitch: 'required'` argument (foreground-fallback: a host without `session.switchModel` rejects the replay with a typed `V2SwitchModelUnavailableError` instead of silently replaying on the failed model; pin-callers keep the logged steer) and an optional `modelVariant` argument (wake model pin: folded into the `switchModel` ref so the host keeps the session's reasoning-effort variant; a variant-less pin that already matches the session's current model — checked via `session.get` at delivery time, fail-soft — skips `switchModel` entirely so variant-less pins from any internal caller can no longer reset the reasoning-effort variant to default; explicit variants and cross-model pins still switch). A failing `switchModel` degrades to steering on the current model — logged, with `switched: false` attached to the result so foreground-fallback can gate its switch bookkeeping on the truth (#1125); internal-initiator body parts (wake prompts) route through `session.synthetic` when the host provides it (`resume: true`, same `delivery`, metadata carried, client-chosen `msg_`-prefixed admission id recorded in `internal-admissions.ts` so the chat-headers bridge can classify the wake) so the wake text stays model-visible without being persisted/rendered as a user bubble — without it they map to prompt `metadata` so the session-prompt bridge can restore the v1 part marker (degraded host: visible wake message). `session.list` maps v2 `Session.Info` to the v1 `{data}` envelope including `outcome`/`time.updated`/`directory` (interview dashboard scan + orchestrator-wake children enumeration). Marks the input `hostFlavor: 'v2'` (multiplexer gating and wake-mode resolution in `src/index.ts` / `src/hooks/orchestrator-wake/`) and threads the probed `generate.text` channel as `experimental_v2`. Never fakes success shapes (no invented `serverUrl`). |
 | `internal-admissions.ts` | Bounded tracker of internal-initiator admissions (`recordInternalAdmission`/`isInternalAdmission` + `createInternalSyntheticMessageID`): the in-band marker source for the chat-headers bridge on v2 (prompt-metadata admissions recorded by the session-prompt bridge; synthetic admissions recorded by the client shim with the client-chosen id the v2 `Session.synthetic` endpoint honors and preserves on the LLM context message). |
 | `delegation.ts` | v2↔v1 delegation tool normalization: `toolNameToV1` (`subagent`→`task`), `subagentArgsToV1` (`agent`→`subagent_type`, `sessionID`→`task_id`), `v1ArgsToSubagent` (reverse). Lets the whole v1 pipeline (task-session-manager, job board, `task_*` tools) run on v2's host `subagent` tool with zero changes. |
-| `event-adapter.ts` | `mapV2EventToV1`: additive-only v2→v1 event synthesis for the event pump. Raw event always first (interview bridge consumes it); payload is read from the live wire key `data` (`{id, created, type, location?, durable?, metadata?, data}` — verified live on v2 hosts) with `properties` as the legacy/test fallback, while every synthesized shape writes `properties` (what the v1 consumers read). Syntheses: `session.execution.*` → v1 busy/idle/error lifecycle shapes, flat child `session.created` → v1 early-registration `{info:{id,parentID,agent?}}`, usage telemetry (`session.usage.updated`/`session.step.ended`) → deduplicated completed-assistant `message.updated` (deterministic fingerprint id; no wall-clock/randomness). |
+| `event-adapter.ts` | `mapV2EventToV1`: additive-only v2→v1 event synthesis for the event pump. Raw event always first (interview bridge consumes it); payload is read from the live wire key `data` (`{id, created, type, location?, durable?, metadata?, data}` — verified live on v2 hosts) with `properties` as the legacy/test fallback, while every synthesized shape writes `properties` (what the v1 consumers read). Syntheses: `session.execution.*` → v1 busy/idle/error lifecycle shapes, flat child `session.created` → v1 early-registration `{info:{id,parentID,agent?}}`, per-request `session.step.ended` telemetry → completed-assistant `message.updated` deduplicated by `assistantMessageID` (cumulative `session.usage.updated` stays passthrough-only). |
 | `tui.ts` | v2 TUI plugin entry (`./tui` export → `dist/tui2.js`): re-exports the v1 dual-contract TUI (`../tui`) and extends its v2 `setup` with the `/preset` keymap flow. The layer registers from an `append: "app"` slot render because the host's `keymap.layer` is provider-scoped (calling it from `setup` throws `Keymap.Provider is missing`), using the host's thunk + full command schema (`id`, `palette`, `slash.arguments`); feedback via `ui.toast.show`; persists via `switchPresetOnDisk`; `/preset <name>` fast path. Capability-guarded: hosts without `ui.slot`/`keymap.layer` keep the sidebar and lose only `/preset`; the interactive picker additionally needs `ui.dialog.select`. |
 | `adapters.ts` | Shape adapters: `parseModelRef`, `adaptPermissions` (v1 map → v2 Rule[] + v2 permissive base + `task`→`subagent`/`bash`→`execute` mapping), `rewritePromptForV2` (`task(`→`subagent(`), `adaptTool`, `applyAgentToDraft`. |
 | `interview-bridge.ts` | v2-only `/interview` marker command, trailing-message context bridge, v2 interview runtime, and per-session transcript projections. |
 | `setup-command.test.ts` | Unit tests for the command marker helpers, add-only draft registration, the shared submit helper, and the merged context-hook seam. |
+| `session-preset-command.ts` | Non-TUI `/preset` list/apply command. Uses the session store and truthful command-error feedback; no prompt or provider turn. |
+| `session-preset-store.ts` | Versioned Host KV snapshots, identity/directory/parent checks, per-session serialization, bounded operations, child model capture and request-option application. |
 
 ## Data Flow
 

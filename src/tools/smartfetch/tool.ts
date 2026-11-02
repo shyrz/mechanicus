@@ -136,6 +136,7 @@ export function createWebfetchTool(
           prompt: args.prompt,
         },
       });
+      ctx.abort.throwIfAborted();
 
       const timeoutMs = Math.min(
         (args.timeout ?? DEFAULT_TIMEOUT_SECONDS) * 1000,

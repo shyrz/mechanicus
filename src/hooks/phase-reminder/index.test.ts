@@ -10,6 +10,46 @@ import {
 } from './index';
 
 describe('createPhaseReminderHook', () => {
+  test('uses the canonical primary name as well as its legacy alias', async () => {
+    const hook = createPhaseReminderHook();
+    const output = {
+      messages: [
+        {
+          info: { role: 'user', agent: 'omnissiah', sessionID: 's1' },
+          parts: [{ type: 'text', text: 'canonical turn' }],
+        },
+      ],
+    };
+
+    await hook['experimental.chat.messages.transform']({}, output);
+
+    expect(output.messages[0].parts[1]?.text).toBe(PHASE_REMINDER);
+  });
+
+  test('reconstructs historical primary reminders after switching to a specialist', async () => {
+    const hook = createPhaseReminderHook();
+    const historical = {
+      info: { role: 'user', agent: 'orchestrator', sessionID: 's1' },
+      parts: [{ type: 'text', text: 'first turn' }],
+    };
+    const initial = { messages: [structuredClone(historical)] };
+    await hook['experimental.chat.messages.transform']({}, initial);
+    const switched = {
+      messages: [
+        structuredClone(historical),
+        {
+          info: { role: 'user', agent: 'magos', sessionID: 's1' },
+          parts: [{ type: 'text', text: 'specialist turn' }],
+        },
+      ],
+    };
+
+    await hook['experimental.chat.messages.transform']({}, switched);
+
+    expect(switched.messages[0].parts).toEqual(initial.messages[0].parts);
+    expect(switched.messages[1].parts).toHaveLength(1);
+  });
+
   test('appends reminder as a separate part for orchestrator sessions', async () => {
     const hook = createPhaseReminderHook();
     const output = {

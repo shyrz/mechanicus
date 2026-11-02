@@ -27,7 +27,7 @@ Centralized utilities and shared abstractions used across the mechanicus plugin.
 
 - **BackgroundTaskConcurrency** (`background-task-concurrency.ts`): Process-local admission scheduler for native background tasks. Tracks queued tickets and active provider/model capacity without owning Job Board lifecycle state.
 
-- **Runtime Session Status** (`session-runtime-status.ts`): Reads and validates the in-process OpenCode session-status map once per observation (5s bounded timeout). It distinguishes a valid absent session (`idle`) from malformed data or lookup failure (`unknown`) so lifecycle policy never treats schema drift as completion.
+- **Runtime Session Status** (`session-runtime-status.ts`): Reads and validates the in-process OpenCode session-status map once per observation (5s bounded timeout). It distinguishes a valid absent session (`idle`) from malformed data or lookup failure (`unknown`) so lifecycle policy never treats schema drift as completion. The terminal gate uses the same bounded reader to re-arm a direct observation when a rehydrate probe had no valid initial snapshot.
 
 - **Session Metadata** (`session-metadata.ts`): `SessionMetadataStore` — bounded session → agent/directory map with LRU eviction that never evicts active orchestrator sessions.
 
@@ -38,6 +38,7 @@ Centralized utilities and shared abstractions used across the mechanicus plugin.
 - **Logger** (`logger.ts`): File-based logging with 7-day retention, automatic directory creation, and write queuing. Logs are written to `~/.local/share/opencode/log/mechanicus.<sessionId>.log` and cleaned up on initialization.
 
 - **Session Utilities** (`session.ts`): Timeout handling, session abort coordination, model reference parsing, and session content extraction. Provides `promptWithTimeout` and `extractSessionResult` for safe session operations.
+- **Child Transcript Evidence** (`child-transcript.ts`): Bounded-result extraction for child histories, including recognition of completed v1 rounds when migrated history has no v2 lifecycle fields. Pending and malformed evidence stays non-terminal.
 
 - **Task Utilities** (`task.ts`): XML-inspired task output parsing for extracting task IDs, states, and results from tool output strings. Used for resumption and status tracking.
 

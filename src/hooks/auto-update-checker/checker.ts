@@ -6,6 +6,7 @@ import {
   stripJsonComments,
 } from '../../cli/config-manager';
 import { getTuiConfig, getTuiConfigJsonc } from '../../cli/paths';
+import { resolveConfigWritePath } from '../../cli/write-path';
 import { INSTALLER_MANAGED_PLUGIN_OPTION } from '../../plugin-entry';
 import { log } from '../../utils/logger';
 import {
@@ -531,13 +532,15 @@ export function updateInstallerManagedVersions(
 ): boolean {
   try {
     const paths = [
-      ...getConfigPaths(directory),
-      ...getOpenCodeConfigPaths(),
-      getTuiConfig(),
-      getTuiConfigJsonc(),
-    ]
-      .filter((value, index, values) => values.indexOf(value) === index)
-      .filter((configPath) => fs.existsSync(configPath));
+      ...new Set(
+        [
+          ...getConfigPaths(directory),
+          ...getOpenCodeConfigPaths(),
+          getTuiConfig(),
+          getTuiConfigJsonc(),
+        ].map(resolveConfigWritePath),
+      ),
+    ].filter((configPath) => fs.existsSync(configPath));
     const newEntry = `${PACKAGE_NAME}@${newVersion}`;
     const updates = paths.flatMap((configPath) => {
       const content = fs.readFileSync(configPath, 'utf-8');
@@ -561,10 +564,10 @@ export function updateInstallerManagedVersions(
     });
     if (updates.length === 0) return false;
     const token = `${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2)}`;
-    for (const update of updates)
-      fs.writeFileSync(`${update.configPath}.${token}.tmp`, update.updated);
     const committed: typeof updates = [];
     try {
+      for (const update of updates)
+        fs.writeFileSync(`${update.configPath}.${token}.tmp`, update.updated);
       for (const update of updates) {
         fs.renameSync(`${update.configPath}.${token}.tmp`, update.configPath);
         committed.push(update);
@@ -576,6 +579,15 @@ export function updateInstallerManagedVersions(
         fs.renameSync(restorePath, update.configPath);
       }
       throw err;
+    } finally {
+      for (const update of updates) {
+        try {
+          fs.rmSync(`${update.configPath}.${token}.tmp`, { force: true });
+          // A failed rollback leaves the only copy of the original bytes.
+        } catch {
+          // Cleanup must not mask the update or rollback error.
+        }
+      }
     }
     return true;
   } catch (err) {

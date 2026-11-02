@@ -14,13 +14,16 @@
  * (agent/tool/mcp/command) stay independently try/catch-guarded.
  */
 
+import { mergeAgentOverrides } from '../config/agent-overrides';
 import { AGENT_ALIASES } from '../config/constants';
 import { loadPluginConfig } from '../config/loader';
+import { resolvePreset } from '../config/presets';
+import { RuntimeConfig } from '../config/runtime';
+import type { PluginConfig } from '../config/schema';
 import { InterviewConfigSchema } from '../config/schema';
 import {
-  runWithSyntheticPartCacheHintScope,
-  type SyntheticPartCacheHint,
-  setDefaultSyntheticPartCacheHint,
+  isTaggedPart,
+  isVolatileTaggedMessage,
   stripTaggedContent,
 } from '../hooks/cache-safe-injection';
 import {
@@ -38,7 +41,7 @@ import {
 } from '../utils/background-job-persistence';
 import { INTERNAL_INITIATOR_METADATA_KEY } from '../utils/internal-initiator';
 import { initLogger, log } from '../utils/logger';
-import { adaptTool, applyAgentToDraft } from './adapters';
+import { adaptTool, applyAgentToDraft, parseModelRef } from './adapters';
 import {
   buildPluginInput,
   resetClientShimGenerationWarnings,
@@ -51,6 +54,12 @@ import {
   recordInternalAdmission,
 } from './internal-admissions';
 import { createV2InterviewBridge } from './interview-bridge';
+import { createSessionPresetCommand } from './session-preset-command';
+import {
+  applySessionPresetOptions,
+  createSessionPresetStore,
+  type SessionPresetBundle,
+} from './session-preset-store';
 import {
   createSessionSubmit,
   textFromContent,
@@ -248,6 +257,11 @@ export interface V2SessionContextHandlerDeps {
    * transcript user messages the v1 injection gates key on when the
    * context event itself carries no agent. */
   knownAgentForSession?: (sessionID: string) => string | undefined;
+  /** Stored transcript, including durable agent switches. Used to reconstruct
+   * historical agent attribution and observer-visible delivery times. */
+  sessionContext?: (
+    sessionID: string,
+  ) => Promise<Array<Record<string, unknown>>>;
   /** v1 `experimental.chat.system.transform` hook. */
   systemTransform?: (
     input: unknown,
@@ -260,10 +274,41 @@ export interface V2SessionContextHandlerDeps {
       messages: Array<{ info: { role: string }; parts: unknown[] }>;
     },
   ) => Promise<void>;
-  /** CacheHint stamped on parts injected while the bridged messages
-   * transform runs (v2 ContentPart.cache; v1 bytes never change — see
-   * cache-safe-injection). */
-  syntheticPartCacheHint?: SyntheticPartCacheHint;
+  /** Request-scoped inference only; no system/message/tool mutation. */
+  applySessionPreset?: (event: V2SessionContextEvent) => void;
+}
+
+/** Reconstruct attribution from durable switches without retaining process state. */
+function attributeAgentsByHistory(
+  history: ReadonlyArray<Record<string, unknown>> | undefined,
+): Map<string, string> {
+  const attribution = new Map<string, string>();
+  let current: string | undefined;
+  let segment: string[] = [];
+
+  for (const entry of history ?? []) {
+    if (!isRecord(entry)) continue;
+    if (entry.type === 'agent-switched') {
+      const seed =
+        current ??
+        (typeof entry.previous === 'string' && entry.previous
+          ? entry.previous
+          : undefined);
+      if (seed !== undefined) {
+        for (const id of segment) attribution.set(id, seed);
+      }
+      segment = [];
+      if (typeof entry.agent === 'string' && entry.agent) {
+        current = entry.agent;
+      }
+    } else if (entry.type === 'user' && typeof entry.id === 'string') {
+      segment.push(entry.id);
+    }
+  }
+  if (current !== undefined) {
+    for (const id of segment) attribution.set(id, current);
+  }
+  return attribution;
 }
 
 /** Build the single `ctx.session.hook("context")` handler: interview marker
@@ -273,6 +318,7 @@ export function createSessionContextHandler(
   deps: V2SessionContextHandlerDeps,
 ): (event: V2SessionContextEvent) => Promise<void> {
   return async (event) => {
+    deps.applySessionPreset?.(event);
     // Interview marker bridge (transcript projection + /interview).
     try {
       await deps.interviewHandleContext(event);
@@ -357,10 +403,31 @@ export function createSessionContextHandler(
       // bridged v1 injection gates (phase-reminder, background-job-board,
       // post-file-tool-nudge) key on user-message info.sessionID /
       // info.agent — without this stamp every injection skips on v2.
-      // Metadata-only (envelope fields; parts/content bytes untouched)
-      // and strictly absence-gated: host-provided values always win.
-      // Idempotent across context events — a message stamped once never
-      // qualifies for stamping again.
+      // Rebuild per-message attribution from durable switch markers. Only
+      // missing envelope fields are stamped; host-provided identity wins.
+      // One stored-history read also serves native delivery-time projection.
+      let storedHistory: Array<Record<string, unknown>> | undefined;
+      if (
+        event.messages.some(
+          (message) =>
+            message.role === 'user' &&
+            (message.agent === undefined ||
+              (!('time' in message) &&
+                message.content.some(
+                  (part) =>
+                    part.type === 'text' &&
+                    typeof part.text === 'string' &&
+                    part.text.startsWith('<subagent sessionID="'),
+                ))),
+        )
+      ) {
+        try {
+          storedHistory = await deps.sessionContext?.(event.sessionID);
+        } catch (err) {
+          log('[v2] session context identity read failed', String(err));
+        }
+      }
+      const attribution = attributeAgentsByHistory(storedHistory);
       const knownAgent =
         typeof event.agent === 'string' && event.agent
           ? event.agent
@@ -370,42 +437,77 @@ export function createSessionContextHandler(
         if (message.sessionID === undefined) {
           message.sessionID = event.sessionID;
         }
-        if (message.agent === undefined && knownAgent) {
-          message.agent = knownAgent;
+        if (message.agent === undefined) {
+          const attributed = message.id
+            ? attribution.get(message.id)
+            : undefined;
+          const agent = attributed ?? knownAgent;
+          if (agent !== undefined) message.agent = agent;
         }
       }
-      // CacheHint tagging (v2-only): parts injected through
-      // cache-safe-injection while the bridged transform runs carry an
-      // ephemeral cache hint (v2 ContentPart.cache), so providers cap the
-      // injected zone's cache contribution. Scoped set/restore inside an
-      // isolated AsyncLocalStorage hint scope — the v2 host serves
-      // different sessions' requests concurrently, so a shared module
-      // default could be restored by one session's transform while
-      // another's is still injecting. The v1 pipeline never executes
-      // inside this wrapper, so v1 payload bytes never change (pinned by
-      // the v1 snapshot/property suites).
-      const messagesTransform = deps.messagesTransform;
-      await runWithSyntheticPartCacheHintScope(async () => {
-        const restoreCacheHint = deps.syntheticPartCacheHint
-          ? setDefaultSyntheticPartCacheHint(deps.syntheticPartCacheHint)
-          : undefined;
-        try {
-          const v1messages = event.messages.map((m) => ({
-            info: m,
-            parts: m.content,
-          }));
-          await messagesTransform({}, { messages: v1messages });
-          event.messages = v1messages.map((m) => {
-            const info = m.info as { content?: unknown };
-            info.content = m.parts;
-            return m.info;
-          }) as V2SessionContextEvent['messages'];
-        } catch (err) {
-          log('[v2] messages transform bridge failed', String(err));
-        } finally {
-          restoreCacheHint?.();
+      try {
+        const storedDeliveries = new Map(
+          storedHistory
+            ?.filter(
+              (entry) =>
+                entry.type === 'synthetic' &&
+                typeof entry.id === 'string' &&
+                typeof entry.text === 'string' &&
+                entry.text.startsWith('<subagent sessionID="') &&
+                entry.time !== undefined,
+            )
+            .map((entry) => [entry.id, entry]) ?? [],
+        );
+        const projectedTimes = new WeakSet<object>();
+        const v1messages = event.messages.map((message) => {
+          const stored = storedDeliveries.get(message.id);
+          const matches =
+            message.role === 'user' &&
+            !('time' in message) &&
+            stored &&
+            message.content.some(
+              (part) => part.type === 'text' && part.text === stored.text,
+            );
+          const info = matches ? { ...message, time: stored.time } : message;
+          if (matches) projectedTimes.add(info);
+          return { info, parts: message.content };
+        });
+        await deps.messagesTransform({}, { messages: v1messages });
+        event.messages = v1messages.map((m) => {
+          const info = m.info as { content?: unknown; time?: unknown };
+          if (projectedTimes.has(info)) delete info.time;
+          info.content = m.parts;
+          return m.info;
+        }) as V2SessionContextEvent['messages'];
+        // Keep one manual breakpoint after stable content. Historical
+        // reminders and the changing board must not spend extra cache slots.
+        const hasInjection = event.messages.some((message) =>
+          message.content.some(
+            (part) =>
+              isTaggedPart(part, PHASE_REMINDER_METADATA_KEY) ||
+              isTaggedPart(part, BACKGROUND_JOB_BOARD_METADATA_KEY),
+          ),
+        );
+        if (hasInjection) {
+          const target = event.messages.findLast(
+            (message) =>
+              message.content.length > 0 &&
+              !isVolatileTaggedMessage(
+                { info: message, parts: message.content },
+                BACKGROUND_JOB_BOARD_METADATA_KEY,
+              ),
+          );
+          if (target) {
+            const index = target.content.length - 1;
+            target.content[index] = {
+              ...target.content[index],
+              cache: { type: 'ephemeral' },
+            };
+          }
         }
-      });
+      } catch (err) {
+        log('[v2] messages transform bridge failed', String(err));
+      }
     }
   };
 }
@@ -1189,6 +1291,16 @@ export function createToolExecuteBridges(
       ) => Promise<void>)
     | undefined,
   after: ((i: unknown, o: unknown) => Promise<void>) | undefined,
+  onDelegation?: (input: {
+    agentType: string;
+    parentSessionID: string;
+    callID: string;
+    args: Record<string, unknown>;
+  }) => Promise<void>,
+  nativeContinuation?: (input: {
+    parentSessionID: string;
+    taskID: string;
+  }) => Promise<void>,
 ): V2ToolBridgeEvents {
   const beforeBridge = async (
     event: Record<string, unknown> & { input: unknown },
@@ -1196,6 +1308,21 @@ export function createToolExecuteBridges(
     if (!before) return;
     const e = event as unknown as V2ToolBeforeEvent;
     const isDelegation = e.tool.toLowerCase() === 'subagent';
+    if (
+      isDelegation &&
+      isRecord(e.input) &&
+      typeof e.input.sessionID === 'string' &&
+      e.input.agent === undefined &&
+      nativeContinuation
+    ) {
+      // The host owns a native continuation; it is not a managed-board
+      // relaunch and does not consume a creation admission.
+      await nativeContinuation({
+        parentSessionID: e.sessionID,
+        taskID: e.input.sessionID,
+      });
+      return;
+    }
     const argsView = isDelegation
       ? subagentArgsToV1(e.input)
       : { ...(e.input as object) };
@@ -1206,6 +1333,19 @@ export function createToolExecuteBridges(
       { tool: toolNameToV1(e.tool), sessionID: e.sessionID, callID: e.id },
       out,
     );
+    if (isDelegation) {
+      const args = out.args as Record<string, unknown>;
+      const agentType =
+        typeof args.subagent_type === 'string' ? args.subagent_type : '';
+      if (agentType) {
+        await onDelegation?.({
+          agentType,
+          parentSessionID: e.sessionID,
+          callID: e.id,
+          args,
+        });
+      }
+    }
     // Hooks like apply-patch replace output.args with recovered/normalized
     // arguments; write back (translated back to v2 names for delegation)
     // so v2 executes the repaired input instead of the original.
@@ -1450,7 +1590,7 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
     // own semantics.
     try {
       const interviewConfig = InterviewConfigSchema.parse(
-        loadPluginConfig(directory).interview ?? {},
+        RuntimeConfig.get(directory).plugin?.interview ?? {},
       );
       const interviewBridge = createV2InterviewBridge(ctx, interviewConfig);
       disposers.push(() => interviewBridge.dispose());
@@ -1487,6 +1627,127 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
       if (!resolvedAgents) {
         resolvedAgents =
           (v1Hooks.agent as Record<string, Record<string, unknown>>) ?? {};
+      }
+
+      const primaryModel = (value: unknown) => {
+        const first = Array.isArray(value) ? value[0] : value;
+        return typeof first === 'string'
+          ? first
+          : isRecord(first) && typeof first.id === 'string'
+            ? first.id
+            : undefined;
+      };
+      const primaryVariant = (value: unknown) => {
+        const first = Array.isArray(value) ? value[0] : undefined;
+        return isRecord(first) && typeof first.variant === 'string'
+          ? first.variant
+          : undefined;
+      };
+      const bundleFor = (config: PluginConfig, name: string | null) => {
+        const preset = name
+          ? resolvePreset(name, config.presets ?? {})
+          : undefined;
+        const effective = mergeAgentOverrides(
+          preset ?? {},
+          config.agents ?? {},
+        );
+        const profiles: SessionPresetBundle['profiles'] = {};
+        const chains: SessionPresetBundle['chains'] = {};
+        for (const [agent, override] of Object.entries(effective)) {
+          const id = primaryModel(override.model);
+          const parsed = id ? parseModelRef(id) : undefined;
+          const variant = override.variant ?? primaryVariant(override.model);
+          const model = parsed
+            ? { ...parsed, ...(variant ? { variant } : {}) }
+            : undefined;
+          if (Array.isArray(override.model)) {
+            chains[agent] = override.model.flatMap((entry) =>
+              typeof entry === 'string'
+                ? [entry]
+                : typeof entry.id === 'string'
+                  ? [entry.id]
+                  : [],
+            );
+          }
+          profiles[agent] = {
+            ...(model ? { model } : {}),
+            ...(typeof override.temperature === 'number'
+              ? { temperature: override.temperature }
+              : {}),
+            ...(override.options ? { options: override.options } : {}),
+            managedOptionKeys: [
+              ...new Set([
+                ...Object.keys(override.options ?? {}),
+                ...Object.keys(config.agents?.[agent]?.options ?? {}),
+                ...(resolvedAgents?.[agent]?.options &&
+                isRecord(resolvedAgents[agent].options)
+                  ? Object.keys(resolvedAgents[agent].options)
+                  : []),
+              ]),
+            ].sort(),
+            ...(override.inheritModelFrom
+              ? { inheritModelFrom: override.inheritModelFrom }
+              : {}),
+          };
+        }
+        return {
+          presetName: name,
+          fallbackEnabled: config.fallback?.enabled !== false,
+          profiles,
+          chains,
+        };
+      };
+      const initialConfig = RuntimeConfig.get(directory).plugin ?? {};
+      const currentBundle = (() => {
+        const runtime = RuntimeConfig.get(directory);
+        const config = { ...initialConfig, agents: runtime.agents() };
+        try {
+          return bundleFor(config, runtime.preset ?? null);
+        } catch {
+          // The loader already warned and retained explicit root agents.
+          // A broken disk default must not disable the whole v2 setup.
+          return bundleFor(config, null);
+        }
+      })();
+      const presets = createSessionPresetStore({
+        ctx,
+        directory,
+        current: () => currentBundle,
+        named: async (name) =>
+          bundleFor(
+            loadPluginConfig(directory, {
+              silent: true,
+              expandPreset: false,
+            }),
+            name,
+          ),
+        agents: new Set(Object.keys(resolvedAgents)),
+      });
+      disposers.push(() => presets.dispose());
+      const setResolver = v1Hooks['v2.setSessionTeamResolver'] as
+        | ((resolver: (id: string) => SessionPresetBundle | undefined) => void)
+        | undefined;
+      setResolver?.((id) => {
+        const record = presets.peek(id);
+        return record?.parentID
+          ? (record.execution ?? record.bundle)
+          : undefined;
+      });
+      if (presets.available) {
+        try {
+          const reg = await ctx.command.transform((draft) => {
+            draft.add(
+              createSessionPresetCommand({
+                directory,
+                read: (id) => presets.state(id),
+                apply: (id, name) => presets.apply(id, name),
+              }),
+            );
+          });
+          disposers.push(() => reg.dispose());
+        } catch (err) {
+          log('[v2] session preset command registration failed', String(err));
+        }
       }
 
       // ── Agents ──
@@ -1666,7 +1927,11 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
       let promptBridge: V2SessionPromptBridge | undefined;
       if (chatMessage) {
         const bridge = createSessionPromptBridge(chatMessage);
-        const promptReg = await ctx.session.hook('prompt', bridge.handlePrompt);
+        const promptReg = await ctx.session.hook('prompt', async (event) => {
+          const admission = await presets.ensure(event.sessionID, event.signal);
+          await presets.capture(event.sessionID, admission);
+          await bridge.handlePrompt(event);
+        });
         disposers.push(() => promptReg.dispose());
         promptBridge = bridge;
         log('[v2] native session prompt hook registered');
@@ -1691,9 +1956,10 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
           promptBridge?.agentForSession(sessionID),
         systemTransform,
         messagesTransform,
-        // v2 ContentPart cache hint for parts injected by the bridged
-        // transforms (v1 bytes never change — see the handler).
-        syntheticPartCacheHint: { type: 'ephemeral' },
+        sessionContext: async (sessionID) =>
+          (await ctx.session.context?.({ sessionID })) ?? [],
+        applySessionPreset: (event) =>
+          applySessionPresetOptions(event, presets.profile(event.sessionID)),
       });
       const reg = await ctx.session.hook('context', handler);
       disposers.push(() => reg.dispose());
@@ -1736,7 +2002,124 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
         const after = v1Hooks['tool.execute.after'] as
           | ((i: unknown, o: unknown) => Promise<void>)
           | undefined;
-        const bridges = createToolExecuteBridges(before, after);
+        const captures = new Map<
+          string,
+          {
+            bundle: SessionPresetBundle;
+            execution: SessionPresetBundle;
+            parentID: string;
+          }
+        >();
+        const maxCaptures = 256;
+        disposers.push(() => captures.clear());
+        let wrapperReady = false;
+        const bridges = createToolExecuteBridges(
+          before,
+          after,
+          async ({ agentType, parentSessionID, callID, args }) => {
+            if (presets.available) {
+              // Native resume keeps the child's existing model. In particular,
+              // a pre-feature child has no launch snapshot to reconstruct.
+              if (typeof args.task_id === 'string') return;
+              if (!wrapperReady) {
+                throw new Error('Subagent preset creation barrier unavailable');
+              }
+              const admission = await presets.ensure(parentSessionID);
+              const bundle = admission?.record?.bundle;
+              if (!bundle) {
+                throw new Error('Parent session preset snapshot unavailable');
+              }
+              const profile = bundle.profiles[agentType];
+              // Hosts exposing a per-call model let the caller override the
+              // preset. We only read that field; the pinned host schema does
+              // not declare it, so the plugin must never synthesize it.
+              const explicitModel = (() => {
+                if (args.model === undefined) return undefined;
+                if (typeof args.model !== 'string') {
+                  throw new Error('Explicit subagent model is invalid');
+                }
+                const hash = args.model.lastIndexOf('#');
+                const ref = parseModelRef(
+                  hash < 0 ? args.model : args.model.slice(0, hash),
+                );
+                if (
+                  !ref ||
+                  (hash >= 0 && (hash === 0 || hash === args.model.length - 1))
+                ) {
+                  throw new Error('Explicit subagent model is invalid');
+                }
+                return hash < 0
+                  ? ref
+                  : { ...ref, variant: args.model.slice(hash + 1) };
+              })();
+              let resolved = explicitModel ?? profile?.model;
+              if (!explicitModel && profile?.inheritModelFrom === 'session') {
+                const parentModel = admission?.model;
+                if (
+                  !isRecord(parentModel) ||
+                  typeof parentModel.providerID !== 'string' ||
+                  typeof parentModel.id !== 'string'
+                ) {
+                  throw new Error('Inherited parent model is unavailable');
+                }
+                resolved = {
+                  providerID: parentModel.providerID,
+                  id: parentModel.id,
+                  ...(typeof parentModel.variant === 'string'
+                    ? { variant: parentModel.variant }
+                    : {}),
+                };
+              }
+              if (!resolved) {
+                const resolveDelegatedModel = v1Hooks?.[
+                  'v2.resolveDelegatedModel'
+                ] as
+                  | ((input: {
+                      agentType: string;
+                      parentSessionID: string;
+                      inheritModelFrom?: 'session' | 'orchestrator';
+                    }) => string | undefined)
+                  | undefined;
+                const id = resolveDelegatedModel?.({
+                  agentType,
+                  parentSessionID,
+                  inheritModelFrom: profile?.inheritModelFrom,
+                });
+                resolved = id ? parseModelRef(id) : undefined;
+              }
+              if (!resolved) {
+                throw new Error('Delegated session model is unavailable');
+              }
+              const execution: SessionPresetBundle = {
+                ...bundle,
+                profiles: {
+                  ...bundle.profiles,
+                  [agentType]: {
+                    ...(profile ?? { managedOptionKeys: [] }),
+                    model: resolved,
+                  },
+                },
+              };
+              const key = `${parentSessionID}:${callID}`;
+              if (!captures.has(key) && captures.size >= maxCaptures) {
+                const oldest = captures.keys().next().value;
+                if (oldest) captures.delete(oldest);
+              }
+              captures.set(key, {
+                bundle,
+                execution,
+                parentID: parentSessionID,
+              });
+            }
+          },
+          async ({ taskID }) => {
+            if (presets.available) {
+              // Resuming does not create a child or consume a launch
+              // admission. Capture its stored inference for the next prompt.
+              await presets.capture(taskID);
+            }
+          },
+        );
         if (before) {
           const reg = await ctx.tool.hook('execute.before', async (event) => {
             try {
@@ -1757,6 +2140,76 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
             }
           });
           disposers.push(() => reg.dispose());
+        }
+        if (before && presets.available) {
+          try {
+            const reg = await ctx.tool.transform((draft) => {
+              wrapperReady = false;
+              const tool = draft.get?.('subagent');
+              if (!tool?.execute || !draft.update) return;
+              const original = tool.execute;
+              draft.update('subagent', (native) => {
+                native.execute = async (input, rawContext) => {
+                  const context = rawContext as {
+                    id?: string;
+                    sessionID?: string;
+                    signal?: AbortSignal;
+                    progress?: (
+                      update: Record<string, unknown>,
+                    ) => Promise<void>;
+                  };
+                  const key = `${context.sessionID}:${context.id}`;
+                  const captured = captures.get(key);
+                  captures.delete(key);
+                  const args = input as Record<string, unknown>;
+                  if (!captured) {
+                    if (typeof args.sessionID === 'string') {
+                      // A native resume owns its existing child. It never
+                      // consumes the creation admission captured for a new
+                      // child, with or without an explicit agent field.
+                      return original(input, context);
+                    }
+                    throw new Error(
+                      'Subagent preset admission was not captured',
+                    );
+                  }
+                  if (context.signal?.aborted) {
+                    throw new Error('Subagent preset admission was cancelled');
+                  }
+                  if (typeof context.progress !== 'function') {
+                    throw new Error('Subagent creation barrier unavailable');
+                  }
+                  return original(input, {
+                    ...context,
+                    progress: async (update: Record<string, unknown>) => {
+                      if (
+                        typeof update.sessionID === 'string' &&
+                        typeof args.sessionID !== 'string'
+                      ) {
+                        await presets.bindChild({
+                          childID: update.sessionID,
+                          parentID: captured.parentID,
+                          bundle: captured.bundle,
+                          execution: captured.execution,
+                          signal: context.signal,
+                        });
+                      }
+                      await context.progress?.(update);
+                    },
+                  });
+                };
+              });
+              wrapperReady = draft.get?.('subagent')?.execute !== original;
+            });
+            disposers.push(() => reg.dispose());
+          } catch (err) {
+            log('[v2] subagent preset wrapper unavailable', String(err));
+          }
+        }
+        if (presets.available && !wrapperReady) {
+          log(
+            '[v2] subagent preset wrapper unavailable; managed delegation rejects new launches',
+          );
         }
         log('[v2] tool hooks registered', { before: !!before, after: !!after });
       } catch (err) {
@@ -1814,6 +2267,15 @@ export function createV2Setup(): (ctx: V2Context) => Promise<V2Cleanup> {
                   // Child-session permission tightening sees the same RAW
                   // event (before v1-shape synthesis) so it is independent
                   // of v1 event-hook presence.
+                  if (next.value.type === 'session.deleted') {
+                    const data = isRecord(next.value.data)
+                      ? next.value.data
+                      : isRecord(next.value.properties)
+                        ? next.value.properties
+                        : {};
+                    const id = data.sessionID ?? data.id;
+                    if (typeof id === 'string') await presets.remove(id);
+                  }
                   await permissionRulesBridge.observeSessionCreated(next.value);
                   if (eventHook) {
                     for (const ev of mapV2EventToV1(next.value)) {

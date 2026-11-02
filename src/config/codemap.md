@@ -30,6 +30,9 @@ The config system follows a layered architecture:
 | `MultiplexerConfig` | Unified pane management configuration (tmux/zellij) | schema.ts |
 | `AgentMcpPolicy` | Per-agent default MCP lists and wildcard/exclusion parsing | agent-mcps.ts |
 | `RuntimeConfig` | Per-directory runtime config singleton with derived getters, host-config snapshot, and preset/model overrides | runtime.ts |
+| `PresetInput` / `Preset` | Raw structured, inline or flat declaration / resolved agent overrides | schema.ts, presets.ts |
+| JSONC preset persistence | Field-level AST edits, comment-preserving removal, duplicate-key rejection, atomic symlink-target writes and stale-write checks | json-file.ts |
+| Project-local skills | Opt-in discovery from `.opencode/skills` and `.agents/skills`, deduplicated by frontmatter name; excludes ancestor directories and symlinked skill roots | project-skills.ts |
 
 ## Flow
 
@@ -48,7 +51,8 @@ The config system follows a layered architecture:
 
 3. Merging Phase
    ├─ User config (base) + Project config (override) → deep merge
-   ├─ Preset resolution: preset → merge preset.agents with root agents
+├─ Preset resolution: merge raw user/project declarations, expand `extends`,
+│  then merge resolved preset agents with root agents (root wins)
    ├─ Legacy tmux → multiplexer migration for backward compatibility
    └─ Normalization: companion defaults, ACP agent defaults
 
@@ -78,9 +82,10 @@ MCP permission resolution:
 Preset resolution flow:
 1. Read config.preset (e.g., "default", "minimal")
 2. Look up preset in config.presets[presetName]
-3. Merge preset.agents with config.agents (root overrides take precedence)
-4. Apply preset-specific agent overrides
-5. Resolve preset model plans for manual agents (orchestrator, oracle, etc.)
+3. Resolve the parent chain with a per-load cache and cycle/missing-parent errors
+4. Merge parent fields first, then child fields; canonicalize legacy aliases
+5. Merge resolved agents with config.agents (root overrides take precedence)
+6. Resolve preset model plans for manual agents (orchestrator, oracle, etc.)
 ```
 
 ## Integration
@@ -109,6 +114,7 @@ The config folder re-exports its public API via `src/config/index.ts`:
 export * from './constants';
 export * from './council-schema';
 export { deepMerge, loadAgentPrompt, loadPluginConfig } from './loader';
+export { resolvePreset, tryResolvePreset } from './presets';
 export * from './schema';
 export { getAcpAgentNames, getAgentOverride, getCustomAgentNames } from './utils';
 ```
@@ -124,6 +130,8 @@ This allows consumers to import directly from `src/config` rather than individua
 - `findPluginConfigPaths(directory)`: Discover user and project config file paths
 - `mergePluginConfigs(base, override)`: Deep merge two PluginConfig objects
 - `deepMerge(base, override)`: Recursively merge nested configuration objects
+- `mergePresetMaps(base, override)`: Merge user/project declarations before expansion
+- `resolvePreset(name, presets)`: Expand a complete inheritance chain without partial fallbacks
 
 ### Agent Configuration
 
@@ -153,7 +161,7 @@ This allows consumers to import directly from `src/config` rather than individua
 - `preset`: Active preset name
 - `setDefaultAgent`: Whether to set default agent model
 - `autoUpdate`: Enable automatic plugin updates
-- `presets`: Named preset groupings (map of presetName → AgentOverrideConfig)
+- `presets`: Named flat agent maps or `{extends, agents}` / inline inheritance declarations
 - `agents`: Per-agent overrides (map of agentName → AgentOverrideConfig)
 - `disabled_agents`: List of agents to disable
 - `disabled_mcps`: List of MCPs to disable
@@ -208,6 +216,7 @@ This allows consumers to import directly from `src/config` rather than individua
 - Invalid JSON → warning, fallback to empty config
 - Invalid schema → warning, fallback to empty config
 - Missing preset → warning, continue with empty preset
+- Missing parent or inheritance cycle → warning, retain root agents, no partial preset
 - Read errors (non-ENOENT) → warning, fallback to empty config
 - All warnings trigger optional `onWarning` callback for programmatic handling
 
@@ -220,3 +229,4 @@ Configuration loading is tested via:
 - `src/config/agent-mcps.test.ts`: MCP permission resolution
 - `src/config/council-schema.test.ts`: Council configuration validation
 - `src/config/runtime.test.ts`: RuntimeConfig seeding, derived getters, preset state, and host capture
+- `src/config/presets.test.ts`: Structured/inline inheritance, layered precedence, aliases and invalid chains

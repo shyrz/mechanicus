@@ -22,6 +22,15 @@ and should not be conflated.
 
 ## Continuous cache-safety tests (CI)
 
+Historical phase reminders derive eligibility from each message's agent,
+accepting both `omnissiah` and `orchestrator`. Changing the active agent does
+not remove reminders from earlier primary-agent turns. The v2 bridge reads
+durable `agent-switched` markers to reconstruct missing agent attribution;
+host-supplied attribution wins. Markerless history and unavailable reads fall
+back to the current session agent, so migrated history without markers cannot
+provide the same attribution guarantee. The local per-message reminder and
+post-file-tool nudge behavior is retained.
+
 Provider prompt caches are exact byte-prefix matches over the rendered
 request. Instead of enumerating known-good payload shapes, these suites
 assert the properties every transform must uphold, so they also catch

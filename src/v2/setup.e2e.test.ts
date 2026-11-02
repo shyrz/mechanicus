@@ -16,7 +16,7 @@
  * - Job-board side effects are observed through the board's public tool
  *   surface: the `task_status` v2 tool captured from the tool draft.
  * - Event-pump mapping is proven name-specifically via cache-monitor: only
- *   the SYNTHESIZED `message.updated` (from v2 `session.usage.updated`) can
+ *   the SYNTHESIZED `message.updated` (from v2 `session.step.ended`) can
  *   trip its bust warning, which is written to the plugin log
  *   (`OPENCODE_LOG_DIR` fixture + `flushLoggerForTesting`).
  */
@@ -51,6 +51,10 @@ interface MockCalls {
   contextHookCb:
     | ((event: Record<string, unknown>) => Promise<void>)
     | undefined;
+  promptHookCb: ((event: Record<string, unknown>) => Promise<void>) | undefined;
+  switchedModels: Array<{ sessionID: string; model: unknown }>;
+  nativeTool: CapturedTool | undefined;
+  kv: Map<string, unknown>;
   disposed: string[];
 }
 
@@ -109,11 +113,34 @@ function createEventQueue() {
   };
 }
 
-function makeMockV2Context(projectDir: string): {
+function makeMockV2Context(
+  projectDir: string,
+  options: { sessionPresets?: boolean } = {},
+): {
   ctx: V2Context;
   calls: MockCalls;
   events: ReturnType<typeof createEventQueue>;
 } {
+  const kv = new Map<string, unknown>();
+  const nativeTool: CapturedTool | undefined = options.sessionPresets
+    ? {
+        name: 'subagent',
+        execute: async (input: unknown, context: unknown) => {
+          const native = context as {
+            id: string;
+            progress: (update: Record<string, unknown>) => Promise<void>;
+          };
+          const requested = input as { sessionID?: string };
+          await native.progress({
+            sessionID:
+              requested.sessionID ??
+              `ses_${native.id.replace(/^call_/, 'child_')}`,
+            status: 'running',
+          });
+          return { content: 'native result' };
+        },
+      }
+    : undefined;
   const calls: MockCalls = {
     agentUpdates: [],
     agentDefault: undefined,
@@ -125,6 +152,10 @@ function makeMockV2Context(projectDir: string): {
     toolBeforeCb: undefined,
     toolAfterCb: undefined,
     contextHookCb: undefined,
+    promptHookCb: undefined,
+    switchedModels: [],
+    nativeTool,
+    kv,
     disposed: [],
   };
   const events = createEventQueue();
@@ -171,6 +202,10 @@ function makeMockV2Context(projectDir: string): {
           add: (toolDef: Record<string, unknown>) => {
             calls.toolAdds.push(toolDef as unknown as CapturedTool);
           },
+          get: (id: string) => (id === 'subagent' ? nativeTool : undefined),
+          update: (id: string, update: (tool: CapturedTool) => void) => {
+            if (id === 'subagent' && nativeTool) update(nativeTool);
+          },
         });
         return reg('tool.transform');
       },
@@ -201,17 +236,71 @@ function makeMockV2Context(projectDir: string): {
       },
       list: async () => [],
     },
-    // Runtime session methods deliberately ABSENT: the shim must degrade
-    // honestly without them (no fake success shapes).
+    // Runtime session methods are absent by default so the shim must degrade
+    // honestly. The preset fixture opts into the real identity/KV surface.
     session: {
       hook: async (name: 'context', cb: (event: never) => Promise<void>) => {
         calls.hooks.push(`session:${name}`);
         if (name === 'context') {
           calls.contextHookCb = cb as unknown as MockCalls['contextHookCb'];
+        } else if (name === 'prompt') {
+          calls.promptHookCb = cb as unknown as MockCalls['promptHookCb'];
         }
         return reg(`session.hook:${name}`);
       },
+      ...(options.sessionPresets
+        ? {
+            get: async ({ sessionID }: { sessionID: string }) => {
+              // The terminal observation must follow the run's last busy
+              // observation, including when the test executes synchronously.
+              await Bun.sleep(2);
+              return {
+                id: sessionID,
+                directory: projectDir,
+                agent: sessionID === 'root' ? 'omnissiah' : 'magos',
+                model: { providerID: 'mock', id: 'one', variant: 'default' },
+                outcome: 'succeeded',
+                time: { idle: Date.now() },
+                ...(sessionID === 'root' ? {} : { parentID: 'root' }),
+              };
+            },
+            switchModel: async (input: {
+              sessionID: string;
+              model: unknown;
+            }) => {
+              calls.switchedModels.push(input);
+            },
+            context: async ({ sessionID }: { sessionID: string }) =>
+              sessionID.startsWith('ses_child')
+                ? [
+                    {
+                      id: 'ses_child_result',
+                      type: 'assistant',
+                      role: 'assistant',
+                      outcome: 'completed',
+                      finish: 'stop',
+                      time: { completed: Date.now() },
+                      content: [{ type: 'text', text: 'native result' }],
+                    },
+                  ]
+                : [],
+          }
+        : {}),
     },
+    ...(options.sessionPresets
+      ? {
+          storage: {
+            get: async (key: string) => kv.get(key),
+            set: async (key: string, value: unknown) => {
+              kv.set(key, value);
+            },
+            remove: async (key: string) => {
+              kv.delete(key);
+            },
+            scan: async () => ({ entries: [] }),
+          },
+        }
+      : {}),
     mcp: {
       transform: async (cb: (draft: unknown) => void) => {
         cb({
@@ -240,15 +329,22 @@ function makeMockV2Context(projectDir: string): {
   return { ctx, calls, events };
 }
 
-/** v2 usage telemetry event (cache-monitor bust signature). */
+/** v2 per-step usage telemetry event (cache-monitor bust signature). */
+let usageSequence = 0;
 function v2UsageEvent(
   sessionID: string,
   tokens: { input: number; read: number; write?: number },
 ): Record<string, unknown> {
+  const sequence = ++usageSequence;
   return {
-    type: 'session.usage.updated',
-    properties: {
+    id: `evt_usage_${sequence}`,
+    created: sequence,
+    type: 'session.step.ended',
+    data: {
       sessionID,
+      assistantMessageID: `msg_usage_${sequence}`,
+      finish: 'stop',
+      cost: 0,
       tokens: {
         input: tokens.input,
         output: 5,
@@ -282,7 +378,9 @@ describe('createV2Setup e2e', () => {
 
   beforeEach(async () => {
     originalEnv = { ...process.env };
-    fixtureRoot = await mkdtemp('/tmp/mechanicus-v2-setup-e2e-');
+    fixtureRoot = await mkdtemp(
+      path.join('.workspace/tmp/mechanicus-v2-setup-e2e-'),
+    );
     projectDir = path.join(fixtureRoot, 'project');
     configDir = path.join(fixtureRoot, 'config');
     logDir = path.join(fixtureRoot, 'logs');
@@ -443,7 +541,7 @@ describe('createV2Setup e2e', () => {
 
     // Cache-monitor bust signature (see event-adapter.test.ts): only the
     // SYNTHESIZED message.updated events can trip the warning — the raw
-    // v2 session.usage.updated passthrough is inert in the v1 pipeline,
+    // v2 session.step.ended passthrough is inert in the v1 pipeline,
     // so this assertion is name-specific to the mapping layer.
     events.push(
       v2UsageEvent('ses_cache', { input: 8000, read: 0, write: 7000 }),
@@ -590,6 +688,281 @@ describe('createV2Setup e2e', () => {
     const logText = readPluginLog();
     expect(logText).toContain('[v2] v1 dispose hook invoked');
     expect(logText).not.toContain('[v2] v1 dispose failed');
+  }, 20_000);
+
+  test('session preset survives default expansion and reaches a native child', async () => {
+    await Bun.write(
+      path.join(configDir, 'mechanicus.json'),
+      JSON.stringify({
+        preset: 'default',
+        companion: { enabled: false },
+        agents: { omnissiah: { model: 'mock/one' } },
+        presets: {
+          default: {
+            magos: { model: 'mock/one', options: { oldOption: true } },
+          },
+          cheap: {
+            magos: {
+              model: 'mock/two',
+              temperature: 0.2,
+              options: { reasoningEffort: 'low' },
+            },
+          },
+        },
+      }),
+    );
+    const { ctx, calls, events } = makeMockV2Context(projectDir, {
+      sessionPresets: true,
+    });
+    const cleanup = await createV2Setup()(ctx);
+    try {
+      const command = calls.commandAdds.find((entry) => entry.name === 'preset')
+        ?.definition as unknown as {
+        execute: (input: {
+          sessionID: string;
+          prompt: { text: string };
+        }) => Promise<void>;
+      };
+      await expect(
+        command.execute({ sessionID: 'root', prompt: { text: 'cheap' } }),
+      ).rejects.toThrow('future child sessions');
+      const parent = calls.kv.get('session-preset/v1/root') as {
+        bundle: {
+          profiles: {
+            magos: { model: { id: string }; managedOptionKeys: string[] };
+          };
+        };
+      };
+      expect(parent.bundle.profiles.magos.model.id).toBe('two');
+      expect(parent.bundle.profiles.magos.managedOptionKeys).toContain(
+        'oldOption',
+      );
+      await expect(
+        command.execute({ sessionID: 'root', prompt: { text: '' } }),
+      ).rejects.toThrow('Session team: cheap');
+      const childID = 'ses_child_child';
+      expect(calls.kv.has(`session-preset/v1/${childID}`)).toBe(false);
+
+      const input = { agent: 'magos', description: 'd', prompt: 'p' };
+      await calls.toolBeforeCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_root_2',
+        id: 'call_child',
+        input,
+      });
+      let progressCalls = 0;
+      await calls.nativeTool?.execute(input, {
+        id: 'call_child',
+        sessionID: 'root',
+        progress: async (update: Record<string, unknown>) => {
+          progressCalls += 1;
+          expect(update.sessionID).toBe(childID);
+        },
+      });
+      expect(progressCalls).toBe(1);
+      await calls.promptHookCb?.({
+        sessionID: childID,
+        messageID: 'msg_child',
+        prompt: { text: 'p' },
+      });
+      expect(calls.switchedModels.at(-1)).toEqual({
+        sessionID: childID,
+        model: { providerID: 'mock', id: 'two' },
+      });
+      const event = {
+        sessionID: childID,
+        agent: 'magos',
+        model: { providerID: 'mock', id: 'two' },
+        options: { maxTokens: 100, oldOption: true },
+        system: [],
+        messages: [],
+        tools: {},
+      };
+      await calls.contextHookCb?.(event);
+      expect(event.options).toEqual({
+        maxTokens: 100,
+        temperature: 0.2,
+        reasoningEffort: 'low',
+      });
+      await calls.toolAfterCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_root_2',
+        id: 'call_child',
+        input,
+        status: 'completed',
+        result: {
+          content: `The subagent is working in the background (sessionID: ${childID}).`,
+        },
+      });
+
+      await calls.toolBeforeCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_root_3',
+        id: 'call_explicit',
+        input: { ...input, model: 'mock/three#high' },
+      });
+      await calls.nativeTool?.execute(
+        { ...input, model: 'mock/three#high' },
+        {
+          id: 'call_explicit',
+          sessionID: 'root',
+          progress: async () => {},
+        },
+      );
+      const explicit = calls.kv.get('session-preset/v1/ses_child_explicit') as {
+        execution: {
+          profiles: { magos: { model: Record<string, string> } };
+        };
+      };
+      expect(explicit.execution.profiles.magos.model).toEqual({
+        providerID: 'mock',
+        id: 'three',
+        variant: 'high',
+      });
+
+      // Rejection occurs before native execution; an invalid explicit model
+      // must never fall back to the selected preset.
+      await expect(
+        calls.toolBeforeCb?.({
+          tool: 'subagent',
+          sessionID: 'root',
+          agent: 'omnissiah',
+          messageID: 'msg_root_4',
+          id: 'call_invalid',
+          input: { ...input, model: 'not-a-model-ref' },
+        }),
+      ).rejects.toThrow('Explicit subagent model is invalid');
+      await expect(
+        calls.nativeTool?.execute(
+          { ...input, model: 'not-a-model-ref' },
+          {
+            id: 'call_invalid',
+            sessionID: 'root',
+            progress: async () => {},
+          },
+        ),
+      ).rejects.toThrow('not captured');
+
+      for (let index = 0; index < 256; index += 1) {
+        await calls.toolBeforeCb?.({
+          tool: 'subagent',
+          sessionID: 'root',
+          agent: 'omnissiah',
+          messageID: `msg_bounded_${index}`,
+          id: `bounded_${index}`,
+          input,
+        });
+      }
+      await calls.toolBeforeCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_bounded_256',
+        id: 'bounded_256',
+        input,
+      });
+      await expect(
+        calls.nativeTool?.execute(input, {
+          id: 'bounded_0',
+          sessionID: 'root',
+          progress: async () => {},
+        }),
+      ).rejects.toThrow('not captured');
+      await calls.toolAfterCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_root_2',
+        id: 'call_child',
+        input,
+        status: 'completed',
+        result: {
+          content: `The subagent is working in the background (sessionID: ${childID}).`,
+        },
+      });
+      await calls.nativeTool?.execute(input, {
+        id: 'bounded_256',
+        sessionID: 'root',
+        progress: async () => {},
+      });
+      expect(calls.kv.has('session-preset/v1/ses_bounded_256')).toBe(true);
+
+      const switchesBeforeResume = calls.switchedModels.length;
+      const resumeInput = {
+        agent: 'magos',
+        description: 'Continue existing child',
+        sessionID: childID,
+        prompt: 'Continue the existing child',
+      };
+      events.push({
+        id: 'evt_child_succeeded',
+        created: Date.now(),
+        type: 'session.execution.succeeded',
+        data: { sessionID: childID },
+      });
+      const taskResult = calls.toolAdds.find(
+        (entry) => entry.name === 'task_result',
+      );
+      const retrieved = (await taskResult?.execute(
+        { task_id: childID },
+        { sessionID: 'root' },
+      )) as { content: string };
+      expect(retrieved.content).toBe('native result');
+      await calls.contextHookCb?.({
+        sessionID: 'root',
+        agent: 'omnissiah',
+        model: { providerID: 'mock', id: 'one' },
+        options: {},
+        system: [],
+        messages: [
+          {
+            id: 'msg_native_delivery',
+            type: 'user',
+            role: 'user',
+            time: { created: Date.now() },
+            content: [
+              {
+                type: 'text',
+                text: `<subagent sessionID="${childID}" state="completed">native result</subagent>`,
+              },
+            ],
+          },
+        ],
+        tools: {},
+      });
+      await calls.promptHookCb?.({
+        sessionID: 'root',
+        messageID: 'msg_root_native_delivery',
+        prompt: { text: 'retrieve the completed result' },
+      });
+      await calls.toolBeforeCb?.({
+        tool: 'subagent',
+        sessionID: 'root',
+        agent: 'omnissiah',
+        messageID: 'msg_resume',
+        id: 'call_resume',
+        input: resumeInput,
+      });
+      await expect(
+        calls.nativeTool?.execute(resumeInput, {
+          id: 'call_resume',
+          sessionID: 'root',
+          progress: async () => {},
+        }),
+      ).resolves.toEqual({ content: 'native result' });
+      expect(calls.switchedModels).toHaveLength(switchesBeforeResume);
+      expect(calls.kv.get(`session-preset/v1/${childID}`)).toMatchObject({
+        execution: { presetName: 'cheap' },
+      });
+    } finally {
+      await cleanup();
+    }
   }, 20_000);
 
   test('host rejecting the model.request hook name fails setup loudly', async () => {

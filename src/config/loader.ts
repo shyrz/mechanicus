@@ -2,7 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stripJsonComments } from '../cli/config-io';
 import { getConfigSearchDirs } from '../cli/paths';
+import { mergeAgentOverrides } from './agent-overrides';
 import { AGENT_ALIASES, DEFAULT_DISABLED_AGENTS } from './constants';
+import { deepMerge } from './merge';
+import { mergePresetMaps, normalizePreset, resolvePreset } from './presets';
 import {
   BackgroundJobsConfigSchema,
   InterviewConfigSchema,
@@ -33,6 +36,8 @@ export interface ConfigLoadWarning {
   formatted?: unknown;
 }
 
+export { deepMerge } from './merge';
+
 /**
  * Options for loadPluginConfig.
  */
@@ -47,6 +52,11 @@ export interface LoadPluginConfigOptions {
    * Suppress console warnings while still invoking onWarning.
    */
   silent?: boolean;
+
+  /** Return the explicit root-agent layer without expanding the disk preset.
+   * Session-scoped bindings use this to preserve root-over-selected-preset
+   * precedence without mistaking the default preset's expansion for input. */
+  expandPreset?: boolean;
 }
 
 const PROMPTS_DIR_NAME = 'mechanicus';
@@ -587,7 +597,7 @@ export function mergePluginConfigs(
     ...base,
     ...override,
     agents: deepMerge(base.agents, override.agents),
-    presets: deepMerge(base.presets, override.presets),
+    presets: mergePresetMaps(base.presets, override.presets),
     multiplexer: deepMerge(base.multiplexer, override.multiplexer),
     interview: deepMerge(base.interview, override.interview),
     backgroundJobs: deepMerge(base.backgroundJobs, override.backgroundJobs),
@@ -603,45 +613,6 @@ export function mergePluginConfigs(
       override.companion as Record<string, unknown> | undefined,
     ) as PluginConfig['companion'],
   };
-}
-
-/**
- * Recursively merge two objects, with override values taking precedence.
- * For nested objects, merges recursively. For arrays and primitives, override replaces base.
- *
- * @param base - Base object to merge into
- * @param override - Override object whose values take precedence
- * @returns Merged object, or undefined if both inputs are undefined
- */
-export function deepMerge<T extends Record<string, unknown>>(
-  base?: T,
-  override?: T,
-): T | undefined {
-  if (!base) return override;
-  if (!override) return base;
-
-  const result = { ...base } as T;
-  for (const key of Object.keys(override) as (keyof T)[]) {
-    const baseVal = base[key];
-    const overrideVal = override[key];
-
-    if (
-      typeof baseVal === 'object' &&
-      baseVal !== null &&
-      typeof overrideVal === 'object' &&
-      overrideVal !== null &&
-      !Array.isArray(baseVal) &&
-      !Array.isArray(overrideVal)
-    ) {
-      result[key] = deepMerge(
-        baseVal as Record<string, unknown>,
-        overrideVal as Record<string, unknown>,
-      ) as T[keyof T];
-    } else {
-      result[key] = overrideVal;
-    }
-  }
-  return result;
 }
 
 /**
@@ -698,18 +669,33 @@ export function loadPluginConfig(
 
   // Resolve preset and merge with root agents
   if (config.preset) {
-    const preset = config.presets?.[config.preset];
-    if (preset) {
+    try {
+      const preset = config.presets
+        ? resolvePreset(config.preset, config.presets)
+        : undefined;
       // Merge preset agents with root agents (root overrides)
-      config.agents = deepMerge(preset, config.agents);
-    } else {
+      if (options?.expandPreset !== false) {
+        const rawPreset = config.presets?.[config.preset];
+        config.agents =
+          rawPreset && normalizePreset(rawPreset).extends === undefined
+            ? (deepMerge(normalizePreset(rawPreset).agents, config.agents) ??
+              config.agents)
+            : mergeAgentOverrides(preset ?? {}, config.agents ?? {});
+      }
+    } catch (error) {
       // Preset name specified but doesn't exist - warn user
       const presetSource =
         envPreset === config.preset ? 'environment variable' : 'config file';
+      const known =
+        config.presets !== undefined &&
+        Object.hasOwn(config.presets, config.preset as string);
       const availablePresets = config.presets
         ? Object.keys(config.presets).join(', ')
         : 'none';
-      const message = `Preset "${config.preset}" not found (from ${presetSource}). Available presets: ${availablePresets}`;
+      const reason = error instanceof Error ? ` ${error.message}` : '';
+      const message = known
+        ? `Preset "${config.preset}" could not be resolved (from ${presetSource}). Available presets: ${availablePresets}${reason}`
+        : `Preset "${config.preset}" not found (from ${presetSource}). Available presets: ${availablePresets}`;
       options?.onWarning?.({
         path: projectConfigPath ?? userConfigPath ?? '',
         kind: 'missing-preset',

@@ -193,7 +193,9 @@ function extractStructuredText(root: Element | null) {
 }
 
 export function cleanHeadingText(input: string): string {
-  const normalized = trimBlankRuns(input).replace(/¶+$/g, '').trim();
+  const normalized = trimBlankRuns(input)
+    .replace(/(?<!¶)¶+$/, '')
+    .trim();
   if (/^(?:C|F)#$/.test(normalized)) return normalized;
   if (/\s#+$/.test(normalized)) {
     return normalized.replace(/\s#+$/g, '').trim();
@@ -202,15 +204,40 @@ export function cleanHeadingText(input: string): string {
 }
 
 export function cleanFetchedMarkdown(input: string): string {
+  const permanentLinkSuffix = '"Permanent link")';
   const output = mapOutsideCodeBlocks(input, (value) =>
     value
-      .replace(/^\s*!\[[^\]]*\]\([^)]+\)\s*$/gm, 'Image omitted')
-      .replace(/(^|\n)Image(?=\n|$)/g, '$1Image omitted')
-      .replace(/^\s*(#{1,6})\s*\\?\['([^'\n]+)'\s*$/gm, '$1 $2')
-      .replace(/^\s*(#{1,6})\s*'([^'\n]+)'\]\s*$/gm, '$1 $2')
-      .replace(/^\s*(#{1,6})\s*'([^'\n]+)'\s*$/gm, '$1 $2')
-      .replace(/(#{1,6}[^\n]*?)\s*\[¶\]\(#.*?"Permanent link"\)\s*$/gm, '$1')
-      .replace(/\s+\(#[A-Za-z0-9_-]+\)\s*$/gm, ''),
+      .split('\n')
+      .map((line) => {
+        let cleaned = line
+          .replace(/^[^\S\n]*!\[[^\]]*\]\([^)]+\)[^\S\n]*$/, 'Image omitted')
+          .replace(/^Image$/, 'Image omitted')
+          .replace(
+            /^[^\S\n]*(#{1,6})[^\S\n]*\\?\['([^'\n]+)'[^\S\n]*$/,
+            '$1 $2',
+          )
+          .replace(/^[^\S\n]*(#{1,6})[^\S\n]*'([^'\n]+)'\][^\S\n]*$/, '$1 $2')
+          .replace(/^[^\S\n]*(#{1,6})[^\S\n]*'([^'\n]+)'[^\S\n]*$/, '$1 $2');
+        const linkStart = cleaned.startsWith('#')
+          ? cleaned.indexOf('[¶](#', 1)
+          : -1;
+        if (linkStart !== -1) {
+          const suffixStart = cleaned.lastIndexOf(permanentLinkSuffix);
+          if (
+            suffixStart >= linkStart + 5 &&
+            /^[^\S\n]*$/.test(
+              cleaned.slice(suffixStart + permanentLinkSuffix.length),
+            ) &&
+            !/[\r\u2028\u2029]/.test(cleaned.slice(0, suffixStart))
+          )
+            cleaned = cleaned.slice(0, linkStart).trimEnd();
+        }
+        return cleaned.replace(
+          /(?<![^\S\n])[^\S\n]+\(#[A-Za-z0-9_-]+\)[^\S\n]*$/,
+          '',
+        );
+      })
+      .join('\n'),
   );
 
   return trimBlankRuns(output);

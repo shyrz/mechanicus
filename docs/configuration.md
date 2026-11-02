@@ -2,6 +2,16 @@
 
 Complete reference for all configuration files and options in mechanicus. For repository-specific configurations, custom agents, and prompt directory lookups, see the [Project-local Customization Guide](project-local-customization.md).
 
+Mechanicus installs Zod 4.6.6 or later within version 4 as a direct runtime
+dependency. This keeps its validation on a patched version even when a host or
+SDK installs an older copy. Earlier versions can exhaust memory while validating
+oversized collections.
+
+Published plugin tool schemas also use this dependency. The SDK tool factory is
+bundled into the plugin so its separately installed Zod copy does not select the
+schema implementation. Source builds pin the same minimum through the package
+override.
+
 ---
 
 ## Config Files
@@ -17,6 +27,9 @@ Complete reference for all configuration files and options in mechanicus. For re
 
 Set `OPENCODE_CONFIG_DIR` to use a custom user config directory instead of
 `~/.config/opencode`; install and runtime config discovery both honor it.
+Config writes follow existing file symlinks, so dotfile-managed links remain
+links. Backups are written next to the link with a `.bak` suffix. A dangling
+config symlink is an error rather than a reason to replace the link.
 
 Set `MECHANICUS_DISABLE` to `1`, `true`, `yes`, or `on` to make
 mechanicus return during startup without registering agents, tools,
@@ -112,10 +125,70 @@ All config files support **JSONC** (JSON with Comments):
 
 ### Runtime Preset Switching
 
-Presets can also be switched at runtime without restarting using the `/preset` command. See [Preset Switching](preset-switching.md) for details.
+Presets can be selected with the `/preset` TUI command. The selection is saved
+to the user config and takes effect after reload; it does not replace the
+current session's agents. See [Preset Switching](preset-switching.md) for details.
+Capable OpenCode v2 hosts additionally support a server `/preset <name>`
+session binding for future child sessions. It does not change the disk default
+or the current root/existing children; see
+[OpenCode v2 session binding](preset-switching.md#opencode-v2-session-binding).
+
+### Preset Inheritance
+
+A preset can inherit another preset with `extends`. Put local overrides under
+`agents`. Parent fields merge first, then child fields, and root-level `agents`
+override both.
+
+```jsonc
+{
+  "preset": "cheap-thinking",
+  "presets": {
+    "cheap": {
+      "orchestrator": {
+        "model": ["openai/gpt-5.6-terra", "openai/gpt-5.6-luna"],
+        "temperature": 0.2
+      }
+    },
+    "cheap-thinking": {
+      "extends": "cheap",
+      "agents": {
+        "orchestrator": { "variant": "high" },
+        "explore": { "inheritModelFrom": "session" }
+      }
+    }
+  },
+  "agents": {
+    "omnissiah": { "temperature": 0.4 }
+  }
+}
+```
+
+For compact declarations, omit `agents` and write the agent entries alongside
+`extends`. New configurations should prefer the structured form above. Legacy
+flat presets and custom agents named `agents` or `extends` remain valid.
+
+User and project declarations merge field by field before inheritance is
+resolved. A project `extends` replaces the parent; if omitted, the user parent
+is retained. Legacy agent aliases resolve to their canonical names, and
+`inheritModelFrom` clears an inherited `model` as before.
+
+A missing parent or inheritance cycle leaves that preset unapplied and emits a
+loader warning. Root `agents` and other valid settings remain active. Selecting
+such a preset with `/preset` fails without writing the config. An invalid
+unselected preset does not prevent other presets from loading.
+
+The v1 TUI editor can change a preset's base and local agent overrides. It shows
+inherited agents read-only and saves only local declarations. Parent deletion
+is blocked while another user or project preset extends it. Preset writes
+preserve JSONC comments and unrelated fields, keep config symlinks, and reject
+stale editor saves. Project-only declarations remain editable in their project
+file. The v2 TUI retains its global selection picker. See
+[Preset Switching](preset-switching.md) for the controls and scope rules.
 
 | `presets` | object | - | Named preset configurations |
 |-----------|--------|---|-----------------------------|
+| `presets.<name>.extends` | string | - | Parent preset name; child agent fields override inherited fields |
+| `presets.<name>.agents` | object | - | Structured child overrides used with `extends` |
 | `presets.<name>.<agent>.model` | string | - | Model ID in `provider/model` format |
 | `presets.<name>.<agent>.temperature` | number | - | Optional temperature (0–2); when omitted, OpenCode chooses its default |
 | `presets.<name>.<agent>.variant` | string | - | Reasoning effort: `"low"`, `"medium"`, `"high"`, or `"max"` (provider-specific) |
@@ -124,6 +197,7 @@ Presets can also be switched at runtime without restarting using the `/preset` c
 | `presets.<name>.<agent>.skills` | string[] | - | Skills the agent can use (`"*"`, `"!item"`, explicit list) |
 | `presets.<name>.<agent>.skills_add` | string[] | - | Skill names added to the effective skills list at config resolution (applies to `agents.<agent>` entries too). Removal via `skills_remove` wins. Folded into `skills` and stripped; see [Skills Assignment](skills.md#adding-or-removing-skills-on-top-of-an-inherited-list) |
 | `presets.<name>.<agent>.skills_remove` | string[] | - | Skill names removed from the effective skills list at config resolution (applies to `agents.<agent>` entries too). Wins over `skills_add`. Folded into `skills` and stripped; see [Skills Assignment](skills.md#adding-or-removing-skills-on-top-of-an-inherited-list) |
+| `presets.<name>.<agent>.skills_include_local` | boolean | false | Includes valid skills from the current project's `.opencode/skills` and `.agents/skills` trees. Also applies to `agents.<agent>`. `skills_remove` still wins; global, ancestor and externally symlinked skill roots are excluded. |
 | `presets.<name>.<agent>.mcps` | string[] | - | MCPs the agent can use (`"*"`, `"!item"`, explicit list) |
 | `presets.<name>.<agent>.options` | object | - | Provider-specific model options passed to the AI SDK (e.g., `textVerbosity`, `thinking` budget) |
 | `agents.<customAgent>.model` | string\|array | - | Required for custom agents inferred from unknown `agents` keys |
@@ -170,7 +244,7 @@ Presets can also be switched at runtime without restarting using the `/preset` c
 | `backgroundJobs.sameProviderPolicy` | object | `{}` | Opt-in per-provider policy keyed by provider ID; the only value is `"foreground"`. When the parent session's current model and the child agent's resolved model both resolve to a configured provider, an explicit `task(..., background: true)` call is converted to the existing foreground execution path. Unconfigured, different, or undeterminable providers keep background behavior. See [Background Job Management](#background-job-management). |
 | `backgroundJobs.waitForUserGuard` | boolean | `true` | When true, intercepts `wait_for_user` calls while background tasks are still running and the orchestrator wake scheduler is enabled, returning guidance to end the turn instead of blocking on manual input. See [Background Job Management](#background-job-management). |
 | `disabled_mcps` | string[] | `[]` | MCP server IDs to disable globally |
-| `fallback.enabled` | boolean | `true` | Enable Slim's foreground model-chain failover. It does not configure OpenCode provider/AI-SDK retries. |
+| `fallback.enabled` | boolean | `true` | Enable foreground model-chain failover. When false, the fallback manager and its event/tracking paths are not created. It does not configure OpenCode provider/AI-SDK retries. |
 | `fallback.maxRetries` | number | `3` | Consecutive retryable 429 responses allowed for the same foreground model before Slim aborts or selects the next configured fallback model. It does not cap OpenCode provider retries or background subagent retries. |
 | `fallback.initialRetryDelayMs` | number | `0` | Delay in milliseconds before triggering the first fallback on a failover-worthy error. Gives intercepting plugins time to recover the current model before the fallback chain advances. 0 disables. |
 | `fallback.retryDelayMs` | number | `500` | Delay in milliseconds between consecutive fallback attempts after the initial trigger. 0 disables. |
@@ -424,6 +498,12 @@ running session.
 OpenCode's provider retry policy. A value of `0` disables Slim's foreground
 429 failover budget; it does not prevent OpenCode from retrying a provider
 request in a child session.
+
+Foreground failover adds an internal retry reminder to the existing session.
+The original user text and attachments remain in history and are not submitted
+again, so stored part IDs cannot overwrite earlier rows or expand files twice.
+On v2 hosts with `session.synthetic`, the reminder does not create a user
+message bubble. Reduced hosts use the prompt route with internal metadata.
 
 ### Agent Display Names
 

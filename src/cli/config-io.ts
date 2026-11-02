@@ -30,6 +30,7 @@ import type {
   InstallConfig,
   OpenCodeConfig,
 } from './types';
+import { resolveConfigWritePath } from './write-path';
 
 const PACKAGE_NAME = 'mechanicus';
 const DEFAULT_OPENCODE_AGENTS_TO_DISABLE = ['explore', 'general'] as const;
@@ -431,13 +432,15 @@ export function parseConfig(path: string): {
  * Write config to file atomically.
  */
 export function writeConfig(configPath: string, config: OpenCodeConfig): void {
+  const targetPath = resolveConfigWritePath(configPath);
+
   if (configPath.endsWith('.jsonc')) {
     console.warn(
       '[config-manager] Writing to .jsonc file - comments will not be preserved',
     );
   }
 
-  const tmpPath = `${configPath}.tmp`;
+  const tmpPath = `${targetPath}.tmp`;
   const bakPath = `${configPath}.bak`;
   const content = `${JSON.stringify(config, null, 2)}\n`;
 
@@ -448,7 +451,7 @@ export function writeConfig(configPath: string, config: OpenCodeConfig): void {
 
   // Atomic write pattern: write to tmp, then rename
   writeFileSync(tmpPath, content);
-  renameSync(tmpPath, configPath);
+  renameSync(tmpPath, targetPath);
 }
 
 export async function addPluginToOpenCodeConfig(): Promise<ConfigMergeResult> {
@@ -553,9 +556,10 @@ export function writeLiteConfig(
   try {
     ensureConfigDir();
     const config = generateLiteConfig(installConfig);
+    const targetPath = resolveConfigWritePath(configPath);
 
     // Atomic write for lite config too
-    const tmpPath = `${configPath}.tmp`;
+    const tmpPath = `${targetPath}.tmp`;
     const bakPath = `${configPath}.bak`;
     const content = `${JSON.stringify(config, null, 2)}\n`;
 
@@ -565,7 +569,7 @@ export function writeLiteConfig(
     }
 
     writeFileSync(tmpPath, content);
-    renameSync(tmpPath, configPath);
+    renameSync(tmpPath, targetPath);
 
     return { success: true, configPath };
   } catch (err) {
@@ -685,9 +689,16 @@ export function detectCurrentConfig(): DetectedConfig {
     const configObj = liteConfig as Record<string, unknown>;
     const presetName = configObj.preset as string;
     const presets = configObj.presets as Record<string, unknown>;
-    const agents = presets?.[presetName] as
-      | Record<string, { model?: unknown }>
-      | undefined;
+    const declaration = presets?.[presetName];
+    const agents = (
+      declaration &&
+      typeof declaration === 'object' &&
+      'agents' in declaration &&
+      declaration.agents &&
+      typeof declaration.agents === 'object'
+        ? declaration.agents
+        : declaration
+    ) as Record<string, { model?: unknown }> | undefined;
 
     if (agents && typeof agents === 'object') {
       const models = Object.values(agents)

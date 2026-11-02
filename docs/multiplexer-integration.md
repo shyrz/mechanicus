@@ -305,9 +305,17 @@ To avoid closing a pane during transient idle notifications, cmux keeps it for
 at least ten seconds after attachment and requires three consecutive idle
 polls plus a final idle recheck with no intervening activity. Missing status is
 treated as a grace condition. This stability policy is cmux-specific; existing
-tmux, Zellij, and Herdr close behavior is unchanged. Native cmux support does
+tmux close handling accepts an exact `can't find pane` response as already
+closed, but retains tracking after socket or transport errors so cleanup can
+retry. Zellij and Herdr close behavior is unchanged. Native cmux support does
 not create placeholder panes while waiting and does not currently expose a
 configurable cmux column width.
+
+When the server requires authentication, tmux forwards v1
+`OPENCODE_SERVER_PASSWORD` and `OPENCODE_SERVER_USERNAME` through
+`split-window -e` on tmux 3.1 and later. Older servers inherit their existing
+environment because they do not support that flag. Diagnostic logs redact both
+values.
 
 **Example: open Zellij subagents in the parent OpenCode tab**
 

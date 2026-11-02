@@ -43,6 +43,10 @@ const VOLATILE_PATTERNS: Array<{ name: string; regex: RegExp }> = [
  */
 const ALLOWLIST = new Map<string, string>([
   [
+    'config/json-file.ts',
+    'randomUUID() names temporary files for atomic preset config writes; no UUID is written to config values, session bindings or prompt content.',
+  ],
+  [
     'hooks/auto-update-checker/skill-sync.ts',
     'Update scheduling and install bookkeeping; produces no prompt content.',
   ],

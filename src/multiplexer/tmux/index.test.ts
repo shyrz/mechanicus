@@ -118,6 +118,24 @@ describe('TmuxMultiplexer', () => {
     );
   });
 
+  test('closePane accepts only a missing target, not a transport error', async () => {
+    for (const [stderr, expected] of [
+      ["can't find pane: %2\n", true],
+      ['error connecting to socket\n', false],
+    ] as const) {
+      crossSpawnMock.mockImplementation((command: string[]) => {
+        if (command[0] === 'which')
+          return createSpawnResult(0, '/usr/bin/tmux\n');
+        if (command[1] === '-V') return createSpawnResult(0, 'tmux 3.6a');
+        if (command.includes('kill-pane'))
+          return createSpawnResult(1, '', stderr);
+        return createSpawnResult();
+      });
+      const { TmuxMultiplexer } = await importFreshTmux();
+      expect(await new TmuxMultiplexer().closePane('%2')).toBe(expected);
+    }
+  });
+
   test('falls back to the server pane when a registered target rejects the split', async () => {
     recordTmuxPane('root-session-b', '%42');
     crossSpawnMock.mockImplementation((command: string[]) => {
@@ -154,9 +172,78 @@ describe('TmuxMultiplexer', () => {
     await tmux.applyLayout('tiled', 60);
   });
 
+  test('forwards v1 viewer credentials without logging either value', async () => {
+    const password = process.env.OPENCODE_SERVER_PASSWORD;
+    const username = process.env.OPENCODE_SERVER_USERNAME;
+    process.env.OPENCODE_SERVER_PASSWORD = 'test-secret';
+    process.env.OPENCODE_SERVER_USERNAME = 'test-user';
+    try {
+      crossSpawnMock.mockImplementation((command: string[]) => {
+        if (command[0] === 'which')
+          return createSpawnResult(0, '/usr/bin/tmux\n');
+        if (command[1] === '-V') return createSpawnResult(0, 'tmux 3.6a');
+        if (command[1] === 'split-window')
+          return createSpawnResult(0, '%2\n', 'test-user test-secret');
+        return createSpawnResult();
+      });
+      const { TmuxMultiplexer } = await importFreshTmux();
+      await new TmuxMultiplexer().spawnPane(
+        'child',
+        'child',
+        'http://host',
+        '/repo',
+      );
+      const split = commands().find((command) =>
+        command.includes('split-window'),
+      );
+      expect(split).toContain('OPENCODE_SERVER_PASSWORD=test-secret');
+      expect(split).toContain('OPENCODE_SERVER_USERNAME=test-user');
+      expect(JSON.stringify(logMock.mock.calls)).not.toContain('test-secret');
+      expect(JSON.stringify(logMock.mock.calls)).not.toContain('test-user');
+      await wait(300);
+    } finally {
+      if (password === undefined) delete process.env.OPENCODE_SERVER_PASSWORD;
+      else process.env.OPENCODE_SERVER_PASSWORD = password;
+      if (username === undefined) delete process.env.OPENCODE_SERVER_USERNAME;
+      else process.env.OPENCODE_SERVER_USERNAME = username;
+    }
+  });
+
+  test('tmux 2.9 inherits v1 credentials without unsupported split flags', async () => {
+    const password = process.env.OPENCODE_SERVER_PASSWORD;
+    process.env.OPENCODE_SERVER_PASSWORD = 'test-secret';
+    try {
+      crossSpawnMock.mockImplementation((command: string[]) => {
+        if (command[0] === 'which')
+          return createSpawnResult(0, '/usr/bin/tmux\n');
+        if (command[1] === '-V') return createSpawnResult(0, 'tmux 2.9');
+        if (command[1] === 'split-window') return createSpawnResult(0, '%2\n');
+        return createSpawnResult();
+      });
+      const { TmuxMultiplexer } = await importFreshTmux();
+      expect(
+        await new TmuxMultiplexer().spawnPane(
+          'child',
+          'child',
+          'http://host',
+          '/repo',
+        ),
+      ).toEqual({ success: true, paneId: '%2' });
+      expect(
+        commands().find((command) => command.includes('split-window')),
+      ).not.toContain('-e');
+      expect(JSON.stringify(logMock.mock.calls)).not.toContain('test-secret');
+      await wait(300);
+    } finally {
+      if (password === undefined) delete process.env.OPENCODE_SERVER_PASSWORD;
+      else process.env.OPENCODE_SERVER_PASSWORD = password;
+    }
+  });
+
   test('coalesces layout application after bursty pane spawns', async () => {
     const { TmuxMultiplexer } = await importFreshTmux();
     const tmux = new TmuxMultiplexer('main-vertical', 60);
+    crossSpawnMock.mockClear();
 
     await tmux.spawnPane(
       'session-1',

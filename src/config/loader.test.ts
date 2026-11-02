@@ -1294,6 +1294,31 @@ describe('preset resolution', () => {
     expect(config.agents?.explorer?.model).toBe('explorer-model');
   });
 
+  test('raw agent layer does not mistake the disk preset for a root override', () => {
+    const projectDir = path.join(tempDir, 'project');
+    const projectConfigDir = path.join(projectDir, '.opencode');
+    fs.mkdirSync(projectConfigDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectConfigDir, 'mechanicus.json'),
+      JSON.stringify({
+        preset: 'default',
+        presets: {
+          default: { magos: { model: 'mock/one' } },
+          cheap: { magos: { model: 'mock/two' } },
+        },
+        agents: { magos: { temperature: 0.7 } },
+      }),
+    );
+
+    const raw = loadPluginConfig(projectDir, { expandPreset: false });
+    const selected = loadPluginConfig(projectDir);
+    expect(raw.agents).toEqual({ magos: { temperature: 0.7 } });
+    expect(selected.agents?.magos).toEqual({
+      model: 'mock/one',
+      temperature: 0.7,
+    });
+  });
+
   test('missing preset: preset set but not in presets -> returns empty/root agents', () => {
     const projectDir = path.join(tempDir, 'project');
     const projectConfigDir = path.join(projectDir, '.opencode');

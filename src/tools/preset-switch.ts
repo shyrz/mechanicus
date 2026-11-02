@@ -1,8 +1,21 @@
 import * as fs from 'node:fs';
-import { stripJsonComments } from '../cli/config-io';
-import type { AgentOverrideConfig, PluginConfig, Preset } from '../config';
+import { isDeepStrictEqual } from 'node:util';
+import { z } from 'zod';
+import type {
+  AgentOverrideConfig,
+  PluginConfig,
+  Preset,
+  PresetInput,
+} from '../config';
 import { AGENT_ALIASES } from '../config/constants';
+import { mutateJsonConfigFile, parseJsonConfigText } from '../config/json-file';
 import { findPluginConfigPaths } from '../config/loader';
+import {
+  mergePresetMaps,
+  normalizePreset,
+  resolvePreset,
+} from '../config/presets';
+import { PresetSchema } from '../config/schema';
 
 /**
  * Result of a preset switch attempt. `message` is user-facing and intended for
@@ -44,7 +57,31 @@ export function switchPresetOnDisk(
   config: PluginConfig,
 ): PresetSwitchResult {
   const presets = config.presets ?? {};
-  const preset = presets[presetName];
+  let preset: Preset | undefined;
+  const known = Object.hasOwn(presets, presetName);
+  try {
+    preset = known ? resolvePreset(presetName, presets) : undefined;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'PresetResolutionError') {
+      return {
+        ok: false,
+        presetName,
+        message: error.message,
+        summary: [],
+      };
+    }
+    const available = Object.keys(presets);
+    const hint =
+      available.length > 0
+        ? `Available presets: ${available.join(', ')}`
+        : 'No presets configured. Define presets in mechanicus.jsonc.';
+    return {
+      ok: false,
+      presetName,
+      message: `Preset "${presetName}" not found. ${hint}`,
+      summary: [],
+    };
+  }
 
   if (!preset) {
     const available = Object.keys(presets);
@@ -59,9 +96,10 @@ export function switchPresetOnDisk(
       summary: [],
     };
   }
-
   const agentUpdates = buildAgentUpdates(preset);
-  if (Object.keys(agentUpdates).length === 0) {
+  if (
+    !Object.values(preset).some((override) => Object.keys(override).length > 0)
+  ) {
     return {
       ok: false,
       presetName,
@@ -70,7 +108,31 @@ export function switchPresetOnDisk(
     };
   }
 
-  persistPresetName(directory, presetName);
+  try {
+    const envPreset = process.env.MECHANICUS_PRESET;
+    const { projectConfigPath } = findPluginConfigPaths(directory);
+    const projectPreset = projectConfigPath
+      ? parseJsonConfigText(fs.readFileSync(projectConfigPath, 'utf8')).preset
+      : undefined;
+    if (envPreset && envPreset !== presetName) {
+      throw new Error(
+        `MECHANICUS_PRESET selects "${envPreset}" and takes precedence. Update or unset it first.`,
+      );
+    }
+    if (typeof projectPreset === 'string' && projectPreset !== presetName) {
+      throw new Error(
+        `Project config selects "${projectPreset}" and takes precedence. Edit its preset field first.`,
+      );
+    }
+    persistPresetName(directory, presetName);
+  } catch (error) {
+    return {
+      ok: false,
+      presetName,
+      message: `Preset "${presetName}" was not saved: ${error instanceof Error ? error.message : String(error)}`,
+      summary: [],
+    };
+  }
 
   return {
     ok: true,
@@ -87,10 +149,17 @@ export function switchPresetOnDisk(
 export function buildAgentUpdates(preset: Preset): Record<string, AgentUpdate> {
   const agentUpdates: Record<string, AgentUpdate> = {};
   for (const [agentName, override] of Object.entries(preset)) {
-    const resolvedName = AGENT_ALIASES[agentName] ?? agentName;
+    const resolvedName = Object.hasOwn(AGENT_ALIASES, agentName)
+      ? AGENT_ALIASES[agentName]
+      : agentName;
     const agentConfig = mapOverrideToAgentConfig(override);
     if (Object.keys(agentConfig).length > 0) {
-      agentUpdates[resolvedName] = agentConfig;
+      Object.defineProperty(agentUpdates, resolvedName, {
+        value: agentConfig,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
     }
   }
   return agentUpdates;
@@ -155,64 +224,123 @@ export function buildPresetSummary(
 
 /**
  * Persist the preset name to the user-level config file so it survives
- * restarts. Best-effort: a failure must not abort the switch, because the
- * persisted name is what makes the next reload pick up the new preset.
- *
- * Note: this rewrites the file as plain JSON (JSONC comments are not
- * preserved), matching the prior server-side behavior.
+ * restarts. A failed write is reported to the caller, never claimed as success.
  */
 function persistPresetName(directory: string, presetName: string): void {
-  try {
-    const { userConfigPath } = findPluginConfigPaths(directory);
-    if (!userConfigPath) return;
-    // Strip a UTF-8 BOM (RFC 8259 permits one); JSON.parse would otherwise
-    // fail with "Unrecognized token" and the preset would not be persisted.
-    const raw = fs.readFileSync(userConfigPath, 'utf-8').replace(/^\uFEFF/, '');
-    const persisted = JSON.parse(stripJsonComments(raw)) as Record<
-      string,
-      unknown
-    >;
-    persisted.preset = presetName;
-    fs.writeFileSync(userConfigPath, `${JSON.stringify(persisted, null, 2)}\n`);
-  } catch {
-    // Non-critical: the preset name is also returned in the switch result
-    // so the caller can surface it to the user.
+  const { userConfigPath } = findPluginConfigPaths(directory);
+  if (!userConfigPath) {
+    throw new Error('No user-level mechanicus.json[c] config file was found.');
   }
+  mutateJsonConfigFile(userConfigPath, (config) => ({
+    ...config,
+    preset: presetName,
+  }));
 }
 
-/**
- * Read the user-level config file as a parsed object. Returns null if the
- * file is absent or unreadable.
- */
-function readUserConfig(directory: string): Record<string, unknown> | null {
-  try {
-    const { userConfigPath } = findPluginConfigPaths(directory);
-    if (!userConfigPath) return null;
-    // Strip a UTF-8 BOM (RFC 8259 permits one); JSON.parse would otherwise
-    // fail with "Unrecognized token" and the preset name would be lost.
-    const raw = fs.readFileSync(userConfigPath, 'utf-8').replace(/^\uFEFF/, '');
-    return JSON.parse(stripJsonComments(raw)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+const PresetMapSchema = z.record(z.string(), PresetSchema);
 
-/**
- * Write the user-level config file (plain JSON; JSONC comments are not
- * preserved, matching the existing switchPreset behavior). Best-effort.
- */
-function writeUserConfig(
+export type PresetEditResult = { ok: true } | { ok: false; message: string };
+
+export function readUserPreset(
   directory: string,
-  config: Record<string, unknown>,
+  name: string,
+): PresetInput | undefined {
+  const { userConfigPath } = findPluginConfigPaths(directory);
+  if (!userConfigPath) return undefined;
+  const config = parseJsonConfigText(fs.readFileSync(userConfigPath, 'utf8'));
+  const presets = PresetMapSchema.parse(config.presets ?? {});
+  return Object.hasOwn(presets, name) ? presets[name] : undefined;
+}
+
+function projectPresets(directory: string): Record<string, PresetInput> {
+  const { projectConfigPath } = findPluginConfigPaths(directory);
+  if (!projectConfigPath) return {};
+  const config = parseJsonConfigText(
+    fs.readFileSync(projectConfigPath, 'utf8'),
+  );
+  return PresetMapSchema.parse(config.presets ?? {});
+}
+
+export function findPresetDependents(
+  base: string,
+  presets: Record<string, PresetInput>,
+): string[] {
+  return Object.entries(presets)
+    .filter(
+      ([name, preset]) =>
+        name !== base && normalizePreset(preset).extends === base,
+    )
+    .map(([name]) => name);
+}
+
+export function wouldCreatePresetCycle(
+  child: string,
+  parent: string,
+  presets: Record<string, PresetInput>,
 ): boolean {
   try {
-    const { userConfigPath } = findPluginConfigPaths(directory);
-    if (!userConfigPath) return false;
-    fs.writeFileSync(userConfigPath, `${JSON.stringify(config, null, 2)}\n`);
-    return true;
-  } catch {
+    resolvePreset(child, {
+      ...presets,
+      [child]: { extends: parent, agents: {} },
+    });
     return false;
+  } catch {
+    return true;
   }
+}
+
+function editUserPresets(
+  directory: string,
+  name: string,
+  edit: (
+    config: Record<string, unknown>,
+    presets: Record<string, PresetInput>,
+  ) => Record<string, unknown>,
+): PresetEditResult {
+  try {
+    if (['__proto__', 'constructor', 'prototype'].includes(name)) {
+      throw new Error('Reserved JavaScript property names cannot be edited');
+    }
+    const { userConfigPath } = findPluginConfigPaths(directory);
+    if (!userConfigPath) throw new Error('No user-level config file was found');
+    mutateJsonConfigFile(userConfigPath, (config) =>
+      edit(config, PresetMapSchema.parse(config.presets ?? {})),
+    );
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/** Validate and save local declarations; an editor snapshot protects later disk edits. */
+export function writePresetWithResult(
+  directory: string,
+  name: string,
+  preset: PresetInput,
+  expected?: { original: PresetInput | undefined },
+): PresetEditResult {
+  return editUserPresets(directory, name, (config, presets) => {
+    const current = Object.hasOwn(presets, name) ? presets[name] : undefined;
+    if (expected && !isDeepStrictEqual(current, expected.original)) {
+      throw new Error(
+        `Preset "${name}" changed while editing; reopen it and retry`,
+      );
+    }
+    const declaration = PresetSchema.parse(preset);
+    const updated = { ...presets, [name]: declaration };
+    // Validate both the global layer and the effective project layer. Never
+    // materialize project fields or parent agents into the editable user file.
+    resolvePreset(name, updated);
+    resolvePreset(
+      name,
+      mergePresetMaps(updated, projectPresets(directory)) ?? updated,
+    );
+    const stored = config.presets as Record<string, unknown> | undefined;
+    return { ...config, presets: { ...stored, [name]: declaration } };
+  });
 }
 
 /**
@@ -222,13 +350,9 @@ function writeUserConfig(
 export function writePreset(
   directory: string,
   name: string,
-  preset: Preset,
+  preset: PresetInput,
 ): boolean {
-  const config = readUserConfig(directory) ?? {};
-  const presets = (config.presets as Record<string, Preset> | undefined) ?? {};
-  presets[name] = preset;
-  config.presets = presets;
-  return writeUserConfig(directory, config);
+  return writePresetWithResult(directory, name, preset).ok;
 }
 
 /**
@@ -236,16 +360,34 @@ export function writePreset(
  * preset did not exist or the write failed.
  */
 export function deletePreset(directory: string, name: string): boolean {
-  const config = readUserConfig(directory);
-  if (!config) return false;
-  const presets = config.presets as Record<string, Preset> | undefined;
-  if (!presets || !(name in presets)) return false;
-  delete presets[name];
-  // If the active preset was deleted, clear the `preset` field too.
-  if (config.preset === name) {
-    delete config.preset;
-  }
-  return writeUserConfig(directory, config);
+  return deletePresetWithResult(directory, name).ok;
+}
+
+export function deletePresetWithResult(
+  directory: string,
+  name: string,
+): PresetEditResult {
+  return editUserPresets(directory, name, (config, presets) => {
+    if (!Object.hasOwn(presets, name)) {
+      throw new Error(`Preset "${name}" does not exist in the user config`);
+    }
+    const dependents = [
+      ...new Set([
+        ...findPresetDependents(name, presets),
+        ...findPresetDependents(name, projectPresets(directory)),
+      ]),
+    ];
+    if (dependents.length) {
+      throw new Error(
+        `Cannot delete "${name}": required by ${dependents.join(', ')}. Change their base preset first.`,
+      );
+    }
+    const remaining = { ...(config.presets as Record<string, unknown>) };
+    delete remaining[name];
+    const next: Record<string, unknown> = { ...config, presets: remaining };
+    if (next.preset === name) delete next.preset;
+    return next;
+  });
 }
 
 /**
@@ -268,7 +410,7 @@ export function removeAgentFromPreset(
   preset: Preset,
   agentName: string,
 ): Preset {
-  if (!(agentName in preset)) return preset;
+  if (!Object.hasOwn(preset, agentName)) return preset;
   const next = { ...preset };
   delete next[agentName];
   return next;

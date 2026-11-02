@@ -352,10 +352,8 @@ describe('v2 client shim delegation', () => {
   });
 
   test('plain external prompts never route through session.synthetic', async () => {
-    // foreground-fallback replays real user parts through promptAsync —
-    // those must keep hitting session.prompt even on synthetic-capable
-    // hosts, or the fallback replay would stop being persisted as the
-    // session's user input.
+    // External input still needs user-message persistence on hosts that
+    // also support synthetic internal continuations.
     const seq: Array<{ m: string; i: unknown }> = [];
     const input = buildPluginInput(
       makeCtx({
@@ -387,13 +385,8 @@ describe('v2 client shim delegation', () => {
     });
   });
 
-  test('mixed fallback replays (user parts + internal reminder) stay on session.prompt with files', async () => {
-    // Regression for the greptile P1 on #1158: foreground-fallback appends
-    // an internal-initiator reminder part to the user's real replay parts.
-    // An ANY-part gate routed the whole mixed body through
-    // session.synthetic — dropping the file attachments (the synthetic
-    // branch forwards text only) and skipping user-input persistence.
-    // Only PURELY internal bodies may take the synthetic route.
+  test('mixed user parts and internal reminders stay on session.prompt with files', async () => {
+    // Only purely internal bodies may use the text-only synthetic route.
     const seq: Array<{ m: string; i: unknown }> = [];
     const input = buildPluginInput(
       makeCtx({
@@ -1199,13 +1192,11 @@ describe('v2 client shim foreground-fallback integration', () => {
       { type: 'text', text: 'Fix the failing build' },
     ]);
 
-    // Step 2: re-submit with the fallback model exactly like
-    // foreground-fallback does (replay parts + synthetic reminder).
+    // Step 2: the request remains in history; retry with only the reminder.
     await session.promptAsync({
       path: { id: 'ses_1' },
       body: {
         parts: [
-          ...replayParts,
           createInternalAgentTextPart(
             'The previous model request failed and is being retried.',
           ),
@@ -1216,8 +1207,8 @@ describe('v2 client shim foreground-fallback integration', () => {
     });
 
     // v2 semantics: switchModel first (v1 {providerID, modelID} → v2
-    // {id, providerID}), then a non-blocking steer prompt carrying both the
-    // original user text and the synthetic reminder.
+    // {id, providerID}), then a non-blocking steer reminder on this reduced
+    // host without session.synthetic.
     expect(seq[0]).toMatchObject({
       m: 'switchModel',
       i: {
@@ -1229,7 +1220,7 @@ describe('v2 client shim foreground-fallback integration', () => {
       m: 'prompt',
       i: { sessionID: 'ses_1', delivery: 'steer' },
     });
-    expect((seq[1].i as { text: string }).text).toContain(
+    expect((seq[1].i as { text: string }).text).not.toContain(
       'Fix the failing build',
     );
     expect((seq[1].i as { text: string }).text).toContain(

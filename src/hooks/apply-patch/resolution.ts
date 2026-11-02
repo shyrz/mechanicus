@@ -176,7 +176,11 @@ export function locateChunk(
         hit: rescued.hit,
         old_lines,
         canonical_old_lines: lines.slice(canonicalStart, canonicalEnd),
-        canonical_new_lines: [...chunk.new_lines],
+        canonical_new_lines: [
+          ...lines.slice(canonicalStart, rescued.hit.start),
+          ...rescued.hit.add,
+          ...lines.slice(rescued.hit.start + rescued.hit.del, canonicalEnd),
+        ],
         resolved_is_end_of_file: canonicalEnd === lines.length,
         rewritten: true,
         strategy: 'prefix/suffix',

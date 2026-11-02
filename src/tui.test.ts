@@ -31,9 +31,12 @@ import {
   default as tuiPlugin,
 } from './tui';
 import {
+  readTuiSnapshot,
   recordTuiAgentActivity,
   recordTuiAgentModels,
   recordTuiSessionParent,
+  resolveTuiSnapshotRoot,
+  TUI_SESSION_PARENTS_MAX,
   type TuiSnapshot,
   updateSnapshot,
 } from './tui-state';
@@ -56,6 +59,49 @@ function createSnapshot(overrides: Partial<TuiSnapshot> = {}): TuiSnapshot {
 }
 
 describe('tui sidebar agents', () => {
+  test('a stalled remote agent request is cancelled and later refreshes run', async () => {
+    const timers = new Map<number, () => void>();
+    let nextTimer = 0;
+    const signals: AbortSignal[] = [];
+    const client = {
+      agent: {
+        list: (_input: unknown, options?: { signal: AbortSignal }) => {
+          if (options) signals.push(options.signal);
+          if (signals.length > 1) return Promise.resolve({ data: [] });
+          return new Promise<never>((_, reject) => {
+            options?.signal.addEventListener('abort', () =>
+              reject(new Error('aborted')),
+            );
+          });
+        },
+      },
+    };
+    const scheduleTimer = (callback: () => void, _delay: number) => {
+      const id = ++nextTimer;
+      timers.set(id, callback);
+      return () => timers.delete(id);
+    };
+    let commits = 0;
+    const refresh = createSerializedRefresh(async () => {
+      await fetchRemoteAgentModels(client, '/project', scheduleTimer);
+      commits++;
+    });
+
+    refresh();
+    await Promise.resolve();
+    refresh();
+    for (const callback of timers.values()) callback();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(signals[0]?.aborted).toBe(true);
+    expect(commits).toBe(1);
+
+    refresh();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(signals).toHaveLength(2);
+    expect(commits).toBe(2);
+    expect(timers.size).toBe(0);
+  });
+
   test('scopes active agents to the visible conversation (#1147)', () => {
     const snapshot = createSnapshot({
       activeSessions: { 'c1-dominus': 'dominus', 'c2-genetor': 'genetor' },
@@ -213,6 +259,33 @@ describe('tui sidebar agents', () => {
     expect(applyRemoteAgentModels(createSnapshot({}), {}).agentModels).toEqual(
       {},
     );
+  });
+
+  test('uses the v2 catalogue id rather than the shared upstream model id', async () => {
+    const client = {
+      agent: {
+        async list() {
+          return {
+            data: {
+              data: [
+                {
+                  id: 'magos',
+                  model: {
+                    providerID: 'openai',
+                    id: 'gpt-test-fast',
+                    modelID: 'gpt-test',
+                  },
+                },
+              ],
+            },
+          };
+        },
+      },
+    };
+
+    expect(await fetchRemoteAgentModels(client, '/srv/project')).toEqual({
+      magos: 'openai/gpt-test-fast',
+    });
   });
 
   test('serialized refresh skips overlap and drops a stale directory (#1133)', async () => {
@@ -866,6 +939,46 @@ describe('dual-contract plugin module', () => {
 });
 
 describe('clickable sidebar sessions', () => {
+  test('pruning keeps ancestry of reusable destinations and live sessions', () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-reusable-parents-'),
+    );
+    const restore = withIsolatedDataHome(root);
+    try {
+      const snapshot = createSnapshot();
+      snapshot.sessionParents.retained = 'middle';
+      snapshot.sessionParents.middle = 'conversation';
+      for (let i = 0; i < TUI_SESSION_PARENTS_MAX - 3; i++) {
+        snapshot.sessionParents[`old-${i}`] = `other-${i}`;
+      }
+      snapshot.sessionParents.live = 'conversation';
+      snapshot.activeSessions.live = 'oracle';
+      snapshot.activityPids.live = process.pid;
+      snapshot.sessionDetails.live = { status: 'busy' };
+      snapshot.reusableByAgent.conversation = {
+        oracle: {
+          taskID: 'retained',
+          alias: 'ora-1',
+          terminalState: 'completed',
+          lastUsedAt: 1,
+        },
+      };
+      updateSnapshot(root, (target) => Object.assign(target, snapshot));
+      recordTuiSessionParent('new', 'other', root);
+      const after = readTuiSnapshot(root);
+      expect(resolveTuiSnapshotRoot(after, 'retained')).toBe('conversation');
+      expect(
+        getSidebarAgentTargets(after, 'retained')[0]?.sessions[0]?.sessionID,
+      ).toBe('live');
+      expect(
+        getSidebarReusableTargets(after, 'retained').get('oracle')?.taskID,
+      ).toBe('retained');
+    } finally {
+      restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('getSidebarAgentTargets groups active subagents by agent with alias/model/status', () => {
     const snapshot = createSnapshot({
       activeSessions: {
@@ -983,22 +1096,21 @@ describe('clickable sidebar sessions', () => {
     expect(() => throwing?.('ses-3')).not.toThrow();
   });
 
-  test('resolveHoverBackground prefers theme.hover then backgroundElement', () => {
+  test('resolveHoverBackground ignores transparent hover and panel colors', () => {
     expect(
       resolveHoverBackground({
         hover: '#333333',
-        backgroundElement: '#222222',
         background: '#111111',
         text: '#ffffff',
       }),
     ).toBe('#333333');
-    expect(
-      resolveHoverBackground({
-        backgroundElement: '#222222',
-        background: '#111111',
-        text: '#ffffff',
-      }),
-    ).toBe('#222222');
+    const background = resolveHoverBackground({
+      hover: RGBA.fromValues(0, 0, 0, 0),
+      background: RGBA.fromValues(0, 0, 0, 0),
+      text: '#ffffff',
+    }) as RGBA;
+    expect(background.toInts()[3]).toBe(255);
+    expect(background.toInts().slice(0, 3)).not.toEqual([34, 34, 34]);
   });
 
   test('expansion state is local to each sidebar instance', () => {
@@ -1181,6 +1293,8 @@ describe('clickable sidebar sessions', () => {
     projectDir: string;
     sessionID: string;
     navigate?: (name: string, params?: Record<string, unknown>) => void;
+    transparentTheme?: boolean;
+    sameSurfaceTheme?: boolean;
   }) {
     const disposers: Array<() => void> = [];
     let slotPlugin: { slots: { sidebar_content: () => unknown } } | undefined;
@@ -1207,11 +1321,15 @@ describe('clickable sidebar sessions', () => {
         theme: {
           current: {
             accent: '#22c55e',
-            background: '#111111',
+            background: opts.transparentTheme
+              ? RGBA.fromValues(0.1, 0.1, 0.1, 0)
+              : opts.sameSurfaceTheme
+                ? '#002b36'
+                : '#111111',
             backgroundElement: '#222222',
             borderActive: '#555555',
             success: '#00ff00',
-            text: '#ffffff',
+            text: opts.sameSurfaceTheme ? '#839496' : '#ffffff',
             textMuted: '#aaaaaa',
             warning: '#ffcc00',
           },
@@ -1222,6 +1340,53 @@ describe('clickable sidebar sessions', () => {
     );
     return { slotPlugin, disposers };
   }
+
+  test('mounted sidebar paints hover on matching and transparent themes', async () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'mechanicus-transparent-hover-'),
+    );
+    const restore = withIsolatedDataHome(root);
+    const disposers: Array<() => void> = [];
+    const screens: Array<Awaited<ReturnType<typeof testRender>>> = [];
+    try {
+      recordTuiAgentModels({ agentModels: { oracle: 'openai/gpt-6' } }, root);
+      const checkHover = async (transparentTheme: boolean) => {
+        const mounted = await mountClickableSidebar({
+          projectDir: root,
+          sessionID: 'root',
+          transparentTheme,
+          sameSurfaceTheme: !transparentTheme,
+        });
+        disposers.push(...mounted.disposers);
+        const screen = await testRender(
+          () => mounted.slotPlugin?.slots.sidebar_content() as never,
+          { width: 60, height: 18 },
+        );
+        screens.push(screen);
+        await screen.renderOnce();
+        const row = screen
+          .captureCharFrame()
+          .split('\n')
+          .findIndex((line) => line.includes('oracle'));
+        expect(row).toBeGreaterThanOrEqual(0);
+        await screen.mockMouse.moveTo(5, row);
+        await screen.renderOnce();
+        expect(
+          screen.captureSpans().lines[row].spans.some((span) => {
+            const [r, g, b, a] = span.bg.toInts();
+            return a === 255 && [r, g, b].join(',') !== '0,43,54';
+          }),
+        ).toBe(true);
+      };
+      await checkHover(false);
+      await checkHover(true);
+    } finally {
+      for (const dispose of disposers) dispose();
+      for (const screen of screens) screen.renderer.destroy();
+      restore();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   function withIsolatedDataHome(root: string): () => void {
     const originalDataHome = process.env.XDG_DATA_HOME;

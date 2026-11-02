@@ -33,6 +33,7 @@ import {
   gracefulClosePane,
   normalizePathForShell,
   resolveOpencodeExecutable,
+  resolvePaneShell,
 } from '../shared';
 import type { Multiplexer, PaneResult } from '../types';
 
@@ -124,15 +125,14 @@ export class KittyMultiplexer implements Multiplexer {
         serverUrl,
         directory,
         resolveOpencodeExecutable(),
+        resolvePaneShell(),
       );
 
       // Normalize for Windows/MSYS2/Git Bash (backslashes would be treated as
       // escape chars). No-op on macOS/Linux. Mirrors the herdr adapter.
       const attachDir = normalizePathForShell(directory);
 
-      // Launch in the user's interactive shell (fish/bash/zsh/sh) so the
-      // command resolves correctly — a hardcoded `sh -c` breaks under fish
-      // and misses login startup files where `opencode` may live on PATH.
+      // Match the user's shell so PATH and non-POSIX quoting stay correct.
       const shellArgs = buildShellLaunchArgs(opencodeCmd);
 
       const args = [

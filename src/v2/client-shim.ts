@@ -113,13 +113,47 @@ function filesFromBody(
 }
 
 /** v2 transcript message (content parts) → v1 SDK message view
- * (`{info: {id, role}, parts}`) expected by the v1 pipeline. */
+ * (`{info: {id, role}, parts}`) expected by the v1 pipeline. Keep host
+ * timestamps and terminal fields for the transcript evidence classifier. */
 function toV1Message(m: Record<string, unknown>) {
+  const sourceType = typeof m.type === 'string' ? m.type : undefined;
+  const role = sourceType === 'idle' ? 'system' : (sourceType ?? m.role);
+  const contentParts = Array.isArray(m.content)
+    ? (m.content as Array<Record<string, unknown>>).map((p) => ({ ...p }))
+    : [];
+  const text =
+    contentParts.length === 0 && typeof m.text === 'string'
+      ? m.text
+      : contentParts.length === 0 &&
+          isRecord(m.payload) &&
+          typeof m.payload.text === 'string'
+        ? m.payload.text
+        : undefined;
   return {
-    info: { id: m.id, role: m.role ?? m.type },
-    parts: Array.isArray(m.content)
-      ? (m.content as Array<Record<string, unknown>>).map((p) => ({ ...p }))
-      : [],
+    info: {
+      id: m.id,
+      role,
+      ...(typeof m.sessionID === 'string' ? { sessionID: m.sessionID } : {}),
+      ...(typeof m.agent === 'string' ? { agent: m.agent } : {}),
+      ...(typeof m.outcome === 'string' ? { outcome: m.outcome } : {}),
+      ...(m.time !== undefined ? { time: m.time } : {}),
+      ...(m.finish !== undefined ? { finish: m.finish } : {}),
+      ...(m.rawFinish !== undefined ? { rawFinish: m.rawFinish } : {}),
+      ...(m.error !== undefined ? { error: m.error } : {}),
+    },
+    parts:
+      text === undefined
+        ? contentParts
+        : [
+            {
+              type: 'text',
+              text,
+              ...(sourceType === 'synthetic' ? { synthetic: true } : {}),
+              ...(sourceType === 'synthetic' && isRecord(m.metadata)
+                ? { metadata: m.metadata }
+                : {}),
+            },
+          ],
   };
 }
 
@@ -186,12 +220,9 @@ function internalInitiatorMetadataFromBody(
 
 /**
  * Pure-internal routing gate: ONLY bodies whose every part is an internal
- * initiator may take the session.synthetic admission. Mixed bodies —
- * notably foreground-fallback's replay of the user's real parts with an
- * appended internal reminder — must stay on session.prompt so they remain
- * persisted user input and keep their file attachments (the synthetic
- * branch forwards text only). See the mixed-replay regression test and
- * the greptile P1 review on #1158.
+ * initiator may take the session.synthetic admission. Mixed bodies must
+ * stay on session.prompt so they remain persisted user input and keep
+ * their file attachments (the synthetic branch forwards text only).
  */
 function isPureInternalInitiatorBody(args: Record<string, unknown>): boolean {
   const body = (args?.body ?? {}) as {
@@ -400,12 +431,10 @@ export function buildPluginInput(
         // flag, which regressed them into visible user bubbles. v2's
         // dedicated session.synthetic admission keeps the text model-visible
         // while skipping user-message persistence, and its default `resume`
-        // preserves the wake semantics. ONLY purely-internal bodies take
-        // this route — mixed bodies (foreground-fallback's user-parts +
-        // internal reminder replay) must stay on session.prompt to preserve
-        // user-input persistence and file attachments. Hosts without
-        // session.synthetic keep the pre-fix prompt path (visible wake,
-        // metadata intact).
+        // preserves continuation semantics, including fallback reminders.
+        // ONLY purely-internal bodies take this route. Mixed bodies stay
+        // on session.prompt to preserve user input and attachments. Hosts
+        // without session.synthetic keep the prompt path with metadata.
         const internalViaSynthetic =
           isPureInternalInitiatorBody(args) &&
           typeof s.synthetic === 'function';
@@ -426,8 +455,7 @@ export function buildPluginInput(
         // snapshot that can be stale by delivery time (#1079). Purely
         // internal bodies WITHOUT the flag keep the pin semantics: the
         // interview runtime tracks its own model and must keep switching.
-        // Mixed bodies (foreground-fallback replay) still switch;
-        // `modelSwitch: 'required'` still switches.
+        // Required fallback switches still run for internal reminders.
         const inheritPersistedSelection =
           args?.modelSelection === 'inherit' &&
           args?.modelSwitch !== 'required';

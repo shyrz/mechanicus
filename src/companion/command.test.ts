@@ -151,6 +151,18 @@ describe('companion command channel', () => {
     }
   });
 
+  test('has no preset protocol and never mistakes a preset request for navigation', () => {
+    writeCommand({
+      version: 1,
+      action: 'preset',
+      presetName: 'cheap',
+      cwd: ALPHA,
+      requestedAt: REQUESTED_AT,
+    });
+    expect(readCommand(REQUESTED_AT + 1)).toBeUndefined();
+    expect(claimNavigation(ALPHA, REQUESTED_AT + 1)).toBeUndefined();
+  });
+
   test('one window wins a race for the same request', () => {
     writeCommand(navigateCommand());
 

@@ -751,6 +751,45 @@ describe('terminal gate', () => {
       resultSummary: undefined,
     });
   });
+  test('a stable idle v1 textless completion becomes an error after the evidence budget', async () => {
+    const h = harness({
+      input: {
+        client: { session: { status: async () => ({ data: {} }) } },
+      } as never,
+      maxEvidenceRetries: 1,
+      readTerminalEvidence: async () => answer(''),
+    });
+    await h.gate.reconcile(h.run);
+    expect(h.board.get(h.run.taskID)?.state).toBe('running');
+    h.advance(10);
+    await h.gate.reconcile(h.run);
+    expect(h.board.get(h.run.taskID)).toMatchObject({
+      state: 'error',
+      resultSummary: COMPLETED_WITHOUT_TEXT_DIAGNOSTIC,
+    });
+  });
+
+  test('a stable idle v1 pending completion remains uncertain after the evidence budget', async () => {
+    const h = harness({
+      input: {
+        client: { session: { status: async () => ({ data: {} }) } },
+      } as never,
+      maxEvidenceRetries: 0,
+      readTerminalEvidence: async () => {
+        const transcript = answer();
+        transcript.data[1].info.finish = 'tool-calls';
+        return transcript;
+      },
+    });
+    await h.gate.reconcile(h.run);
+    h.advance(10);
+    await h.gate.reconcile(h.run);
+    expect(h.board.get(h.run.taskID)).toMatchObject({
+      state: 'running',
+    });
+    expect(h.board.get(h.run.taskID)?.resultSummary).toBeUndefined();
+  });
+
   test('textless completion needs independent host termination and stabilization, never a parsed label', async () => {
     let terminated = false;
     const h = harness({

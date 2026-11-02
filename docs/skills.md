@@ -31,6 +31,9 @@ broader evidence only when the change's risk or uncertainty warrants it.
 | [`clonedeps`](#clonedeps) | Local dependency source cloning | `orchestrator` |
 | [`deepwork`](#deepwork) | Heavy/complex coding sessions workflow | `orchestrator` |
 | [`verification-planning`](#verification-planning) | Design project-specific evidence before implementation | `orchestrator` |
+| [`step-back`](#step-back) | Reassess direction when patches and workarounds accumulate | `orchestrator` |
+| [`deanchor`](#deanchor) | Infer intent from examples before producing an original result | `orchestrator` |
+| [`ai-estimates`](#ai-estimates) | Estimate AI work separately from human and external delays | `orchestrator` |
 | [`reflect`](#reflect) | Review repeated work and suggest reusable workflow improvements | `orchestrator` |
 | [`worktrees`](#worktrees) | Safe Git worktree lane management | `orchestrator` |
 | [`mechanicus`](#mechanicus) | Plugin configuration and self-improvement guidance | `orchestrator` |
@@ -174,6 +177,32 @@ verification-only dependencies, persistent instrumentation, production debug
 surfaces, or structural changes. Temporary support is removed; durable support
 needs a clear justification. Completed work reports what was established and its
 limitations.
+
+---
+
+## step-back
+
+`step-back` asks the primary agent to reassess the approach when repeated fixes,
+workarounds or compatibility paths accumulate. It explains the drift and a
+cleaner alternative before continuing. Use it when local patches are making
+the overall design harder to maintain.
+
+## deanchor
+
+`deanchor` separates an example's intent and constraints from its incidental
+wording and structure. It helps the primary agent produce an original result
+while following an exact template when the user requests one.
+
+## ai-estimates
+
+`ai-estimates` separates work the AI can perform from human decisions,
+review, real-world testing and external waits. It gives a duration range and
+states the main uncertainty instead of assuming a person does all work alone.
+
+These three skills are granted to `omnissiah` by default, including through
+its `orchestrator` alias. Explicit skill lists and `disabled_skills` retain
+their existing precedence. They use the same installer and customization
+preservation as the other bundled skills.
 
 ---
 

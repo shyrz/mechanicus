@@ -11,6 +11,10 @@ import {
 } from './matching';
 
 describe('apply-patch/matching', () => {
+  test('prefers native trim matching over an earlier unicode-only match', () => {
+    expect(seek(['“key”', '  "key"'], ['"key"'], 0)).toBe(1);
+  });
+
   test('seek finds matches with unicode and trim-end', () => {
     expect(seek(['console.log(“hola”);  '], ['console.log("hola");'], 0)).toBe(
       0,

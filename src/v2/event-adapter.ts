@@ -7,8 +7,8 @@
  *   events (live-verified on v2 hosts);
  * - `session.created` carries flat `{sessionID, parentID?}` instead of
  *   v1's `properties.info` object;
- * - token/cache telemetry moved to `session.usage.updated` /
- *   `session.step.ended` (v2 has no `message.updated`).
+ * - per-request token/cache telemetry moved to `session.step.ended`
+ *   (v2 has no `message.updated`).
  *
  * Payload key: live v2 hosts deliver the event payload under `data`
  * (`{id, created, type, location?, durable?, metadata?, data}` — the
@@ -77,18 +77,15 @@ function payloadOf(event: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * v2 usage telemetry (`session.usage.updated` / `session.step.ended`)
- * → v1 completed-assistant `message.updated`.
+ * v2 per-request `session.step.ended` → v1 completed-assistant
+ * `message.updated`. Session usage updates are cumulative, not requests.
  *
- * The documented v2 event carries no message identity, so `info.id` is a
- * deterministic fingerprint of the telemetry content: the
- * step.ended/usage.updated pair for one request dedups to a single
- * observation (cache-monitor dedups by message id), replays are stable,
- * and genuinely distinct token snapshots stay distinct. No wall-clock or
- * randomness — only fields already on the event.
+ * Use the host's assistant message identity so replays deduplicate without
+ * merging distinct requests that happen to report identical token counts.
  */
 function usageToMessageUpdated(
   props: Record<string, unknown>,
+  event: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
   const sessionID = props.sessionID;
   if (typeof sessionID !== 'string') return undefined;
@@ -107,13 +104,18 @@ function usageToMessageUpdated(
   ) {
     return undefined;
   }
+  const identity = props.assistantMessageID;
+  if (typeof identity !== 'string' || !identity) return undefined;
   const output = finiteNumber(tokens.output) ?? 0;
   const reasoning = finiteNumber(tokens.reasoning) ?? 0;
-  const id = `v2-usage:${sessionID}:${input}:${output}:${cacheRead}:${cacheWrite}`;
+  const id = `v2-usage:${identity}`;
   // cache-monitor only requires a non-null completed marker; prefer a
   // real timestamp from the event when the host provides one.
   const completedAt =
-    finiteNumber(props.timestamp) ?? finiteNumber(props.activityAt) ?? 0;
+    finiteNumber(event.created) ??
+    finiteNumber(props.timestamp) ??
+    finiteNumber(props.activityAt) ??
+    0;
   return {
     type: 'message.updated',
     properties: {
@@ -156,9 +158,14 @@ function formFieldToQuestion(
       }))
     : [];
   const question: Record<string, unknown> = {
-    question: title,
+    question:
+      typeof field.description === 'string' && field.description
+        ? field.description
+        : title,
     // v1 QuestionV1 caps the header at 30 chars.
     header: title.slice(0, 30),
+    // Replies must retain the native form key, not the display header.
+    key: typeof field.key === 'string' && field.key ? field.key : title,
     options,
   };
   if (field.type === 'multiselect') question.multiple = true;
@@ -398,11 +405,8 @@ export function mapV2EventToV1(
         },
       });
     }
-  } else if (
-    type === 'session.usage.updated' ||
-    type === 'session.step.ended'
-  ) {
-    const mapped = usageToMessageUpdated(props);
+  } else if (type === 'session.step.ended') {
+    const mapped = usageToMessageUpdated(props, event);
     if (mapped) out.push(mapped);
   } else if (type === 'form.created') {
     const mapped = formCreatedToQuestionAsked(props);

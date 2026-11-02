@@ -1,16 +1,21 @@
 import { describe, expect, mock, test } from 'bun:test';
 import * as fs from 'node:fs/promises';
-import { appendTaggedSyntheticPart } from '../hooks/cache-safe-injection';
+import {
+  appendTaggedSyntheticPart,
+  appendTrailingVolatileMessage,
+} from '../hooks/cache-safe-injection';
 import { createJsonErrorRecoveryHook } from '../hooks/json-error-recovery/hook';
 import {
   createPhaseReminderHook,
   PHASE_REMINDER_METADATA_KEY,
 } from '../hooks/phase-reminder';
+import { BACKGROUND_JOB_BOARD_METADATA_KEY } from '../hooks/task-session-manager/board-injection';
 import {
   createToolLoopGuardHook,
   LOOP_GUARD_WARNING,
 } from '../hooks/tool-loop-guard/hook';
 import { createV2InterviewBridge, markerText } from './interview-bridge';
+import { applySessionPresetOptions } from './session-preset-store';
 import { createSessionSubmit } from './session-submit';
 import {
   applyCommandMarkerToContext,
@@ -101,6 +106,42 @@ describe('command marker wrap/parse', () => {
     expect(
       stripCommandMarker(`pre ${wrapCommandMarker('deepwork', 'x')} post`),
     ).toBe(`pre ${wrapCommandMarker('deepwork', 'x')} post`);
+  });
+});
+
+describe('v2 session preset cache boundary', () => {
+  test('request options cannot rewrite the stable prompt/tool prefix', async () => {
+    const profile = {
+      model: { providerID: 'provider', id: 'two' },
+      temperature: 0.2,
+      options: { reasoningEffort: 'low' },
+      managedOptionKeys: ['reasoningEffort'],
+    };
+    const handler = createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      applySessionPreset: (event) => applySessionPresetOptions(event, profile),
+    });
+    const render = async () => {
+      const event = makeEvent([
+        { id: 'm1', role: 'user', content: [{ type: 'text', text: 'one' }] },
+        {
+          id: 'm2',
+          role: 'assistant',
+          content: [{ type: 'text', text: 'two' }],
+        },
+      ]);
+      event.model = { providerID: 'provider', id: 'two' };
+      event.options = { temperature: 0.2, reasoningEffort: 'low' };
+      await handler(event);
+      return {
+        prefix: JSON.stringify([event.system, event.messages, event.tools]),
+        options: event.options,
+      };
+    };
+    const first = await render();
+    const second = await render();
+    expect(second.prefix).toBe(first.prefix);
+    expect(second.options).toEqual(first.options);
   });
 });
 
@@ -358,6 +399,37 @@ describe('applyCommandMarkerToContext', () => {
 });
 
 describe('createSessionContextHandler (merged context hook seam)', () => {
+  test('stored history supplies native delivery time only to the observer', async () => {
+    const text =
+      '<subagent sessionID="ses_child" state="completed" description="work">\ndone\n</subagent>';
+    const event = makeEvent([
+      { id: 'msg_delivery', role: 'user', content: [{ type: 'text', text }] },
+    ]);
+    let observedTime: unknown;
+    const sessionContext = mock(async () => [
+      {
+        id: 'msg_delivery',
+        type: 'synthetic',
+        text,
+        time: { created: 2_000 },
+      },
+    ]);
+    const handler = createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      sessionContext,
+      messagesTransform: async (_input, output) => {
+        observedTime = (
+          output.messages[0]?.info as { time?: unknown } | undefined
+        )?.time;
+      },
+    });
+
+    await handler(event);
+    expect(observedTime).toEqual({ created: 2_000 });
+    expect(sessionContext).toHaveBeenCalledTimes(1);
+    expect(event.messages[0]).not.toHaveProperty('time');
+  });
+
   function recordCommandCalls(): {
     calls: Array<{
       command: string;
@@ -651,9 +723,7 @@ describe('context bridge: transcript user-message identity enrichment', () => {
   });
 
   test('end-to-end: a recognized agent now performs the phase-reminder injection it previously skipped', async () => {
-    const phaseReminder = createPhaseReminderHook({
-      shouldInject: () => true,
-    });
+    const phaseReminder = createPhaseReminderHook();
 
     // The pre-fix behavior: the raw v2 transcript message (no
     // sessionID/agent) fails the gate inside the real v1 hook.
@@ -690,6 +760,149 @@ describe('context bridge: transcript user-message identity enrichment', () => {
         PHASE_REMINDER_METADATA_KEY
       ],
     ).toBe(true);
+  });
+});
+
+describe('context bridge: historical agent attribution', () => {
+  test('reconstructs historical reminder bytes across switches and plugin restart', async () => {
+    const user = (id: string) => ({
+      id,
+      role: 'user',
+      content: [{ type: 'text', text: id }],
+    });
+    const history = [
+      { type: 'user', id: 'first' },
+      {
+        type: 'agent-switched',
+        previous: 'orchestrator',
+        agent: 'magos',
+      },
+      { type: 'user', id: 'second' },
+    ];
+    const phase = createPhaseReminderHook();
+    const initial = makeEvent([user('first')]);
+    await createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      sessionContext: async () => [history[0]],
+      messagesTransform: phase['experimental.chat.messages.transform'],
+    })(initial);
+    const historyBefore = structuredClone(history);
+    let reads = 0;
+    const switched = makeEvent([user('first'), user('second')], {
+      agent: 'magos',
+    });
+    const makeHandler = () =>
+      createSessionContextHandler({
+        interviewHandleContext: async () => {},
+        sessionContext: async () => {
+          reads += 1;
+          return history;
+        },
+        messagesTransform: phase['experimental.chat.messages.transform'],
+      });
+
+    await makeHandler()(switched);
+
+    expect(switched.messages[0].agent).toBe('orchestrator');
+    expect(switched.messages[1].agent).toBe('magos');
+    const withoutHint = (parts: Array<Record<string, unknown>>) =>
+      parts.map(({ cache: _cache, ...part }) => part);
+    expect(withoutHint(switched.messages[0].content)).toEqual(
+      withoutHint(initial.messages[0].content),
+    );
+    expect(switched.messages[1].content).toHaveLength(1);
+    const restarted = makeEvent([user('first'), user('second')], {
+      agent: 'magos',
+    });
+    await makeHandler()(restarted);
+    expect(restarted.messages).toEqual(switched.messages);
+    expect(reads).toBe(2);
+    expect(history).toEqual(historyBefore);
+  });
+
+  test.each([
+    {
+      label: 'multiple switches',
+      history: [
+        { type: 'user', id: 'first' },
+        { type: 'agent-switched', previous: 'omnissiah', agent: 'magos' },
+        { type: 'user', id: 'middle' },
+        { type: 'agent-switched', previous: 'incorrect', agent: 'artisan' },
+        { type: 'user', id: 'last' },
+      ],
+      agents: ['omnissiah', 'magos', 'artisan'],
+    },
+    {
+      label: 'marker without previous leaves the earlier segment unknown',
+      history: [
+        { type: 'user', id: 'first' },
+        { type: 'agent-switched', agent: 'magos' },
+        { type: 'user', id: 'middle' },
+      ],
+      agents: ['artisan', 'magos', 'artisan'],
+    },
+    {
+      label: 'markerless history uses the known session agent',
+      history: [{ type: 'user', id: 'first' }],
+      agents: ['artisan', 'artisan', 'artisan'],
+    },
+  ])('$label', async ({ history, agents }) => {
+    const event = makeEvent(
+      ['first', 'middle', 'last'].map((id) => ({
+        id,
+        role: 'user',
+        content: [{ type: 'text', text: id }],
+      })),
+      { agent: 'artisan' },
+    );
+    await createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      sessionContext: async () => history,
+      messagesTransform: async () => {},
+    })(event);
+
+    expect(event.messages.map((message) => message.agent)).toEqual(agents);
+  });
+
+  test('failed history reads retain host attribution and prompt-bridge fallback', async () => {
+    const event = makeEvent(
+      [
+        { id: 'known', role: 'user', content: [] },
+        { id: 'missing', role: 'user', content: [] },
+      ],
+      { agent: undefined },
+    );
+    event.messages[0].agent = 'host-agent';
+    await createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      knownAgentForSession: () => 'omnissiah',
+      sessionContext: async () => {
+        throw new Error('history unavailable');
+      },
+      messagesTransform: async () => {},
+    })(event);
+
+    expect(event.messages.map((message) => message.agent)).toEqual([
+      'host-agent',
+      'omnissiah',
+    ]);
+  });
+
+  test('does not read stored history when the host supplies complete attribution', async () => {
+    const event = makeEvent([{ id: 'known', role: 'user', content: [] }]);
+    event.messages[0].agent = 'host-agent';
+    let reads = 0;
+    await createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      sessionContext: async () => {
+        reads += 1;
+        return [];
+      },
+      messagesTransform: async () => {},
+    })(event);
+
+    expect(reads).toBe(0);
+    expect(event.messages[0].agent).toBe('host-agent');
   });
 });
 
@@ -746,6 +959,55 @@ describe('tool execute bridge normalization', () => {
         input: {},
       }),
     ).rejects.toThrow('duplicate spawn refused');
+  });
+
+  test('delegation capture never adds a model tool argument', async () => {
+    const event = {
+      tool: 'subagent',
+      sessionID: 'ses_parent',
+      agent: 'omnissiah',
+      messageID: 'msg_1',
+      id: 'call_1',
+      input: { agent: 'magos', description: 'd', prompt: 'p' },
+    };
+    const { beforeBridge } = createToolExecuteBridges(
+      async () => {},
+      undefined,
+      async () => {},
+    );
+    await beforeBridge(event);
+    expect(event.input).toEqual({
+      agent: 'magos',
+      description: 'd',
+      prompt: 'p',
+    });
+  });
+
+  test('delegation capture preserves an explicit host per-call model', async () => {
+    let captured: Record<string, unknown> | undefined;
+    const event = {
+      tool: 'subagent',
+      sessionID: 'ses_parent',
+      agent: 'omnissiah',
+      messageID: 'msg_1',
+      id: 'call_1',
+      input: {
+        agent: 'magos',
+        description: 'd',
+        prompt: 'p',
+        model: 'custom/model/with/slashes',
+      },
+    };
+    const { beforeBridge } = createToolExecuteBridges(
+      async () => {},
+      undefined,
+      async ({ args }) => {
+        captured = args;
+      },
+    );
+    await beforeBridge(event);
+    expect(captured?.model).toBe('custom/model/with/slashes');
+    expect(event.input.model).toBe('custom/model/with/slashes');
   });
 
   test('after bridge presents subagent output under task name', async () => {
@@ -1608,6 +1870,52 @@ describe('createSessionPromptBridge (native session.prompt hook)', () => {
 });
 
 describe('context handler: native prompt mode + CacheHint', () => {
+  test('places one breakpoint after stable content and before the volatile board', async () => {
+    const finalPart = { type: 'text', text: 'latest assistant content' };
+    const event = makeEvent([
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `u-${index}`,
+        role: 'user',
+        content: [{ type: 'text', text: `turn-${index}` }],
+      })),
+      { id: 'assistant', role: 'assistant', content: [finalPart] },
+    ]);
+    const handler = createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      messagesTransform: async (_input, output) => {
+        for (const message of output.messages) {
+          if (message.info.role === 'user') {
+            appendTaggedSyntheticPart(message, {
+              text: 'PHASE REMINDER',
+              metadataKey: PHASE_REMINDER_METADATA_KEY,
+            });
+          }
+        }
+        appendTrailingVolatileMessage(
+          output.messages,
+          { role: 'user', sessionID: event.sessionID },
+          {
+            text: 'CHANGING BOARD',
+            metadataKey: BACKGROUND_JOB_BOARD_METADATA_KEY,
+          },
+        );
+      },
+    });
+
+    await handler(event);
+
+    const hinted = event.messages.flatMap((message) =>
+      message.content.filter((part) => part.cache !== undefined),
+    );
+    expect(hinted).toEqual([{ ...finalPart, cache: { type: 'ephemeral' } }]);
+    expect(event.messages[8].content[0]).not.toBe(finalPart);
+    expect(finalPart).toEqual({
+      type: 'text',
+      text: 'latest assistant content',
+    });
+    expect(event.messages.at(-1)?.content[0]?.cache).toBeUndefined();
+  });
+
   test('observeContextAgent runs and the per-request emulation is skipped', async () => {
     const observed: string[] = [];
     const handler = createSessionContextHandler({
@@ -1622,7 +1930,29 @@ describe('context handler: native prompt mode + CacheHint', () => {
     expect(observed).toEqual(['ses_cmd']);
   });
 
-  test('v2-injected parts carry cache:{type:"ephemeral"} via the bridge', async () => {
+  test('does not put a breakpoint on a board-only payload', async () => {
+    const event = makeEvent([]);
+    const handler = createSessionContextHandler({
+      interviewHandleContext: async () => {},
+      messagesTransform: async (_input, output) => {
+        appendTrailingVolatileMessage(
+          output.messages,
+          { role: 'user', sessionID: event.sessionID },
+          {
+            text: 'CHANGING BOARD',
+            metadataKey: BACKGROUND_JOB_BOARD_METADATA_KEY,
+          },
+        );
+      },
+    });
+
+    await handler(event);
+
+    expect(event.messages).toHaveLength(1);
+    expect(event.messages[0].content[0]?.cache).toBeUndefined();
+  });
+
+  test('places a breakpoint on a trailing phase reminder', async () => {
     const message = {
       id: 'u',
       role: 'user',
@@ -1636,10 +1966,9 @@ describe('context handler: native prompt mode + CacheHint', () => {
         if (!target) throw new Error('no message');
         appendTaggedSyntheticPart(target, {
           text: 'INJECTED REMINDER',
-          metadataKey: 'mechanicus_test_tag',
+          metadataKey: PHASE_REMINDER_METADATA_KEY,
         });
       },
-      syntheticPartCacheHint: { type: 'ephemeral' },
     });
 
     await handler(event);
@@ -1648,7 +1977,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
     expect(injected.cache).toEqual({ type: 'ephemeral' });
   });
 
-  test('without the hint dep injected parts stay byte-identical to v1', async () => {
+  test('without recognized injections the bridge adds no cache hints', async () => {
     const message = {
       id: 'u',
       role: 'user',
@@ -1679,9 +2008,8 @@ describe('context handler: native prompt mode + CacheHint', () => {
     });
   });
 
-  test('hint scoping restores the default after the transform', async () => {
-    // Outside the bridged transform, injection must not carry the hint —
-    // proves the set/restore wrapper cannot leak into v1-path calls.
+  test('v1 injection outside the v2 transform keeps its original bytes', async () => {
+    // The v2 breakpoint must not change how the shared v1 helper creates parts.
     const probe: Array<Record<string, unknown>> = [];
     const handler = createSessionContextHandler({
       interviewHandleContext: async () => {},
@@ -1693,7 +2021,6 @@ describe('context handler: native prompt mode + CacheHint', () => {
           metadataKey: 'mechanicus_test_tag',
         });
       },
-      syntheticPartCacheHint: { type: 'ephemeral' },
     });
     await handler(makeEvent([{ id: 'u', role: 'user', content: [] }]));
     appendTaggedSyntheticPart(
@@ -1712,12 +2039,9 @@ describe('context handler: native prompt mode + CacheHint', () => {
     expect(outside.cache).toBeUndefined();
   });
 
-  test('interleaved transforms for two sessions keep their cache-hint scopes (P2 race)', async () => {
-    // Greptile P2 scenario: the v2 host serves different sessions'
-    // requests concurrently (per-session serialization only), so two
-    // context-hook invocations can overlap across the awaited messages
-    // transform. Session A's restore must not clear the scoped default
-    // session B's still-running transform injects with.
+  test('interleaved sessions receive independent cache breakpoints', async () => {
+    // The host can run different sessions' transforms concurrently. Releasing
+    // one must not affect the other session's breakpoint or injected bytes.
     const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
     const gates: Record<string, Array<() => void>> = {
       ses_a: [],
@@ -1737,7 +2061,7 @@ describe('context handler: native prompt mode + CacheHint', () => {
         });
         appendTaggedSyntheticPart(target, {
           text: `INJECTED ${session}`,
-          metadataKey: 'mechanicus_test_tag',
+          metadataKey: PHASE_REMINDER_METADATA_KEY,
         });
       };
     };
@@ -1749,7 +2073,6 @@ describe('context handler: native prompt mode + CacheHint', () => {
       createSessionContextHandler({
         interviewHandleContext: async () => {},
         messagesTransform: makeGatedTransform(session),
-        syntheticPartCacheHint: { type: 'ephemeral' },
       });
 
     const eventA = makeSessionEvent('ses_a');
@@ -1757,12 +2080,12 @@ describe('context handler: native prompt mode + CacheHint', () => {
     const pendingA = makeHandler('ses_a')(eventA);
     await tick(); // A reaches its transform and parks on its gate
     const pendingB = makeHandler('ses_b')(eventB);
-    await tick(); // B enters its transform scope and parks (A still set)
+    await tick(); // B reaches its transform while A is still parked.
 
-    // Release A: it injects and restores its hint scope while B is parked.
+    // A completes while B is still parked.
     for (const resolve of gates.ses_a ?? []) resolve();
     await pendingA;
-    // Only now release B: its part must still carry the v2 cache hint.
+    // B must receive its own breakpoint after A completes.
     for (const resolve of gates.ses_b ?? []) resolve();
     await pendingB;
 

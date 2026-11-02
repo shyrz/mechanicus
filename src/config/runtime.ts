@@ -15,6 +15,8 @@
  * assembly. This module must never expose volatile text for prompts; any
  * prompt-injecting consumer must go through src/hooks/cache-safe-injection.ts.
  */
+
+import { canonicalizeAgentKeys, mergeAgentOverrides } from './agent-overrides';
 import {
   AGENT_ALIASES,
   ALL_AGENT_NAMES,
@@ -33,6 +35,7 @@ import {
 } from './constants';
 import type { CouncilConfig } from './council-schema';
 import { deepMerge } from './loader';
+import { tryResolvePreset } from './presets';
 import { discoverProjectLocalSkillNames } from './project-skills';
 import type {
   AcpAgentsConfig,
@@ -114,69 +117,6 @@ function primaryModelFromOverride(
     return typeof first === 'string' ? first : first?.id;
   }
   return undefined;
-}
-
-/**
- * Normalize a layer's agent keys onto canonical names. Without this, a preset
- * keyed 'explore' and a root entry keyed 'explorer' stay separate records and
- * their fields never combine, so an alias-supplied directive (e.g.
- * skills_include_local) would drop the canonical layer's fields instead of
- * merging with them.
- */
-function canonicalizeAgentKeys(
-  layer: Record<string, AgentOverrideConfig>,
-): Record<string, AgentOverrideConfig> {
-  const out: Record<string, AgentOverrideConfig> = {};
-  for (const [name, value] of Object.entries(layer)) {
-    const canonical = AGENT_ALIASES[name] ?? name;
-    const existing = out[canonical];
-    // Canonical spelling wins when one layer carries both spellings.
-    out[canonical] =
-      existing === undefined || name === canonical
-        ? value
-        : (deepMerge(existing, value) ?? existing);
-  }
-  return out;
-}
-
-/**
- * Merge agent layers while allowing an explicit inheritance policy to clear a
- * model supplied by a lower-precedence layer. A missing `model` normally
- * means "keep the lower layer", but `inheritModelFrom` is an intentional
- * request to use another source instead.
- */
-function mergeAgentOverrides(
-  base: Record<string, AgentOverrideConfig>,
-  override: Record<string, AgentOverrideConfig>,
-): Record<string, AgentOverrideConfig> {
-  const merged =
-    deepMerge(canonicalizeAgentKeys(base), canonicalizeAgentKeys(override)) ??
-    base;
-  for (const [name, agentOverride] of Object.entries(override)) {
-    if (
-      agentOverride.model !== undefined ||
-      agentOverride.inheritModelFrom === undefined
-    ) {
-      continue;
-    }
-    const resolvedName = AGENT_ALIASES[name] ?? name;
-    // A canonical key in the same layer remains authoritative over its
-    // legacy alias. Otherwise, apply the alias directive to the canonical
-    // lower-layer entry so getOverrideFromAgents sees the effective policy.
-    if (resolvedName !== name && Object.hasOwn(override, resolvedName)) {
-      continue;
-    }
-    const entry = merged[resolvedName] ?? merged[name];
-    if (entry) {
-      const updatedEntry = { ...entry };
-      delete updatedEntry.model;
-      if (resolvedName !== name) {
-        updatedEntry.inheritModelFrom = agentOverride.inheritModelFrom;
-      }
-      merged[resolvedName] = updatedEntry;
-    }
-  }
-  return merged;
 }
 
 /** Recursive clone of plain JSON data (drops prototypes, no functions). */
@@ -293,9 +233,10 @@ export class RuntimeConfig {
    */
   agents(): Record<string, AgentOverrideConfig> {
     let base = this.pluginConfig?.agents ?? {};
-    const filePreset = this.pluginConfig?.preset
-      ? this.pluginConfig.presets?.[this.pluginConfig.preset]
-      : undefined;
+    const filePreset = tryResolvePreset(
+      this.pluginConfig?.preset,
+      this.pluginConfig?.presets,
+    );
     if (filePreset) {
       base = mergeAgentOverrides(filePreset, base);
     }
@@ -484,9 +425,10 @@ export class RuntimeConfig {
    * subagent model). Was getConfigPrimaryModel in src/agents/index.ts.
    */
   get primaryModel(): string | undefined {
-    const activePreset = this.preset
-      ? this.pluginConfig?.presets?.[this.preset]
-      : undefined;
+    const activePreset = tryResolvePreset(
+      this.preset,
+      this.pluginConfig?.presets,
+    );
     if (!activePreset) {
       return undefined;
     }
@@ -578,7 +520,9 @@ export class RuntimeConfig {
     if (!name) {
       return undefined;
     }
-    return this.pluginConfig?.presets?.[name];
+    return this.pluginConfig?.presets
+      ? tryResolvePreset(name, this.pluginConfig.presets)
+      : undefined;
   }
 
   private projectLocalSkillNames(): readonly string[] {

@@ -45,7 +45,8 @@ The main idea is simple: instead of forcing one model to do everything, the plug
 - **[Multiplexer integration](docs/multiplexer-integration.md)** - watch agents
   work live in Tmux, Zellij, Herdr, cmux, or kitty panes.
 - **[Preset switching](docs/preset-switching.md)** - swap the whole team's
-  models at runtime with `/preset`.
+models with `/preset`, reuse base presets, and edit local overrides while
+preserving JSONC comments.
 - **[Code intelligence tools](docs/tools.md)** - LSP tools, AST-aware search
   across 25 languages, and built-in MCPs for docs and GitHub code
   search.
@@ -564,7 +565,7 @@ If any agent fails to respond, check your provider authentication and config fil
 Skills are prompt-based instructions injected into an agent's system prompt to
 guide decisions, workflows, and tool use. Unlike MCPs (which are running
 servers), a skill runs no process — it is a focused playbook an agent activates
-when the task calls for it. The installer bundles eight skills and keeps them
+when the task calls for it. The installer bundles eleven skills and keeps them
 updated on plugin auto-update; local customizations are preserved.
 
 > [!TIP]
@@ -577,6 +578,9 @@ updated on plugin auto-update; local customizations are preserved.
 | <img src="img/skills/codemap.webp" width="120" alt="Codemap artifact"><br>[`codemap`](src/skills/codemap/SKILL.md) | Hierarchical repository maps so agents understand codebases without re-reading everything | `orchestrator` | `run codemap` |
 | <img src="img/skills/deepwork.webp" width="120" alt="Deepwork artifact"><br>[`deepwork`](src/skills/deepwork/SKILL.md) | Structured workflow for large, risky, multi-phase coding sessions with review gates | `orchestrator` | `/deepwork <task>` |
 | <img src="img/skills/verification-planning.webp" width="120" alt="Verification Planning artifact"><br>[`verification-planning`](src/skills/verification-planning/SKILL.md) | Plans a project-specific evidence path before non-trivial changes | `orchestrator` | automatic before non-trivial work |
+| [`step-back`](src/skills/step-back/SKILL.md) | Reassesses direction when patches and workarounds accumulate | `orchestrator` | ask to reassess the approach |
+| [`deanchor`](src/skills/deanchor/SKILL.md) | Infers intent from examples before creating an original result | `orchestrator` | provide examples or reference outputs |
+| [`ai-estimates`](src/skills/ai-estimates/SKILL.md) | Separates AI work from human decisions and external waits in estimates | `orchestrator` | ask for a duration estimate |
 | <img src="img/skills/simplify.webp" width="120" alt="Simplify artifact"><br>[`simplify`](src/skills/simplify/SKILL.md) | Behavior-preserving simplification for readability and maintainability | `oracle` | ask for simplification or during review |
 | <img src="img/skills/worktrees.webp" width="120" alt="Worktrees artifact"><br>[`worktrees`](src/skills/worktrees/SKILL.md) | Git worktrees as safe, isolated coding lanes for risky or parallel work | `orchestrator` | `work in a worktree` |
 | <img src="img/skills/clonedeps.webp" width="120" alt="Clonedeps artifact"><br>[`clonedeps`](src/skills/clonedeps/SKILL.md) | Clones dependency source locally so agents can inspect library internals | `orchestrator` | `clone dependencies` |
