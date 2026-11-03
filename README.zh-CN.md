@@ -2,7 +2,7 @@
   <a href="https://github.com/shyrz/mechanicus/stargazers">
     <img src="img/v2.jpg" alt="mechanicus V2 Release" style="border-radius: 10px;">
   </a>
-  <h3>✨ mechanicus ✨</h3>
+  <h3>✨ Mechanicus ✨</h3>
 
   <p><i>七位神圣存在从代码黎明中现身，各自是不朽的工艺大师，<br>等待你的号令，将混沌锻造成秩序，并构建曾被认为不可能之物。</i></p>
 
