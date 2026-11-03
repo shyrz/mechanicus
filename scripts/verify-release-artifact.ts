@@ -276,7 +276,7 @@ function verifyFreshInstall(tarballPath: string) {
     run('bun', ['--eval', tuiSmokeScript], { cwd: installDir });
 
     // v2 hosts install this package with `subpaths: ["server", ""]`; the
-    // exports map must resolve ./server to the self-contained bundle.
+    // exports map must resolve ./server to the bundled server entrypoint.
     const serverSmokeScript = smokeScript.replace(
       "from 'mechanicus';",
       "from 'mechanicus/server';",

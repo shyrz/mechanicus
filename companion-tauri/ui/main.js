@@ -15,13 +15,14 @@
 const root = document.documentElement;
 const content = document.getElementById('content');
 const grid = document.getElementById('grid');
-const label = document.getElementById('label');
 
 /** @type {{ el: HTMLElement, agent: string }[]} */
 let tiles = [];
 let payload = null;
 /** Window-local pointer position in logical px, or null when it is outside. */
 let cursorAt = null;
+let collapsed = false;
+let lastTooltip = null;
 
 /** Whether `el` is under the pointer, measured rather than derived. */
 function cursorOver(el) {
@@ -35,6 +36,25 @@ function cursorOver(el) {
   );
 }
 
+function showTooltip(el) {
+  const project = payload?.session?.project;
+  let request = null;
+  if (el && project && !collapsed) {
+    const box = el.getBoundingClientRect();
+    request = {
+      project,
+      anchor: [box.left, box.top, box.right - box.left, box.bottom - box.top],
+    };
+  }
+  const key = request ? JSON.stringify(request) : null;
+  if (key === lastTooltip) return;
+  lastTooltip = key;
+  core?.invoke('set_project_tooltip', { request }).catch((error) => {
+    lastTooltip = null;
+    console.error('[companion] tooltip failed', error);
+  });
+}
+
 /**
  * Paints the button under the pointer from the position Rust publishes.
  *
@@ -45,11 +65,15 @@ function cursorOver(el) {
  * the stylesheet, so whichever arrives first wins and they cannot disagree.
  */
 function paintHover() {
+  let hovered = null;
   for (const tile of tiles) {
-    tile.el.classList.toggle('cursor-over', cursorOver(tile.el));
+    const over = cursorOver(tile.el);
+    tile.el.classList.toggle('cursor-over', over);
+    if (over) hovered = tile.el;
   }
   // Collapsed, the window is the handle, so anywhere inside it is over the pill.
   content.classList.toggle('cursor-over', cursorAt !== null);
+  showTooltip(hovered);
 }
 
 // ── Rendering ──────────────────────────────────────────────────────────────
@@ -76,7 +100,13 @@ function render(p) {
     tiles = agents.map((agent) => {
       const el = document.createElement('div');
       el.className = 'tile';
-      el.title = agent;
+      el.ariaLabel = agent;
+      el.addEventListener('pointerenter', () => {
+        showTooltip(el);
+      });
+      el.addEventListener('pointerleave', () => {
+        if (!cursorOver(el)) showTooltip(null);
+      });
       // Inline SVG, so the button's colour drives the icon via currentColor.
       el.innerHTML = window.agentIcon(agent);
       grid.appendChild(el);
@@ -94,10 +124,6 @@ function render(p) {
   // the collapsed handle's bar. On `dataset`, because `content.className` is
   // rewritten on every snap payload.
   content.dataset.status = status;
-  label.textContent = p.session ? `${p.session.project} · ${status}` : '';
-  // Rust decides whether a caption fits inside the footprint (a side dock is too
-  // narrow for one); this renders that decision instead of repeating it.
-  label.classList.toggle('is-hidden', p.caption === false);
   // After the class lists above, which would otherwise drop this.
   paintHover();
 
@@ -127,6 +153,7 @@ function applySnap(s) {
   root.style.setProperty('--content-h', `${h}px`);
 
   const progress = s.snapped ? s.progress : 0;
+  collapsed = progress > 0.5;
   root.style.setProperty('--radius', radiusFor(s.target, progress));
   // Tiles give way to the handle as the overlay collapses.
   root.style.setProperty('--tiles-opacity', String(1 - progress));
@@ -137,7 +164,7 @@ function applySnap(s) {
   // Derived from `progress`, not from the payload's `expanded`: the fade is driven
   // by `progress`, and the two can sit far apart (Rust's hover flag versus where the
   // animation actually is), in which case the label and the handle showed at once.
-  content.className = `content${s.target ? ` target-${s.target}` : ''}${progress > 0.5 ? ' collapsed' : ''}`;
+  content.className = `content${s.target ? ` target-${s.target}` : ''}${collapsed ? ' collapsed' : ''}`;
   // `content.className` was just rebuilt, so the hover class is reapplied here.
   paintHover();
 }

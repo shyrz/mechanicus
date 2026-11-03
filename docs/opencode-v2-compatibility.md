@@ -58,7 +58,7 @@ Three builds are produced:
 | Export | File | Build | Externals |
 |---|---|---|---|
 | `.` (main) | `dist/index.js` | `build:plugin` | zod, jsdom, jsonc-parser, @opencode-ai/sdk and its v2 entry, @opencode-ai/plugin/tui, @opentui/*, solid-js; the SDK tool factory is bundled |
-| `./server` | `dist/server/index.js` | `build:v2` | jsdom and jsonc-parser |
+| `./server` | `dist/server/index.js` | `build:v2` | jsdom, jsonc-parser and zod |
 | `./tui` | `dist/tui2.js` | `build:tui` | jsdom, jsonc-parser, @opencode-ai/*, @opentui/*, solid-js; composes the v1 TUI entry and inlines zod |
 
 The optional `@opentui/*` peers track `@opencode/plugin`'s peer floor
@@ -67,7 +67,7 @@ the stable host's peer range.
 
 v2's plugin resolver tries the `server` subpath first
 (`subpaths: ["server", ""]`), which the exports map resolves directly to
-`dist/server/index.js` — the self-contained v2 server bundle, and also the
+`dist/server/index.js` — the v2 server bundle, and also the
 entrypoint v2 loads when the `dist/server` directory is registered directly
 (see [Installing on v2](#installing-on-v2)); the release artifact check
 requires it. v1 uses the main entry.

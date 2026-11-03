@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capabilities for the companion overlay window",
-  "windows": ["main", "snap-overlay"],
+  "windows": ["main", "snap-overlay", "project-tooltip"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",

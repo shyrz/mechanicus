@@ -54,6 +54,20 @@ companion-tauri/
 
 ## Running it
 
+### Prebuilt macOS Apple silicon binary
+
+The experimental standalone executable is available from the
+[Tauri Companion release](https://github.com/shyrz/mechanicus/releases/tag/companion-tauri-v0.1.1).
+The release also includes a SHA-256 checksum. The executable is ad hoc signed,
+not notarized.
+
+Download and extract the archive, then configure `companion.binaryPath` to the
+absolute path of the extracted `mechanicus-companion-tauri` executable. Custom
+paths are not managed by the plugin's auto-updater. The existing automatic
+Companion download continues to install the original egui implementation.
+
+### Build from source
+
 ```bash
 # 1. Build and run. The session id is required — without it the process exits,
 #    exactly like the original companion.
@@ -90,6 +104,10 @@ it to take effect.
   → councillor, plus `intro`, `input`, and `sharp/bot` as the fallback for an
   unknown agent. Icons are inline SVG, so nothing is copied into `ui/` and the
   bundle carries no sprite sheets.
+- Hovering an icon immediately reveals the project name in a black speech
+  bubble. Long names wrap, and the bubble moves above the icon when there is no
+  room below. Waiting/busy states use dashed amber and solid green rings, with
+  the same distinction on the collapsed handle.
 - Native window drag with a click/drag threshold
 - Per-project window position restore
 - Click to reveal the session being shown, as far as the host allows: opened on
@@ -285,6 +303,7 @@ single executable:
 - `installCompanionArchive` extracts one file, `chmod`s it and renames it into
   place — that does not transfer to a bundle.
 
-Both need a bundle-aware branch before this can be distributed. `binaryPath`
-sidesteps them entirely for evaluation: point it at
-`Companion.app/Contents/MacOS/<binary>` so PID tracking keeps working.
+Both need a bundle-aware branch before a macOS app bundle can be installed by
+the plugin. For evaluation, `binaryPath` can point to the standalone release
+executable or to `Companion.app/Contents/MacOS/<binary>`; PID tracking continues
+to work in either case.

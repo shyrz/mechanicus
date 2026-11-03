@@ -5,11 +5,8 @@ import { join } from 'node:path';
 /**
  * Guards for the decisions that moved out of JavaScript.
  *
- * Each of these used to be made twice -- a colour literal in both main.js and the
- * stylesheet, the caption's visibility in both Rust's payload and a CSS selector --
- * and a duplicated decision is one that can disagree with itself. These pin the
- * single owner, because the failure mode is silent: the second copy keeps working
- * until the day the first one changes.
+ * Each of these used to be made twice, with a colour literal in both main.js and
+ * the stylesheet. These pin the single owner so the two cannot drift apart.
  */
 
 const ROOT = join(import.meta.dir, '..', '..');
@@ -74,16 +71,6 @@ describe('companion rendering decisions', () => {
     expect(JS).not.toMatch(/rgba\(\s*255,\s*176,\s*32/);
     expect(JS).not.toMatch(/rgba\(\s*64,\s*200,\s*120/);
     expect(JS).toMatch(/content\.dataset\.status = status/);
-  });
-
-  test('the caption is drawn from the payload, not decided again in CSS', () => {
-    // Rust owns the footprint, so it owns the decision.
-    expect(JS).toMatch(
-      /classList\.toggle\('is-hidden', p\.caption === false\)/,
-    );
-    expect(CSS).toContain('.label.is-hidden');
-    // The old second copy: a selector repeating what the payload already says.
-    expect(CSS).not.toMatch(/target-(left|right) \.label/);
   });
 
   test('hover is painted from the cursor the poll publishes', () => {

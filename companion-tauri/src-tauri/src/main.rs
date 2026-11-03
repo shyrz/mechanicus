@@ -14,6 +14,7 @@ mod pointer;
 mod singleton;
 mod snap;
 mod state;
+mod tooltip;
 mod workarea;
 
 use std::sync::Arc;
@@ -66,17 +67,12 @@ struct Payload {
     button: f32,
     cols: usize,
     rows: usize,
-    /// Whether the caption strip is part of the footprint. False on a side dock,
-    /// where the column is too narrow to show a readable caption.
-    caption: bool,
 }
 
 /// Space between buttons, mirroring the stylesheet's grid gap.
 const BUTTON_GAP: f32 = 6.0;
 /// Padding around the button grid, mirroring the stylesheet's grid padding.
 const GRID_PAD: f32 = 6.0;
-/// Caption strip below the grid: the label's height plus its bottom margin.
-const LABEL_H: f32 = 20.0;
 
 /// Grid shape for `n` agents docked to `target`.
 ///
@@ -123,28 +119,12 @@ fn button_size(size: &str) -> f32 {
 
 /// Expanded content footprint for a `cols` x `rows` grid of `button` discs.
 ///
-/// The caption is added to the height rather than taken out of the grid: the
-/// buttons are a fixed size, so the window has to be tall enough for both. This
-/// is the one place the footprint is computed, so the native window and the
-/// click-through region cannot disagree about it.
-///
-/// `caption` is false for a side dock. One column of buttons is about 48px wide,
-/// which cannot show a caption: the label renders as an ellipsis ("ma…") and
-/// reads as broken text. The status it would carry is already on the ring, so the
-/// strip is dropped rather than squeezed, and the window is that much shorter.
-fn content_size(button: f32, cols: usize, rows: usize, caption: bool) -> (f32, f32) {
+/// The project tooltip has its own click-through window and does not affect the
+/// icon grid's footprint.
+fn content_size(button: f32, cols: usize, rows: usize) -> (f32, f32) {
     let span =
         |n: usize| n as f32 * button + n.saturating_sub(1) as f32 * BUTTON_GAP + GRID_PAD * 2.0;
-    let label = if caption { LABEL_H } else { 0.0 };
-    (span(cols), span(rows) + label)
-}
-
-/// Whether a dock has room for the caption strip.
-fn shows_caption(target: Option<snap::SnapTarget>) -> bool {
-    !matches!(
-        target,
-        Some(snap::SnapTarget::Left | snap::SnapTarget::Right)
-    )
+    (span(cols), span(rows))
 }
 
 fn build_payload(
@@ -192,14 +172,13 @@ fn build_payload(
         button,
         cols,
         rows,
-        caption: shows_caption(target),
     }
 }
 
 impl Payload {
     /// Expanded content footprint, in logical pixels.
     fn content(&self) -> (f32, f32) {
-        content_size(self.button, self.cols, self.rows, self.caption)
+        content_size(self.button, self.cols, self.rows)
     }
 }
 
@@ -646,6 +625,7 @@ fn main() {
 
     tauri::Builder::default()
         .manage(Arc::clone(&snap_controller))
+        .manage(tooltip::TooltipState::default())
         .invoke_handler(tauri::generate_handler![
             get_state,
             reveal_session,
@@ -653,7 +633,11 @@ fn main() {
             set_snap_enabled,
             set_dragging,
             snap_overlay_state,
-            simulate_drop
+            simulate_drop,
+            tooltip::set_project_tooltip,
+            tooltip::project_tooltip_ready,
+            tooltip::measure_project_tooltip,
+            tooltip::show_project_tooltip
         ])
         .setup(move |app| {
             // Match the original companion: a macOS accessory app, so no Dock
@@ -671,6 +655,9 @@ fn main() {
             // to leave the drag loop.
             if let Err(err) = build_overlay_window(app) {
                 eprintln!("[companion-tauri] snap overlay unavailable: {err}");
+            }
+            if let Err(err) = tooltip::build(app) {
+                eprintln!("[companion-tauri] project tooltip unavailable: {err}");
             }
 
             if let Some(window) = app.get_webview_window("main") {
@@ -840,70 +827,28 @@ mod tests {
     }
 
     #[test]
-    fn a_captioned_side_dock_is_not_square_but_an_uncaptioned_one_is() {
-        // Captionless (a side dock): the content must be exactly as wide as it is
-        // tall, or the disc would be drawn as an ellipse.
-        let (w, h) = content_size(36.0, 1, 1, false);
+    fn a_single_button_has_a_square_footprint() {
+        let (w, h) = content_size(36.0, 1, 1);
         assert_eq!(w, 36.0 + GRID_PAD * 2.0);
         assert_eq!(h, 36.0 + GRID_PAD * 2.0);
-
-        // With a caption the strip adds height, which is expected.
-        let (w, h) = content_size(36.0, 1, 1, true);
-        assert_eq!(w, 36.0 + GRID_PAD * 2.0);
-        assert_eq!(h, 36.0 + GRID_PAD * 2.0 + LABEL_H);
-    }
-
-    #[test]
-    fn a_side_dock_drops_the_caption() {
-        // One column is too narrow for a readable caption, so the strip must not
-        // be part of the footprint. Otherwise the window reserves height for text
-        // that renders as an ellipsis.
-        for target in [snap::SnapTarget::Left, snap::SnapTarget::Right] {
-            assert!(
-                !shows_caption(Some(target)),
-                "{target:?} must not reserve caption height"
-            );
-        }
-        // The bottom dock is wide, and a floating overlay has room, so both keep
-        // the caption.
-        assert!(shows_caption(Some(snap::SnapTarget::Bottom)));
-        assert!(shows_caption(None));
-    }
-
-    #[test]
-    fn the_caption_only_changes_height_when_shown() {
-        let captionless = content_size(36.0, 1, 3, false);
-        let captioned = content_size(36.0, 1, 3, true);
-        assert_eq!(captionless.0, captioned.0);
-        assert!((captioned.1 - captionless.1 - LABEL_H).abs() < f32::EPSILON);
     }
 
     #[test]
     fn a_column_is_taller_than_it_is_wide() {
-        let (w, h) = content_size(36.0, 1, 3, false);
+        let (w, h) = content_size(36.0, 1, 3);
         assert!(h > w, "a column of three must be tall: {w}x{h}");
     }
 
     #[test]
     fn a_row_is_wider_than_it_is_tall() {
-        let (w, h) = content_size(36.0, 3, 1, true);
+        let (w, h) = content_size(36.0, 3, 1);
         assert!(w > h, "a row of three must be wide: {w}x{h}");
     }
 
     #[test]
     fn a_bigger_button_tier_widens_the_footprint() {
-        let small = content_size(button_size("small"), 3, 1, true);
-        let large = content_size(button_size("large"), 3, 1, true);
+        let small = content_size(button_size("small"), 3, 1);
+        let large = content_size(button_size("large"), 3, 1);
         assert!(large.0 > small.0);
-    }
-
-    #[test]
-    fn the_caption_is_counted_once() {
-        // The label is a single strip under the grid, so it is added once
-        // whatever the shape -- not per row.
-        let (_, one_row) = content_size(36.0, 3, 1, true);
-        let (_, two_rows) = content_size(36.0, 3, 2, true);
-        let grid_growth = 36.0 + BUTTON_GAP;
-        assert!((two_rows - one_row - grid_growth).abs() < f32::EPSILON);
     }
 }
