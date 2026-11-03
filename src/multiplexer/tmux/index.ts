@@ -9,6 +9,7 @@ import {
   buildOpencodeAttachCommand,
   findBinary,
   gracefulClosePane,
+  redactViewerSecretArgs,
 } from '../shared';
 import { readTmuxPane } from '../tmux-pane-registry';
 import type { Multiplexer, PaneResult, PaneSpawnOptions } from '../types';
@@ -20,6 +21,7 @@ export class TmuxMultiplexer implements Multiplexer {
 
   private binaryPath: string | null = null;
   private hasChecked = false;
+  private supportsSplitEnv = false;
   private storedLayout: MultiplexerLayout;
   private storedMainPaneSize: number;
   private targetPane = process.env.TMUX_PANE;
@@ -36,7 +38,16 @@ export class TmuxMultiplexer implements Multiplexer {
       return this.binaryPath !== null;
     }
 
-    this.binaryPath = await findBinary('tmux', { verify: true });
+    this.binaryPath = await findBinary('tmux', {
+      verify: true,
+      onVerified: (version) => {
+        const match = /^tmux\s+(\d+)\.(\d+)([a-z]?)/i.exec(version);
+        if (!match) return;
+        const major = Number(match[1]);
+        const minor = Number(match[2]);
+        this.supportsSplitEnv = major > 3 || (major === 3 && minor >= 1);
+      },
+    });
     this.hasChecked = true;
     return this.binaryPath !== null;
   }
@@ -58,6 +69,21 @@ export class TmuxMultiplexer implements Multiplexer {
       return { success: false };
     }
 
+    const credentials = [
+      ['OPENCODE_SERVER_PASSWORD', process.env.OPENCODE_SERVER_PASSWORD],
+      ['OPENCODE_SERVER_USERNAME', process.env.OPENCODE_SERVER_USERNAME],
+    ] as const;
+    const credentialArgs = this.supportsSplitEnv
+      ? credentials.flatMap(([name, value]) =>
+          value === undefined ? [] : ['-e', `${name}=${value}`],
+        )
+      : [];
+    const redact = (text: string): string =>
+      credentials.reduce(
+        (result, [, secret]) =>
+          secret ? result.replaceAll(secret, '<redacted>') : result,
+        text,
+      );
     try {
       // Build the attach command
       const opencodeCmd = buildOpencodeAttachCommand(
@@ -70,7 +96,12 @@ export class TmuxMultiplexer implements Multiplexer {
         ? readTmuxPane(options.parentSessionId)
         : undefined;
       let targetPane = registeredTarget ?? this.targetPane;
-      let result = await this.splitPane(tmux, targetPane, opencodeCmd);
+      let result = await this.splitPane(
+        tmux,
+        targetPane,
+        opencodeCmd,
+        credentialArgs,
+      );
 
       if (
         result.exitCode !== 0 &&
@@ -82,7 +113,12 @@ export class TmuxMultiplexer implements Multiplexer {
           fallbackTarget: this.targetPane,
         });
         targetPane = this.targetPane;
-        result = await this.splitPane(tmux, targetPane, opencodeCmd);
+        result = await this.splitPane(
+          tmux,
+          targetPane,
+          opencodeCmd,
+          credentialArgs,
+        );
       }
 
       const paneId = result.stdout.trim();
@@ -90,7 +126,7 @@ export class TmuxMultiplexer implements Multiplexer {
       log('[tmux] spawnPane: result', {
         exitCode: result.exitCode,
         paneId,
-        stderr: result.stderr.trim(),
+        stderr: redact(result.stderr.trim()),
         targetPane,
       });
 
@@ -112,7 +148,7 @@ export class TmuxMultiplexer implements Multiplexer {
 
       return { success: false };
     } catch (err) {
-      log('[tmux] spawnPane: exception', { error: String(err) });
+      log('[tmux] spawnPane: exception', { error: redact(String(err)) });
       return { success: false };
     }
   }
@@ -123,6 +159,8 @@ export class TmuxMultiplexer implements Multiplexer {
     const closed = await gracefulClosePane(tmux, paneId, {
       ctrlC: ['send-keys', '-t', paneId, 'C-c'],
       close: ['kill-pane', '-t', paneId],
+      isAlreadyClosed: (stderr) =>
+        stderr.trim() === `can't find pane: ${paneId}`,
     });
     if (closed) {
       this.paneTargets.delete(paneId);
@@ -238,6 +276,7 @@ export class TmuxMultiplexer implements Multiplexer {
     tmux: string,
     targetPane: string | undefined,
     opencodeCmd: string,
+    credentialArgs: string[],
   ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
     const args = [
       'split-window',
@@ -247,9 +286,13 @@ export class TmuxMultiplexer implements Multiplexer {
       '-F',
       '#{pane_id}',
       ...this.targetArgs(targetPane),
+      ...credentialArgs,
       opencodeCmd,
     ];
-    log('[tmux] spawnPane: executing', { tmux, args });
+    log('[tmux] spawnPane: executing', {
+      tmux,
+      args: redactViewerSecretArgs(args),
+    });
 
     const proc = crossSpawn([tmux, ...args], {
       stdout: 'pipe',

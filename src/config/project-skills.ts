@@ -5,24 +5,37 @@ import { parseFrontmatter } from '../utils/frontmatter';
 /**
  * Discover valid OpenCode skills that belong to the current project.
  *
- * This intentionally mirrors only the project-local `.opencode/skills`
- * portion of OpenCode's broader skill discovery. Global skills, external
+ * This mirrors the project-local `.opencode/skills` and `.agents/skills`
+ * portions of OpenCode's broader skill discovery. Global skills, external
  * compatibility directories, configured extra paths, and URL sources are
  * outside this helper's scope.
  */
 export function discoverProjectLocalSkillNames(
   projectDirectory: string,
 ): string[] {
-  const configuredRoot = path.join(projectDirectory, '.opencode', 'skills');
+  const names = new Set<string>();
+  for (const source of ['.opencode', '.agents'] as const) {
+    for (const name of discoverLocalSkills(projectDirectory, source)) {
+      names.add(name);
+    }
+  }
+  return [...names].sort((left, right) => left.localeCompare(right));
+}
+
+function discoverLocalSkills(
+  projectDirectory: string,
+  source: '.opencode' | '.agents',
+): string[] {
+  const configuredRoot = path.join(projectDirectory, source, 'skills');
   let root: string;
 
   try {
     const canonicalProject = fs.realpathSync(projectDirectory);
     root = fs.realpathSync(configuredRoot);
-    const expectedRoot = path.join(canonicalProject, '.opencode', 'skills');
+    const expectedRoot = path.join(canonicalProject, source, 'skills');
 
     // Keep the opt-in strictly project-local. In particular, do not let a
-    // symlinked `.opencode` or `skills` directory turn this into discovery of
+    // symlinked skill root turn this into discovery of
     // an external/global skill tree.
     if (root !== expectedRoot) {
       return [];

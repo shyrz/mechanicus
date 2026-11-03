@@ -98,8 +98,8 @@ from `index.ts`) that returns the hook points OpenCode invokes.
   injection and on `session-lifecycle.ts` for delete coordination.
 - **Orchestrator-wake**: gates on the task-session-manager's `hasInputWait`
   and continuation-model seams.
-- **Foreground-fallback**: uses `types.ts` replay helpers
-  (`isReplayableUserMessage`, `partsFromReplayMessage`) and reports
+- **Foreground-fallback**: uses `types.ts` to locate an existing user request
+  (`isReplayableUserMessage`), adds only an internal retry reminder and reports
   retryable/deferred errors to the task-session-manager event router.
 
 ### Subdirectories

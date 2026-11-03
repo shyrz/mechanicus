@@ -63,7 +63,7 @@ export function createApplyPatchHook(ctx: PluginInput) {
       input: ToolExecuteBeforeInput,
       output: ToolExecuteBeforeOutput,
     ): Promise<void> => {
-      if (input.tool !== 'apply_patch') {
+      if (input.tool !== 'apply_patch' && input.tool !== 'patch') {
         return;
       }
 

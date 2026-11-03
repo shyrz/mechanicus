@@ -16,6 +16,56 @@ function createHook() {
 }
 
 describe('apply-patch/hook', () => {
+  test('normalizes v2 patch input and keeps verification before native execution', async () => {
+    const root = await createTempDir('v2-patch-hook-');
+    await writeFixture(root, 'sample.txt', 'alpha\nbeta\n');
+    const hook = createHook();
+    const cleanPatchText =
+      '*** Begin Patch\n*** Update File: sample.txt\n@@\n-alpha\n+omega\n*** End Patch';
+    const output = {
+      args: { patchText: `cat <<'PATCH'\n${cleanPatchText}\nPATCH` },
+    };
+    await hook['tool.execute.before'](
+      { tool: 'patch', directory: root },
+      output,
+    );
+    expect(output.args.patchText).toBe(cleanPatchText);
+    const invalid = {
+      args: { patchText: cleanPatchText.replace('-alpha', '-missing') },
+    };
+    await expect(
+      hook['tool.execute.before']({ tool: 'patch', directory: root }, invalid),
+    ).rejects.toThrow('apply_patch verification failed');
+    expect(await readFile(path.join(root, 'sample.txt'), 'utf-8')).toBe(
+      'alpha\nbeta\n',
+    );
+  });
+
+  test('uses the native whitespace anchor before an earlier unicode anchor', async () => {
+    const root = await createTempDir('apply-patch-native-anchor-');
+    await writeFixture(root, 'sample.txt', 'x\n“k”\ny\n  "k"\ny\n');
+    const hook = createHook();
+    const output = {
+      args: {
+        patchText:
+          '*** Begin Patch\n*** Update File: sample.txt\n@@ "k"\n-y\n+Y\n*** End Patch',
+      },
+    };
+    await hook['tool.execute.before'](
+      { tool: 'apply_patch', directory: root },
+      output,
+    );
+    const changes = await preparePatchChanges(
+      root,
+      output.args.patchText,
+      DEFAULT_OPTIONS,
+    );
+    await applyPreparedChanges(changes);
+    expect(await readFile(path.join(root, 'sample.txt'), 'utf-8')).toBe(
+      'x\n“k”\ny\n  "k"\nY\n',
+    );
+  });
+
   test('ignores tools other than apply_patch', async () => {
     const hook = createHook();
     const patchText = '*** Begin Patch\n*** End Patch';

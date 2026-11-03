@@ -109,6 +109,8 @@ Each tool is implemented as a factory function that returns a `ToolDefinition` r
 ```
 1. Agent invokes task_status
    ├─> Resolves task_id to a BackgroundJobBoard entry
+   ├─> diagnostic: true reads bounded, non-final failure evidence for
+   │   error/cancelled/stopped without consuming or acknowledging the task
    ├─> Reads the bounded live session-status snapshot (session-runtime-status)
    ├─> summarizeTaskStatus() (task-policy.ts) prefers the live-confirmed host
    │   status; board state is only reported with explicit uncertainty
@@ -209,6 +211,7 @@ Tools Layer → Web Layer
 
 - **ACP Agents**: Defined in `src/config/agents.ts`, consumed by `acp_run.ts`
 - **Presets**: Defined in plugin config (`mechanicus.jsonc`), persisted by `preset-switch.ts` for the TUI `/preset` manager
+- **Preset editor writes**: `writePresetWithResult` / `deletePresetWithResult` validate inheritance and dependencies, preserve user-only deltas and reject stale editor snapshots. `config/json-file.ts` preserves JSONC during atomic writes; masked global selections fail without writing.
 - **Task Status**: `task-status.ts` consumes `summarizeTaskStatus` from `task-policy.ts` and the live session-status snapshot
 
 

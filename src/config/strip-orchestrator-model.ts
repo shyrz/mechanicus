@@ -1,3 +1,4 @@
+import { tryResolvePreset } from './presets';
 import type { PluginConfig, Preset } from './schema';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -32,6 +33,6 @@ export function applyOrchestratorModelConfig(input: {
   stripOrchestratorModel(
     input.agents,
     input.enabled,
-    presetName ? input.presets?.[presetName] : undefined,
+    tryResolvePreset(presetName, input.presets),
   );
 }

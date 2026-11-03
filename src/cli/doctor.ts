@@ -5,6 +5,7 @@ import {
   mergePluginConfigs,
   normalizeDisabledArrayKeys,
 } from '../config/loader';
+import { PresetResolutionError, resolvePreset } from '../config/presets';
 import { type PluginConfig, PluginConfigSchema } from '../config/schema';
 import { stripJsonComments } from './config-io';
 
@@ -165,13 +166,19 @@ function checkPreset(
     return undefined;
   }
 
-  if (!mergedConfig.presets?.[presetName]) {
+  try {
+    if (!mergedConfig.presets) throw new Error('No presets configured');
+    resolvePreset(presetName, mergedConfig.presets);
+  } catch (error) {
     return {
       preset: presetName,
       ok: false,
       error: {
         kind: 'missing-preset',
-        message: `Preset "${presetName}" not found in config`,
+        message:
+          error instanceof PresetResolutionError
+            ? error.message
+            : `Preset "${presetName}" not found in config`,
       },
     };
   }

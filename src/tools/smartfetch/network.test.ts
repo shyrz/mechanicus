@@ -2,7 +2,9 @@ import { afterEach, describe, expect, mock, test } from 'bun:test';
 import {
   buildAllowedOrigins,
   buildConditionalHeaders,
+  decodeBody,
   fetchWithRedirects,
+  fetchWithUpgradeFallback,
   normalizeUrl,
 } from './network';
 
@@ -12,6 +14,92 @@ describe('smartfetch/network', () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     mock.restore();
+  });
+
+  test('sniffs charset only within the first 2048 HTML bytes', () => {
+    const bytes = Buffer.from(
+      `${' '.repeat(2048)}<meta charset="windows-1252">é`,
+      'utf8',
+    );
+    const result = decodeBody(bytes, undefined, 'text/html');
+    expect(result.decodedCharset).toBe('utf-8');
+    expect(result.text).toEndWith('é');
+  });
+
+  test('discards malformed redirect responses before throwing', async () => {
+    const response = new Response('redirect body', {
+      status: 302,
+      headers: { location: 'http://[invalid' },
+    });
+    globalThis.fetch = mock(async () => response) as unknown as typeof fetch;
+    await expect(
+      fetchWithRedirects(
+        'https://example.com/start',
+        1000,
+        'text',
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('Invalid redirect location');
+    expect(response.body?.locked).toBe(false);
+    expect(response.bodyUsed).toBe(true);
+  });
+
+  test('returns 304 as a conditional response instead of treating it as a redirect', async () => {
+    globalThis.fetch = mock(
+      async () => new Response(null, { status: 304 }),
+    ) as unknown as typeof fetch;
+    const result = await fetchWithRedirects(
+      'https://example.com/cache',
+      1000,
+      'text',
+      new AbortController().signal,
+    );
+    expect('response' in result && result.response.status).toBe(304);
+  });
+
+  test('does not start an HTTP fallback after cancellation', async () => {
+    const controller = new AbortController();
+    const fetchMock = mock(async () => {
+      controller.abort(new Error('cancelled primary fetch'));
+      throw controller.signal.reason;
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await expect(
+      fetchWithUpgradeFallback(
+        normalizeUrl('http://example.com/'),
+        1000,
+        'text',
+        controller.signal,
+      ),
+    ).rejects.toThrow('cancelled primary fetch');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('discards a failed HTTPS response and attempts HTTP fallback only once', async () => {
+    const response = new Response('failed secure response', { status: 500 });
+    const fetchMock = mock(async (input: string | URL | Request) => {
+      if (String(input).startsWith('https:')) return response;
+      throw new Error('HTTP fallback failed');
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    await expect(
+      fetchWithUpgradeFallback(
+        normalizeUrl('http://example.com/'),
+        1000,
+        'text',
+        new AbortController().signal,
+      ),
+    ).rejects.toThrow('HTTP fallback failed');
+    expect(response.bodyUsed).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  test('sniffs repeated incomplete meta tags without unbounded backtracking', () => {
+    const bytes = Buffer.from('<meta '.repeat(200_000));
+    const started = performance.now();
+    const result = decodeBody(bytes, undefined, 'text/html');
+    expect(result.text).toBe(bytes.toString());
+    expect(performance.now() - started).toBeLessThan(1000);
   });
 
   test('normalizeUrl strips the fragment from fetch URLs only', () => {

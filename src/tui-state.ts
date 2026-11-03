@@ -55,6 +55,7 @@ export interface TuiSnapshot {
   reusableByAgent: Record<string, Record<string, TuiReusableSession>>;
 }
 
+export const TUI_SESSION_PARENTS_MAX = 256;
 const STATE_DIR = 'mechanicus';
 const STATE_FILE = 'tui-state.json';
 const STATE_LOCK_RETRY_MS = 5;
@@ -526,6 +527,25 @@ export function updateSnapshot(
       return;
     }
     snapshot.updatedAt = Date.now();
+    // Preserve the conversation links needed by both live and reusable rows.
+    const {
+      sessionParents: parents,
+      activeSessions,
+      reusableByAgent,
+    } = snapshot;
+    const keep = new Set<string>();
+    const destinations = Object.entries(reusableByAgent).flatMap(
+      ([parentID, agents]) => [
+        parentID,
+        ...Object.values(agents).map((session) => session.taskID),
+      ],
+    );
+    for (let id of [...Object.keys(activeSessions), ...destinations]) {
+      for (; parents[id] && !keep.has(id); id = parents[id]) keep.add(id);
+    }
+    for (const key of Object.keys(parents).slice(0, -TUI_SESSION_PARENTS_MAX)) {
+      if (!keep.has(key)) delete parents[key];
+    }
     if (writeTuiSnapshot(snapshot, projectDir)) {
       rememberSnapshot(statePath, snapshot);
     }
@@ -552,17 +572,22 @@ export function recordTuiAgentModel(
     agentName: string;
     model: string;
     variant?: string | null;
+    fallbackVariant?: string | null;
   },
   projectDir: string,
 ): void {
   updateSnapshot(projectDir, (snapshot) => {
     snapshot.agentModels[input.agentName] = input.model;
-    if (input.variant !== undefined) {
-      if (input.variant === null) {
-        delete snapshot.agentVariants[input.agentName];
-      } else {
-        snapshot.agentVariants[input.agentName] = input.variant;
-      }
+    const variant =
+      input.variant !== undefined
+        ? input.variant
+        : snapshot.agentModels[input.agentName] === input.model
+          ? snapshot.agentVariants[input.agentName]
+          : input.fallbackVariant;
+    if (variant === undefined || variant === null) {
+      delete snapshot.agentVariants[input.agentName];
+    } else {
+      snapshot.agentVariants[input.agentName] = variant;
     }
   });
 }

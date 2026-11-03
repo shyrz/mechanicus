@@ -11,8 +11,10 @@ import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { stateFilePath } from './companion/manager';
-import type { MultiplexerConfig } from './config';
+import type { MultiplexerConfig, PluginConfig } from './config';
+import { RuntimeConfig } from './config/runtime';
 import * as wakeHooks from './hooks';
+import { ForegroundFallbackManager } from './hooks/foreground-fallback';
 import {
   getWakeProgress,
   resetOrchestratorWakeGateForTests,
@@ -601,6 +603,49 @@ describe('plugin TUI agent activity', () => {
     await hooks?.dispose?.();
 
     expect(readTuiSnapshot(projectDir).activeSessions).toEqual({});
+  });
+
+  test('message updates preserve the selected variant until the model or variant changes', async () => {
+    const sessionID = 'selected-variant';
+    const info = {
+      sessionID,
+      role: 'assistant',
+      agent: 'oracle',
+      providerID: 'openai',
+      modelID: 'gpt-b',
+    };
+    const snapshot = () => readTuiSnapshot(projectDir);
+
+    await hooks?.['chat.message']?.(
+      {
+        sessionID,
+        agent: 'oracle',
+        model: { providerID: 'openai', modelID: 'gpt-b' },
+        variant: 'high',
+      } as never,
+      {} as never,
+    );
+    await hooks?.event?.({
+      event: { type: 'message.updated', properties: { info } },
+    } as never);
+    expect(snapshot().agentVariants.dominus).toBe('high');
+
+    await hooks?.event?.({
+      event: {
+        type: 'message.updated',
+        properties: { info: { ...info, variant: 'low' } },
+      },
+    } as never);
+    expect(snapshot().agentVariants.dominus).toBe('low');
+
+    await hooks?.event?.({
+      event: {
+        type: 'message.updated',
+        properties: { info: { ...info, modelID: 'gpt-c' } },
+      },
+    } as never);
+    expect(snapshot().agentModels.dominus).toBe('openai/gpt-c');
+    expect(snapshot().agentVariants.dominus).toBe('low');
   });
 
   test('second plugin init in the same PID does not wipe the first instance activity', async () => {
@@ -1515,7 +1560,10 @@ describe('plugin config model inheritance', () => {
     }
   });
 
-  async function loadConfiguredPlugin(config: Record<string, unknown>) {
+  async function loadConfiguredPlugin(
+    config: Record<string, unknown>,
+    runtimePreset?: string,
+  ) {
     const configDir = await mkdtemp('/tmp/oh-my-opencode-inheritance-');
     configDirs.push(configDir);
     await Bun.write(`${configDir}/mechanicus.json`, JSON.stringify(config));
@@ -1526,6 +1574,13 @@ describe('plugin config model inheritance', () => {
       XDG_CACHE_HOME: `${configDir}/cache`,
       OPENCODE_LOG_DIR: `${configDir}/logs`,
     };
+
+    if (runtimePreset) {
+      RuntimeConfig.reset(configDir);
+      RuntimeConfig.init(configDir, config as PluginConfig).setRuntimePreset(
+        runtimePreset,
+      );
+    }
 
     const client = createPluginClient(async () => ({}));
     client.session.status = async () => ({ data: {} });
@@ -1548,6 +1603,41 @@ describe('plugin config model inheritance', () => {
       serverUrl: new URL('http://127.0.0.1:4096'),
     } as never);
   }
+
+  test('disabled fallback skips manager event, tracking and disposal paths', async () => {
+    const events = spyOn(ForegroundFallbackManager.prototype, 'handleEvent');
+    const tracking = spyOn(
+      ForegroundFallbackManager.prototype,
+      'registerSessionAgent',
+    );
+    const disposal = spyOn(ForegroundFallbackManager.prototype, 'dispose');
+    const hooks = await loadConfiguredPlugin({ fallback: { enabled: false } });
+    try {
+      await hooks.config?.({});
+      await hooks['chat.message']?.(
+        { sessionID: 'cold-fallback', agent: 'omnissiah' } as never,
+        {} as never,
+      );
+      await hooks.event?.({
+        event: {
+          type: 'session.error',
+          properties: {
+            sessionID: 'cold-fallback',
+            error: { statusCode: 429 },
+          },
+        },
+      } as never);
+      await hooks.dispose?.();
+
+      expect(events).not.toHaveBeenCalled();
+      expect(tracking).not.toHaveBeenCalled();
+      expect(disposal).not.toHaveBeenCalled();
+    } finally {
+      events.mockRestore();
+      tracking.mockRestore();
+      disposal.mockRestore();
+    }
+  });
 
   async function assertAdmissionUsesFinalModel(
     subagentType: string,
@@ -1704,6 +1794,29 @@ describe('plugin config model inheritance', () => {
       expect(agents.fixer?.temperature).toBe(0.4);
     } finally {
       await hooks.dispose?.();
+    }
+  });
+
+  test('a broken runtime preset chain falls back instead of aborting reload', async () => {
+    const config: PluginConfig = {
+      presets: {
+        stale: { extends: 'missing', agents: {} },
+      },
+      agents: { orchestrator: { model: 'root/model' } },
+    };
+    const hooks = await loadConfiguredPlugin(config, 'stale');
+    const directory = process.env.OPENCODE_CONFIG_DIR;
+    expect(directory).toBeDefined();
+    try {
+      const hostConfig: Record<string, unknown> = {};
+      await hooks.config?.(hostConfig);
+      expect(hooks.agent).toMatchObject({
+        omnissiah: { model: 'root/model' },
+      });
+      expect(RuntimeConfig.get(directory ?? '').getRuntimePreset()).toBeNull();
+    } finally {
+      await hooks.dispose?.();
+      RuntimeConfig.reset(directory);
     }
   });
 

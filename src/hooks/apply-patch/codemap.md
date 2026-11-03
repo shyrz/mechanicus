@@ -20,6 +20,7 @@ The module is organized into five cohesive files:
 - Exports `createApplyPatchHook()` factory that returns the `tool.execute.before` hook
 - Intercepts `apply_patch` tool calls and delegates to `rewritePatch()`
 - Handles error normalization and fail-open/fail-closed behavior
+- Accepts both v1 `apply_patch` and v2 `patch`, using the same `patchText` argument and pre-native verification
 - Logs hook lifecycle events (rewrite, unchanged, skipped, blocked, validation, verification, internal)
 
 ### 2. codec.ts (Patch Serialization)
@@ -30,7 +31,7 @@ The module is organized into five cohesive files:
 - **Diff Algorithm**: Internal diffMatrix for rendering optimized patch chunks
 
 ### 3. matching.ts (Fuzzy Matching Engine)
-- **Comparators**: Multiple line comparison strategies (exact, unicode, trim-end, unicode-trim-end, trim, unicode-trim)
+- **Comparators**: Direct matching prefers exact, trim-end, then trim before Unicode normalization, matching native selection order. Fuzzy rescue retains its conservative exact/Unicode/trim-end set and does not use full-trim anchors.
 - **Prefix/Suffix Rescue**: `rescueByPrefixSuffix()` matches patches by common prefix/suffix patterns
 - **LCS Rescue**: `rescueByLcs()` uses longest common subsequence for fuzzy matching when exact lines not found
 - **Anchor Resolution**: `resolveUniqueAnchor()` finds insertion points for new content
@@ -41,7 +42,7 @@ The module is organized into five cohesive files:
 - **Chunk Resolution**: `locateChunk()` finds where patch chunks should be applied in files
 - **Anchor Handling**: Resolves insertion points for new content using change_context markers
 - **Content Application**: `applyHits()` applies resolved patch hits to file content
-- **State Management**: Tracks canonical old/new lines, rewrite strategies, and match comparators
+- **State Management**: Tracks canonical old/new lines, rewrite strategies, and match comparators. Prefix/suffix rescue builds canonical replacement lines from the original context bytes and the rescued replacement only, preserving unchanged whitespace and Unicode punctuation.
 
 ### 5. rewrite.ts (Patch Rewriting Pipeline)
 - **Dependency Tracking**: Groups patches by file path to handle file moves and multiple operations on same file

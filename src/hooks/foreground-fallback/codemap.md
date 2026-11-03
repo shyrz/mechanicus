@@ -4,7 +4,7 @@
 Runtime model fallback system for foreground (interactive) agent sessions. When OpenCode emits rate-limit signals via `message.updated`, `session.error`, or `session.status` events, this manager:
 - Detects retryable conditions using pattern matching against error messages and status codes (rate limits, 429, 403/Forbidden, 401/410 failover errors)
 - Aborts the rate-limited prompt via `client.session.abort()` on the `session.status` retry path; `session.error` and `message.updated` paths re-prompt directly without abort
-- Retrieves the last user message from the session history
+- Confirms a user request exists in session history without copying its parts
 - Re-prompts the session with the next available model from the agent's configured fallback chain
 - Operates reactively through the event system (cannot wrap `prompt()` directly for interactive sessions)
 - Defers terminal job-board bookkeeping for inline 401/410 errors while recovery is still possible (cooperates with task-session-manager's `willAttemptFallback`)
@@ -29,6 +29,7 @@ Runtime model fallback system for foreground (interactive) agent sessions. When 
 - **No cross-agent bleed**: When agent is identified, only that agent's chain is used (prevents re-prompting with wrong agent's models)
 
 ### Retryable Error Detection
+- **Host error envelopes**: Accepts v2 `provider.rate-limit`, `provider.quota`, `provider.auth` and `provider.internal` classifications. HTTP status lookup accepts integer numbers or exact three-digit strings in the 100–599 range across direct, data, cause and response envelopes. Invalid outer values cannot hide a valid nested status; non-string text fields are ignored.
 - **Pattern matching**: Comprehensive regex patterns for rate-limit error messages (429, "rate limit", "too many requests", "quota exceeded", etc.) plus `isFailoverError` / `isInlineFailoverError` classification for persistent 401/410 provider-model errors
 - **Event coverage**: Handles three OpenCode event types:
   - `message.updated`: Error in message metadata
@@ -56,7 +57,7 @@ Resolve fallback chain for session
     ↓
 Abort current rate-limited prompt (session.status retry path only, with timeout)
     ↓
-Retrieve last user message from session history (replayed via isReplayableUserMessage/partsFromReplayMessage)
+Confirm a user message exists in session history via isReplayableUserMessage
     ↓
 Re-prompt session with next model via promptAsync()
     ↓
@@ -67,9 +68,9 @@ Log fallback event
 
 ### Key Operations
 1. **Abort with timeout**: `abortSessionWithTimeout()` sends Ctrl+C to pane then kills it after 250ms delay
-2. **Message retrieval**: Queries session messages via `client.session.messages()` and finds last user message
+2. **Message retrieval**: Queries session messages via `client.session.messages()` and finds a user request; original text, attachments and part IDs stay in that history
 3. **Model switching**: Uses `parseModelReference()` to extract providerID/modelID from chain entry
-4. **Re-prompting**: Calls `promptAsync()` which queues prompt and returns immediately (non-blocking); appends trusted internal-initiator provenance so the replay is not mistaken for new external user input
+4. **Re-prompting**: Calls `promptAsync()` with only a trusted internal retry reminder. v2 uses `session.synthetic` when available and keeps the required model switch; reduced hosts use the prompt route with internal metadata. Stored user parts are never resubmitted
 5. **Failover deferral**: 401/410 errors (`isFailoverError`) leave terminal job-board bookkeeping to the task-session-manager event router, which defers it while `willAttemptFallback` holds
 
 ## Integration
@@ -86,7 +87,7 @@ Log fallback event
   - `createInternalAgentTextPart()`: Internal-initiator provenance for replays
   - `log()`: Structured logging for observability
 - **SessionLifecycle** (`src/hooks/session-lifecycle.ts`): registers `session.deleted` cleanup
-- **Message types** (`src/hooks/types.ts`): `isReplayableUserMessage` / `partsFromReplayMessage` for safe replay
+- **Message types** (`src/hooks/types.ts`): `isReplayableUserMessage` for locating an existing user request
 - **Configuration**: Fallback chains provided at construction from agent configurations
 
 ### Configuration Schema

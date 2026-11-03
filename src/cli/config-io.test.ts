@@ -3,10 +3,12 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -126,6 +128,64 @@ describe('config-io', () => {
     expect(JSON.parse(readFileSync(`${path}.bak`, 'utf-8'))).toEqual({
       old: true,
     });
+  });
+
+  test('config writes follow relative symlinks and preserve the backup', () => {
+    const targetDir = join(tmpDir, 'dotfiles');
+    mkdirSync(targetDir);
+    const target = join(targetDir, 'config.jsonc');
+    const link = join(tmpDir, 'config.jsonc');
+    const original = '{"preset":"old"}';
+    writeFileSync(target, original);
+    symlinkSync('dotfiles/config.jsonc', link);
+
+    writeConfig(link, { preset: 'new' });
+
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(JSON.parse(readFileSync(target, 'utf8'))).toEqual({
+      preset: 'new',
+    });
+    expect(readFileSync(`${link}.bak`, 'utf8')).toBe(original);
+  });
+
+  test('dangling config symlinks fail without replacing the link', () => {
+    const link = join(tmpDir, 'config.json');
+    symlinkSync('missing.json', link);
+
+    expect(() => writeConfig(link, { enabled: true })).toThrow(
+      'Cannot resolve config path',
+    );
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(existsSync(`${link}.bak`)).toBe(false);
+  });
+
+  test('broken JSONC config is selected for writes and fails clearly', async () => {
+    paths.ensureConfigDir();
+    const link = paths.getConfigJsonc();
+    symlinkSync('missing.jsonc', link);
+
+    const result = await addPluginToOpenCodeConfig();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Cannot resolve config path');
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(existsSync(paths.getConfigJson())).toBe(false);
+  });
+
+  test('resetting a symlinked lite config updates its target', () => {
+    paths.ensureConfigDir();
+    const link = paths.getLiteConfig();
+    const target = join(tmpDir, 'dotfiles.json');
+    const original = '{"preset":"old"}';
+    writeFileSync(target, original);
+    symlinkSync(target, link);
+
+    const result = writeLiteConfig({ reset: true }, link);
+
+    expect(result.success).toBe(true);
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(JSON.parse(readFileSync(target, 'utf8')).preset).toBe('openai');
+    expect(readFileSync(`${link}.bak`, 'utf8')).toBe(original);
   });
 
   test('addPluginToOpenCodeConfig adds plugin and removes duplicates', async () => {

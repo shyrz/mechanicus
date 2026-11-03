@@ -14,6 +14,20 @@ export function quoteShellArg(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+export type PaneShell = 'posix' | 'powershell';
+
+function quoteForShell(value: string, shell?: PaneShell): string {
+  return shell === 'powershell'
+    ? `'${value.replace(/'/g, "''")}'`
+    : quoteShellArg(value);
+}
+
+/** Select the command dialect before selecting the shell launch flags. */
+export function resolvePaneShell(shell = process.env.SHELL): PaneShell {
+  const name = (shell?.split(/[/\\]/).at(-1) ?? '').replace(/\.exe$/i, '');
+  return name === 'pwsh' || name === 'powershell' ? 'powershell' : 'posix';
+}
+
 /** Normalize Windows backslashes to / so sh -lc (MSYS2/Git Bash) doesn't treat them as escape chars. */
 export function normalizePathForShell(directory: string): string {
   return process.platform === 'win32'
@@ -26,16 +40,22 @@ export function buildOpencodeAttachCommand(
   serverUrl: string,
   directory: string,
   executable = 'opencode',
+  shell?: PaneShell,
 ): string {
   const attachDir = normalizePathForShell(directory);
+  const normalizedExecutable = normalizePathForShell(executable);
+  const formattedExecutable =
+    executable === 'opencode'
+      ? executable
+      : `${shell === 'powershell' ? '& ' : ''}${quoteForShell(normalizedExecutable, shell)}`;
   return [
-    executable === 'opencode' ? executable : quoteShellArg(executable),
+    formattedExecutable,
     'attach',
-    quoteShellArg(serverUrl),
+    quoteForShell(serverUrl, shell),
     '--session',
-    quoteShellArg(sessionId),
+    quoteForShell(sessionId, shell),
     '--dir',
-    quoteShellArg(attachDir),
+    quoteForShell(attachDir, shell),
   ].join(' ');
 }
 
@@ -136,7 +156,10 @@ export function resolveHostOpencodeBinary(
 
 export async function findBinary(
   binaryName: string,
-  options: { verify?: boolean } = {},
+  options: {
+    verify?: boolean;
+    onVerified?: (version: string) => void;
+  } = {},
 ): Promise<string | null> {
   const isWindows = process.platform === 'win32';
   const cmd = isWindows ? 'where' : 'which';
@@ -178,6 +201,7 @@ export async function findBinary(
           return null;
         }
         const verifyStdout = await verifyProc.stdout();
+        options.onVerified?.(verifyStdout.trim());
         log(`${logPrefix} findBinary: verified`, {
           version: verifyStdout.trim(),
         });
@@ -196,6 +220,20 @@ export async function findBinary(
   }
 }
 
+/** Keep credentials out of process-argument diagnostics. */
+export function redactViewerSecretArgs(args: readonly string[]): string[] {
+  return args.map((arg) => {
+    const separator = arg.indexOf('=');
+    if (separator === -1) return arg;
+    const name = arg.slice(0, separator);
+    return name === 'OPENCODE_PASSWORD' ||
+      name === 'OPENCODE_SERVER_PASSWORD' ||
+      name === 'OPENCODE_SERVER_USERNAME'
+      ? `${name}=<redacted>`
+      : arg;
+  });
+}
+
 const GRACEFUL_SHUTDOWN_DELAY_MS = 250;
 
 export interface GracefulClosePaneOptions {
@@ -205,6 +243,8 @@ export interface GracefulClosePaneOptions {
   close: string[];
   /** Accept exit code 1 as success (zellij/herdr treat "already closed" as 1). */
   acceptExitCode1?: boolean;
+  /** A backend-specific missing-target response proves the pane is closed. */
+  isAlreadyClosed?: (stderr: string) => boolean;
   /** Return true for empty/unknown paneId instead of false (zellij/herdr behavior). */
   emptyPaneReturnsTrue?: boolean;
   /** Env to pass to the kitten/kitty invocations (e.g. KITTY_LISTEN_ON). */
@@ -232,13 +272,18 @@ export async function gracefulClosePane(
     await new Promise((r) => setTimeout(r, GRACEFUL_SHUTDOWN_DELAY_MS));
 
     const proc = crossSpawn([binary, ...options.close], {
-      stdout: 'ignore',
-      stderr: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: options.env,
     });
-    const exitCode = await proc.exited;
+    const [exitCode, , stderr] = await Promise.all([
+      proc.exited,
+      proc.stdout(),
+      proc.stderr(),
+    ]);
 
     if (exitCode === 0) return true;
+    if (options.isAlreadyClosed?.(stderr)) return true;
     if (options.acceptExitCode1 && exitCode === 1) return true;
     return false;
   } catch {

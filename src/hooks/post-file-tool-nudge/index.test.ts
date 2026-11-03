@@ -63,12 +63,12 @@ describe('post-file-tool-nudge hook', () => {
     expect(reminderParts(freshMessage)).toHaveLength(1);
   });
 
-  test('shared session eligibility suppresses a rejected turn and retains its pending nudge', async () => {
+  test('session eligibility retains a pending nudge without suppressing historical phase reminders', async () => {
     const coordinator = new SessionLifecycle(() => {});
     let isOrchestratorSession = false;
     const shouldInject = () => isOrchestratorSession;
     const nudge = createPostFileToolNudgeHook({ coordinator, shouldInject });
-    const phaseReminder = createPhaseReminderHook({ shouldInject });
+    const phaseReminder = createPhaseReminderHook();
     const rejectedMessage = orchestratorMessage();
 
     await nudge['tool.execute.after']({ tool: 'Read', sessionID: 's1' }, {});
@@ -76,11 +76,12 @@ describe('post-file-tool-nudge hook', () => {
       {},
       { messages: [rejectedMessage] },
     );
+    expect(reminderParts(rejectedMessage)).toHaveLength(0);
     await phaseReminder['experimental.chat.messages.transform'](
       {},
       { messages: [rejectedMessage] },
     );
-    expect(reminderParts(rejectedMessage)).toHaveLength(0);
+    expect(reminderParts(rejectedMessage)).toHaveLength(1);
 
     isOrchestratorSession = true;
     const eligibleMessage = orchestratorMessage();
@@ -88,6 +89,7 @@ describe('post-file-tool-nudge hook', () => {
       {},
       { messages: [eligibleMessage] },
     );
+    expect(reminderParts(eligibleMessage)).toHaveLength(1);
     await phaseReminder['experimental.chat.messages.transform'](
       {},
       { messages: [eligibleMessage] },

@@ -2,6 +2,11 @@
 
 The desktop companion app provides a floating status overlay showing running and active agents.
 
+Companion clicks open a session through the existing navigation channel. The
+current Companion has no preset selection or v2 session-binding protocol. Use
+the [preset controls](preset-switching.md) to select a global default or bind a
+capable v2 session; these are separate operations.
+
 ## How to Enable in Configuration
 
 You can enable the companion by adding a `companion` section to your setting configuration file (`~/.config/opencode/mechanicus.json` or `.opencode/mechanicus.json`):

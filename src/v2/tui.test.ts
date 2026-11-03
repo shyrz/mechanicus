@@ -185,6 +185,29 @@ describe('v2 tui preset plugin', () => {
       ]);
     });
 
+    test('revalidates disk config after the user selects from an open picker', async () => {
+      writeUserConfig({
+        preset: 'balanced',
+        presets: {
+          balanced: { magos: { model: 'one/model' } },
+          cheap: { magos: { model: 'two/model' } },
+        },
+      });
+      const stub = makeStubCtx('cheap');
+      stub.ctx.ui.dialog.select = async () => {
+        writeUserConfig({
+          preset: 'balanced',
+          presets: { balanced: { magos: { model: 'one/model' } } },
+        });
+        return 'cheap';
+      };
+
+      await runPresetFlow(stub.ctx);
+
+      expect(stub.toasts[0]).toContain('not found');
+      expect(readUserConfig().preset).toBe('balanced');
+    });
+
     test('applies a named preset directly without opening the dialog', async () => {
       writeUserConfig({
         preset: 'balanced',

@@ -86,7 +86,8 @@ export function canUseCanonicalCacheAlias(baseUrl: string, aliasUrl: string) {
   try {
     const base = new URL(baseUrl);
     const alias = new URL(aliasUrl);
-    if (alias.username || alias.password) return false;
+    if (base.username || base.password || alias.username || alias.password)
+      return false;
     return (
       base.protocol === alias.protocol &&
       base.hostname === alias.hostname &&
@@ -137,11 +138,11 @@ function acceptHeader(_format: 'text' | 'markdown' | 'html') {
 
 function inferCharsetFromHtml(text: string) {
   const metaCharset = text.match(
-    /<meta[^>]+charset\s*=\s*["']?([^\s"'>/;]+)/i,
+    /<meta[^<>]+charset\s*=\s*["']?([^\s"'>/;]+)/i,
   )?.[1];
   if (metaCharset) return metaCharset.trim();
   const httpEquiv = text.match(
-    /<meta[^>]+http-equiv\s*=\s*["']content-type["'][^>]+content\s*=\s*["'][^"']*charset=([^\s"'>;]+)/i,
+    /<meta[^<>]+http-equiv\s*=\s*["']content-type["'][^<>]+content\s*=\s*["'][^"']*charset=([^\s"'>;]+)/i,
   )?.[1];
   if (httpEquiv) return httpEquiv.trim();
   return undefined;
@@ -274,21 +275,22 @@ export async function fetchWithRedirects(
       },
     });
 
-    if (response.status >= 300 && response.status < 400) {
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
       const location = response.headers.get('location');
       if (!location) {
+        await discard(response);
         throw new Error(
           `Redirect response missing location header: ${response.status}`,
         );
       }
+      if (!URL.canParse(location, current)) {
+        await discard(response);
+        throw new Error(`Invalid redirect location: ${location}`);
+      }
       const next = new URL(location, current).toString();
       redirects.push({ from: current, to: next, status: response.status });
       if (!isPermittedRedirect(current, next, allowedOrigins)) {
-        try {
-          await response.body?.cancel();
-        } catch {
-          // ignore cancel failures
-        }
+        await discard(response);
         return {
           blockedRedirect: true,
           redirectUrl: next,
@@ -296,11 +298,7 @@ export async function fetchWithRedirects(
           redirectChain: redirects,
         };
       }
-      try {
-        await response.body?.cancel();
-      } catch {
-        // ignore cancel failures
-      }
+      await discard(response);
       current = next;
       continue;
     }
@@ -309,6 +307,14 @@ export async function fetchWithRedirects(
   }
 
   throw new Error(`Too many redirects (exceeded ${MAX_REDIRECTS})`);
+}
+
+async function discard(response: Response) {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // A cancellation failure must not mask the fetch result.
+  }
 }
 
 export async function fetchWithUpgradeFallback(
@@ -320,58 +326,46 @@ export async function fetchWithUpgradeFallback(
   method: 'GET' | 'HEAD' = 'GET',
   allowedOrigins?: Set<string>,
 ) {
+  const attempt = (url: string) =>
+    fetchWithRedirects(
+      url,
+      timeoutMs,
+      format,
+      signal,
+      extraHeaders,
+      method,
+      allowedOrigins,
+    );
+  let primary: FetchWithRedirectsResult;
   try {
-    const result = await fetchWithRedirects(
-      normalized.url,
-      timeoutMs,
-      format,
-      signal,
-      extraHeaders,
-      method,
-      allowedOrigins,
-    );
-    if (normalized.fallbackUrl && 'blockedRedirect' in result) {
-      const fallbackResult = await fetchWithRedirects(
-        normalized.fallbackUrl,
-        timeoutMs,
-        format,
-        signal,
-        extraHeaders,
-        method,
-        allowedOrigins,
-      );
-      return { result: fallbackResult, upgradedToHttps: false };
-    }
-    if (
-      normalized.fallbackUrl &&
-      !('blockedRedirect' in result) &&
-      result.response.status !== 304 &&
-      !result.response.ok
-    ) {
-      const fallbackResult = await fetchWithRedirects(
-        normalized.fallbackUrl,
-        timeoutMs,
-        format,
-        signal,
-        extraHeaders,
-        method,
-        allowedOrigins,
-      );
-      return { result: fallbackResult, upgradedToHttps: false };
-    }
-    return { result, upgradedToHttps: normalized.upgradedToHttps };
+    primary = await attempt(normalized.url);
   } catch (error) {
-    if (!normalized.fallbackUrl) throw error;
-    const result = await fetchWithRedirects(
-      normalized.fallbackUrl,
-      timeoutMs,
-      format,
-      signal,
-      extraHeaders,
-      method,
-      allowedOrigins,
-    );
+    if (!normalized.fallbackUrl || signal.aborted) throw error;
+    const result = await attempt(normalized.fallbackUrl);
     return { result, upgradedToHttps: false };
+  }
+  if (
+    !normalized.fallbackUrl ||
+    (!('blockedRedirect' in primary) &&
+      (primary.response.ok || primary.response.status === 304))
+  ) {
+    return { result: primary, upgradedToHttps: normalized.upgradedToHttps };
+  }
+  if (!('blockedRedirect' in primary)) await discard(primary.response);
+  signal.throwIfAborted();
+  try {
+    const result = await attempt(normalized.fallbackUrl);
+    if (
+      'blockedRedirect' in primary &&
+      ('blockedRedirect' in result || !result.response.ok)
+    ) {
+      if (!('blockedRedirect' in result)) await discard(result.response);
+      return { result: primary, upgradedToHttps: normalized.upgradedToHttps };
+    }
+    return { result, upgradedToHttps: false };
+  } catch (error) {
+    if (!('blockedRedirect' in primary) || signal.aborted) throw error;
+    return { result: primary, upgradedToHttps: normalized.upgradedToHttps };
   }
 }
 
@@ -401,7 +395,9 @@ export function decodeBody(
   const utf8Text = new TextDecoder().decode(data);
 
   if (!declaredCharset && contentType && isHtmlLikeContentType(contentType)) {
-    declaredCharset = inferCharsetFromHtml(utf8Text);
+    declaredCharset = inferCharsetFromHtml(
+      new TextDecoder().decode(data.subarray(0, 2048)),
+    );
   }
 
   if (!declaredCharset) {

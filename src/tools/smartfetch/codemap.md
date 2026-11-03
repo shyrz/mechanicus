@@ -9,6 +9,7 @@
 
 - **One orchestration entrypoint:** `createWebfetchTool` in `tool.ts` owns permission prompts, cache lookup/revalidation, llms.txt preference logic, binary-vs-text branching, metadata emission, and optional secondary-model summarization.
 - **Transport/policy split from rendering:** `network.ts` focuses on URL normalization, redirect allowlists, charset/body decoding, header extraction, and llms.txt probing, while `utils.ts` focuses on turning fetched content into cleaned text/markdown/html plus frontmatter and user-facing messages.
+- **Untrusted input bounds:** charset sniffing reads the first 2048 bytes; Markdown cleanup operates by line to avoid cross-line regex backtracking. Redirect error/fallback paths discard unused bodies, and cancellation prevents further fallback requests. Canonical aliases reject credentialed source and destination URLs.
 - **Cache keyed by fetch shape:** `cache.ts` keys fetches by URL plus behavior-affecting options (`extract_main`, `prefer_llms_txt`, `save_binary`), while render format is derived from the cached fetch result so text/markdown/html do not force redundant network requests.
 - **Graceful degradation:** missing/invalid `llms.txt`, blocked redirects, metadata-only binary responses, and secondary-model failures all return a usable result instead of throwing away the fetched content.
 - **Warning-scoped JSDOM construction:** any new JSDOM construction or css-tree trigger point must be wrapped in `withCssTreeWarningsSuppressed` (see `utils.ts`) so css-tree lexer warnings never leak into the host process stderr.

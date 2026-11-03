@@ -37,6 +37,8 @@ export interface V2ToolDefinition {
 }
 export interface V2ToolDraft {
   add(tool: V2ToolDefinition): void;
+  get?(id: string): V2ToolDefinition | undefined;
+  update?(id: string, update: (tool: V2ToolDefinition) => void): void;
 }
 /** A v2 command definition passed to `command.transform` drafts. The command
  * body runs `execute` directly (no template field). */
@@ -63,6 +65,8 @@ export interface V2SessionContextEvent {
   readonly sessionID: string;
   readonly agent: string;
   readonly model: Record<string, unknown>;
+  /** Generation keys and provider options share this host request surface. */
+  options?: Record<string, unknown>;
   system: Array<{ type: 'text'; text: string }>;
   messages: Array<{
     id?: string;
@@ -100,6 +104,7 @@ export interface V2SessionPromptEvent {
   };
   metadata?: Record<string, unknown>;
   readonly delivery?: unknown;
+  readonly signal?: AbortSignal;
 }
 /**
  * v2 `session.model.request` hook payload: fires once per provider request

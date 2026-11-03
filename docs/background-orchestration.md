@@ -191,6 +191,11 @@ the orchestrator session. That lifecycle state is not proof the output was used;
 the orchestrator must still verify it consumed the relevant result before
 finalizing.
 
+Native v1 `<task>` and v2 `<subagent>` completion notices can also acknowledge
+an existing terminal publication when its parent, timestamp and terminal state
+match. One notice cannot retire a later relaunched run, and it never publishes
+a new terminal state without independent result evidence.
+
 Parent terminal notifications are best-effort, with retries bounded by the
 existing notification policy (a zero retry budget still permits the initial
 send). Each transport wait is limited to 10 seconds. No notification attempt
@@ -227,6 +232,14 @@ in-process artifact — on v1 hosts the probe harmlessly never tombstones). On
 OpenCode v2 hosts with the optional `ctx.storage` domain, deletion tombstones
 and alias counters additionally persist across host restarts (see the
 [v2 compatibility doc](opencode-v2-compatibility.md#background-job-state-rehydrate-probe-and-persistence)).
+
+After rehydration, a valid runtime observation is required before terminal
+evidence can settle a running record. If the initial status snapshot is
+unavailable but the session-existence probe succeeds, the gate re-arms its
+bounded runtime read. A completed assistant result can then publish normally;
+pending evidence remains running. Transcript or status read failures alone do
+not prove interruption, and v1 does not infer a restart from an old running
+tool part.
 
 Specialist outputs are inputs, not final truth. The orchestrator reconciles them
 against each other and the original user goal.
@@ -537,6 +550,12 @@ job back to running; the session remains listed under Retained / Recovery until
 revived or evicted. Only explicit terminal task output proves completion, error,
 or cancellation.
 
+On v1, a stable idle session with a completed assistant turn but no public
+text resolves to `error` after the bounded evidence retries. A pending turn
+or unreadable transcript remains uncertain; neither is treated as completion.
+Migrated v1 histories with a completed assistant turn can supply terminal
+evidence when no v2 lifecycle fields are present.
+
 Stopped-job recovery facts are checked again by task ID and run generation
 before a queued recovery wake is delivered. The inline detail queue is bounded;
 when it overflows, the wake carries an explicit overflow signal directing the
@@ -546,6 +565,13 @@ Malformed status entries and failed status requests are surfaced as `status
 uncertain`; they never prove that a job stopped or completed and do not confirm
 a pending stop. Each observation is generation-aware, so a delayed response
 cannot modify a relaunched task.
+
+`task_status(..., diagnostic: true)` provides a separate, read-only failure
+diagnostic for `error`, `cancelled`, and `stopped` tasks. It returns at most
+6 KiB of retained assistant text and error evidence, excluding tool inputs
+and successful tool outputs. The excerpt is not a terminal result and does
+not consume or acknowledge board state. If the bounded transcript read fails,
+the diagnostic says that evidence is unavailable rather than guessing.
 
 ### Background Task Concurrency
 

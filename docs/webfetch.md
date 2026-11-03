@@ -78,6 +78,11 @@ Two modes:
 
 When a cross-origin redirect is blocked by policy, the response explains which
 URL was attempted and provides the redirect URL so you can fetch it directly.
+Malformed redirect responses are discarded before the error is reported.
+Only redirect statuses 301, 302, 303, 307, and 308 are followed; 304 remains
+available to the conditional-cache revalidation path. Cancellation prevents
+HTTP fallback and requests cancelled before permission completes perform no
+network I/O.
 
 ## Secondary Model
 
@@ -112,6 +117,8 @@ returns the raw fetched content as a graceful fallback.
 Fetches are cached in memory with an LRU cache (50 MiB max, 15-minute TTL).
 The cache key includes the URL plus behavior-affecting options (`extract_main`,
 `prefer_llms_txt`, `save_binary`), so changing these re-fetches the URL.
+Canonical aliases never share a credentialed URL's response with an
+unauthenticated URL. Same-document fragments still share a cache entry.
 
 **Revalidation:** Cache entries with `ETag` or `Last-Modified` headers support
 conditional revalidation. When a stale entry exists, `webfetch` sends
@@ -121,6 +128,10 @@ refreshes the TTL without re-downloading.
 **llms.txt validation:** Cached `llms.txt` results are validated — if the
 cached entry doesn't actually look like an llms.txt response (wrong path,
 HTML content, login page), it is evicted and re-fetched.
+
+HTML charset detection inspects only the first 2048 response bytes. Large
+malformed Markdown is cleaned by line with bounded regex matching; fenced
+code examples retain their content.
 
 ## llms.txt Probing
 

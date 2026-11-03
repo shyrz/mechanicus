@@ -9,6 +9,7 @@ Orchestrates phase reminder injection into user messages for the orchestrator ag
 - **Hook Factory**: `createPhaseReminderHook()` returns an OpenCode experimental chat message transformer hook
 - **Non-Mutating Strategy**: Appends phase reminder as a separate message part rather than modifying user-authored text
 - **Targeted Injection**: Only processes messages from the orchestrator agent
+- **Historical Stability**: Reconstructs each eligible primary-agent user message from its own agent attribution, accepting canonical `omnissiah` and legacy `orchestrator`. The current session agent never gates historical reminders. Per-message injection also rebuilds parts previously added by post-file-tool-nudge.
 
 ### Key Components
 - `PHASE_REMINDER` constant (imported from `../../config/constants`)
@@ -28,7 +29,7 @@ Orchestrates phase reminder injection into user messages for the orchestrator ag
 
 1. **Hook Invocation**: OpenCode calls the `experimental.chat.messages.transform` hook before sending messages to API
 2. **Message Analysis**: Iterates backward through messages to find the last user message
-3. **Agent Validation**: Confirms the message is from the orchestrator agent
+3. **Agent Validation**: Checks each historical user message's primary-agent attribution within the current session
 4. **Text Part Detection**: Locates the text part in the message
 5. **Duplicate Prevention**: Checks for existing phase reminder injection
 6. **Injection**: Appends phase reminder as a new text message part

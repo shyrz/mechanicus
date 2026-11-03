@@ -14,6 +14,7 @@
  */
 import type { PluginConfig } from '../config';
 import { loadPluginConfig } from '../config/loader';
+import { tryResolvePreset } from '../config/presets';
 import {
   buildAgentUpdates,
   buildPresetSummary,
@@ -102,8 +103,10 @@ const NO_PRESETS_MESSAGE =
  */
 export function buildPresetOptions(config: PluginConfig): PresetOption[] {
   const presets = config.presets ?? {};
-  return Object.entries(presets).map(([name, preset]) => {
-    const summary = buildPresetSummary(buildAgentUpdates(preset));
+  return Object.keys(presets).map((name) => {
+    const summary = buildPresetSummary(
+      buildAgentUpdates(tryResolvePreset(name, presets) ?? {}),
+    );
     return {
       title: name,
       value: name,
@@ -168,7 +171,13 @@ export async function runPresetFlow(
       current: config.preset,
     });
     if (name === undefined) return;
-    toast(applyPresetByName(directory, config, name).message);
+    toast(
+      applyPresetByName(
+        directory,
+        loadPluginConfig(directory, { silent: true }),
+        name,
+      ).message,
+    );
   } catch (err) {
     log('[v2][tui] preset flow failed', String(err));
     toast(`Preset switch failed: ${String(err)}`);

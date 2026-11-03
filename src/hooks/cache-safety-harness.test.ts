@@ -92,9 +92,7 @@ export function createPipeline(options: PipelineOptions = {}): Pipeline {
     coordinator: lifecycle,
   });
 
-  const phaseReminder = createPhaseReminderHook({
-    shouldInject: shouldInjectOrchestratorReminder,
-  });
+  const phaseReminder = createPhaseReminderHook();
 
   const filterAvailableSkills = createFilterAvailableSkillsHook(
     {} as never,

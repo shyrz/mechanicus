@@ -1,5 +1,7 @@
 import { describe, expect, mock, test } from 'bun:test';
 import { BackgroundJobBoard } from '../utils/background-job-board';
+import { createBackgroundJobTerminalGate } from '../utils/background-job-terminal-gate';
+import { DIAGNOSTIC_MAX_BYTES } from '../utils/child-transcript';
 import { createTaskStatusTool } from './task-status';
 
 let client: Record<string, any>;
@@ -9,13 +11,47 @@ function makeTool(options: {
   board: BackgroundJobBoard;
   now?: () => number;
   statusTimeoutMs?: number;
+  readTimeoutMs?: number;
 }) {
   return createTaskStatusTool({
     input: { directory: '/test' } as any,
     backgroundJobBoard: options.board,
     now: options.now,
     statusTimeoutMs: options.statusTimeoutMs,
+    readTimeoutMs: options.readTimeoutMs,
   });
+}
+
+async function stoppedBoard() {
+  const board = new BackgroundJobBoard();
+  const run = board.registerLaunch({
+    taskID: 'ses_child1',
+    parentSessionID: 'parent-1',
+    agent: 'fixer',
+    description: 'implement',
+    now: 0,
+  });
+  let now = 1;
+  const terminalGate = createBackgroundJobTerminalGate({
+    backgroundJobBoard: board,
+    baselineFor: () => 'baseline',
+    readTerminalEvidence: async () => ({
+      data: [{ info: { id: 'baseline', role: 'user' }, parts: [] }],
+    }),
+    now: () => now,
+    graceMs: 5,
+    readRuntime: async () => ({
+      kind: 'quiescent',
+      origin: 'test',
+      readStartedAt: now,
+    }),
+  });
+  await terminalGate.reconcile(run);
+  expect(board.get(run.taskID)?.state).toBe('running');
+  now = 20;
+  await terminalGate.reconcile(run);
+  expect(board.get(run.taskID)?.state).toBe('stopped');
+  return { board, terminalGate };
 }
 
 describe('task_status', () => {
@@ -219,5 +255,131 @@ describe('task_status', () => {
         sessionID: 'parent-2',
       } as any),
     ).rejects.toThrow('Unknown task ID or alias');
+  });
+
+  test('diagnostic reads bounded failure evidence without exposing tool I/O', async () => {
+    const { board, terminalGate } = await stoppedBoard();
+    client = {
+      session: {
+        messages: mock(async () => ({
+          data: [
+            { info: { role: 'user' }, parts: [] },
+            {
+              info: { role: 'assistant' },
+              parts: [
+                {
+                  type: 'tool',
+                  state: {
+                    status: 'completed',
+                    input: 'PRIVATE INPUT',
+                    output: 'PRIVATE OUTPUT',
+                  },
+                },
+                { type: 'text', text: `${'界'.repeat(3000)}😀partial` },
+              ],
+            },
+          ],
+        })),
+      },
+    };
+    const { task_status } = makeTool({ board });
+    const context = { sessionID: 'parent-1' } as any;
+    const output = await task_status.execute(
+      { task_id: 'ses_child1', diagnostic: true },
+      context,
+    );
+    expect(output).toContain('state: stopped');
+    expect(output).toContain('partial_output: true');
+    expect(output).toContain('not attributed to the current generation');
+    expect(output).toContain('partial');
+    expect(output).not.toContain('PRIVATE');
+    expect(new TextEncoder().encode(output).byteLength).toBeLessThanOrEqual(
+      DIAGNOSTIC_MAX_BYTES,
+    );
+    expect(board.get('ses_child1')?.state).toBe('stopped');
+    await expect(
+      task_status.execute({ task_id: 'ses_child1', diagnostic: true }, context),
+    ).resolves.toBe(output);
+    expect(client.session.messages).toHaveBeenCalledTimes(2);
+    terminalGate.dispose();
+  });
+
+  test('diagnostic deadline returns unavailable evidence without changing the task', async () => {
+    const { board, terminalGate } = await stoppedBoard();
+    try {
+      client = {
+        session: {
+          messages: mock(() => new Promise(() => {})),
+        },
+      };
+      const before = structuredClone(board.get('ses_child1'));
+      const { task_status } = makeTool({ board, readTimeoutMs: 5 });
+      const output = await task_status.execute(
+        {
+          task_id: 'ses_child1',
+          diagnostic: true,
+        },
+        { sessionID: 'parent-1' } as any,
+      );
+      expect(output).toContain('evidence: unavailable');
+      expect(output).toContain('child transcript read timed out');
+      expect(board.get('ses_child1')).toEqual(before);
+    } finally {
+      terminalGate.dispose();
+    }
+  });
+
+  test('diagnostic rejects evidence read across a new generation', async () => {
+    const { board, terminalGate } = await stoppedBoard();
+    try {
+      client = {
+        session: {
+          messages: mock(async () => {
+            board.registerLaunch({
+              taskID: 'ses_child1',
+              parentSessionID: 'parent-1',
+              agent: 'fixer',
+            });
+            return {
+              data: [
+                {
+                  info: { role: 'assistant' },
+                  parts: [{ type: 'text', text: 'stale evidence' }],
+                },
+              ],
+            };
+          }),
+        },
+      };
+      const { task_status } = makeTool({ board });
+      await expect(
+        task_status.execute(
+          {
+            task_id: 'ses_child1',
+            diagnostic: true,
+          },
+          { sessionID: 'parent-1' } as any,
+        ),
+      ).rejects.toThrow('changed generation');
+      expect(board.get('ses_child1')?.state).toBe('running');
+    } finally {
+      terminalGate.dispose();
+    }
+  });
+
+  test('diagnostic refuses a running task instead of presenting a final result', async () => {
+    const board = new BackgroundJobBoard();
+    board.registerLaunch({
+      taskID: 'ses_child1',
+      parentSessionID: 'parent-1',
+      agent: 'fixer',
+    });
+    const { task_status } = makeTool({ board });
+    await expect(
+      task_status.execute({ task_id: 'ses_child1', diagnostic: true }, {
+        sessionID: 'parent-1',
+      } as any),
+    ).resolves.toContain('Diagnostics are only for finished-but-unsuccessful');
+    expect(board.get('ses_child1')?.state).toBe('running');
   });
 });

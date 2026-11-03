@@ -22,6 +22,9 @@
 | `simplify/` | General-purpose | Readability and maintainability guidance skill |
 | `deepwork/` | Orchestrator-only | Heavy coding sessions, multi-phase implementation, and risky refactors |
 | `verification-planning/` | Orchestrator-only | Project-specific evidence planning and verification affordances before non-trivial implementation |
+| `step-back/` | Orchestrator-only | Reassess direction when patches and workarounds accumulate |
+| `deanchor/` | Orchestrator-only | Generalize intent and constraints from examples |
+| `ai-estimates/` | Orchestrator-only | Separate AI work from human and external delays in estimates |
 | `reflect/` | Orchestrator-only | Learning from repeated work and suggesting reusable improvements |
 | `worktrees/` | Orchestrator-only | Safe Git worktree lanes for parallel, risky, or isolated work |
 | `mechanicus/` | Orchestrator-only | Plugin configuration and self-improvement guidance |
@@ -58,6 +61,9 @@
   - `src/skills/clonedeps/SKILL.md`
   - `src/skills/deepwork/SKILL.md`
   - `src/skills/verification-planning/SKILL.md`
+  - `src/skills/step-back/SKILL.md`
+  - `src/skills/deanchor/SKILL.md`
+  - `src/skills/ai-estimates/SKILL.md`
   - `src/skills/reflect/SKILL.md`
   - `src/skills/worktrees/SKILL.md`
   - `src/skills/mechanicus/SKILL.md`

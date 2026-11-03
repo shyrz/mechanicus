@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { loadJSDOM } from '../../utils/jsdom';
 import {
+  cleanFetchedMarkdown,
   extractFromHtml,
   extractHeadingsFromMarkdown,
   joinRenderedContent,
@@ -29,6 +30,40 @@ const CSS_PARSING_ERROR_HTML = `<!DOCTYPE html><html><head>
 </head><body><article><h1>Hello</h1><p>World</p></article></body></html>`;
 
 describe('smartfetch/utils', () => {
+  test('cleans malformed large markdown without quadratic backtracking', () => {
+    const started = performance.now();
+    const input = `${'\u2028'.repeat(350_000)}![`;
+    expect(cleanFetchedMarkdown(input)).toBe('![');
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
+  test('preserves fenced examples while cleaning images and heading permalinks', () => {
+    const example =
+      '```md\n![icon](icon.png)\n# Example [¶](#example "Permanent link")\n```';
+    const result = cleanFetchedMarkdown(
+      [
+        '![icon](icon.png)',
+        '# Heading [¶](#heading "Permanent link")',
+        example,
+      ].join('\n'),
+    );
+    expect(result).toBe(['Image omitted', '# Heading', example].join('\n'));
+  });
+
+  test('bounds large heading and anchor cleanup', () => {
+    const generators = [
+      () => cleanFetchedMarkdown(`${' \t'.repeat(500_000)}(#x)`),
+      () =>
+        cleanFetchedMarkdown(`#${'[¶](#'.repeat(150_000)}"Permanent link")`),
+      () => extractHeadingsFromMarkdown(`# ${'¶'.repeat(500_000)}#`),
+    ];
+    for (const run of generators) {
+      const started = performance.now();
+      run();
+      expect(performance.now() - started).toBeLessThan(1000);
+    }
+  });
+
   test('extracts cleaned headings from markdown', () => {
     const headings = extractHeadingsFromMarkdown(
       ['# Intro', '## Details ###', '### C#', 'plain text'].join('\n'),

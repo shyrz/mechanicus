@@ -101,7 +101,7 @@ export const AgentOverrideConfigSchema = z
       .boolean()
       .optional()
       .describe(
-        "When true, adds every valid skill under the current project's `.opencode/skills/**/SKILL.md` tree to this agent's effective skills list before `skills_remove` is applied. Global and external skill sources are not included.",
+        "When true, adds every valid skill under the current project's `.opencode/skills/**/SKILL.md` and `.agents/skills/**/SKILL.md` trees to this agent's effective skills list before `skills_remove` is applied. Global, ancestor and external skill sources are not included.",
       ),
     mcps: z.array(z.string()).optional(), // MCPs this agent can use ("*" = all, "!item" = exclude)
     prompt: z.string().min(1).optional(),
@@ -158,9 +158,33 @@ export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>;
 /** Normalized model entry with optional per-model variant. */
 export type ModelEntry = { id: string; variant?: string };
 
-export const PresetSchema = z.record(z.string(), AgentOverrideConfigSchema);
+export const PresetAgentsSchema = z.record(
+  z.string(),
+  AgentOverrideConfigSchema,
+);
 
-export type Preset = z.infer<typeof PresetSchema>;
+export type Preset = z.infer<typeof PresetAgentsSchema>;
+
+export const PresetDefinitionSchema = z
+  .object({
+    extends: z.string().min(1).optional(),
+    agents: PresetAgentsSchema,
+  })
+  .strict();
+
+const InlinePresetDefinitionSchema = z
+  .object({ extends: z.string().min(1) })
+  .catchall(AgentOverrideConfigSchema);
+
+/** Raw declarations stay unexpanded until all config layers have merged. */
+export const PresetSchema = z.union([
+  PresetDefinitionSchema,
+  InlinePresetDefinitionSchema,
+  PresetAgentsSchema,
+]);
+
+export type PresetDefinition = z.infer<typeof PresetDefinitionSchema>;
+export type PresetInput = z.infer<typeof PresetSchema>;
 
 // MCP names
 export const McpNameSchema = z.enum(['context7', 'gh_grep']);
@@ -560,7 +584,16 @@ export const PluginConfigSchema = z
 
     if (value.presets) {
       for (const [presetName, preset] of Object.entries(value.presets)) {
-        rejectOrchestratorPromptOnOrchestrator(preset, ctx, [
+        const agents =
+          'agents' in preset &&
+          typeof preset.agents === 'object' &&
+          preset.agents !== null &&
+          !Array.isArray(preset.agents)
+            ? preset.agents
+            : Object.fromEntries(
+                Object.entries(preset).filter(([name]) => name !== 'extends'),
+              );
+        rejectOrchestratorPromptOnOrchestrator(agents as Preset, ctx, [
           'presets',
           presetName,
         ]);

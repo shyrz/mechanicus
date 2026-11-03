@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -86,12 +86,22 @@ export function getTuiConfigJsonc(): string {
   return join(getConfigDir(), 'tui.jsonc');
 }
 
+function existsOrSymlink(filePath: string): boolean {
+  if (existsSync(filePath)) return true;
+  try {
+    return lstatSync(filePath).isSymbolicLink();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 export function getExistingLiteConfigPath(): string {
   const jsonPath = getLiteConfig();
-  if (existsSync(jsonPath)) return jsonPath;
+  if (existsOrSymlink(jsonPath)) return jsonPath;
 
   const jsoncPath = getLiteConfigJsonc();
-  if (existsSync(jsoncPath)) return jsoncPath;
+  if (existsOrSymlink(jsoncPath)) return jsoncPath;
 
   return jsonPath;
 }
@@ -101,20 +111,20 @@ export function getExistingTuiConfigPath(): string {
   if (customConfigPath) return customConfigPath;
 
   const jsonPath = join(getConfigDir(), 'tui.json');
-  if (existsSync(jsonPath)) return jsonPath;
+  if (existsOrSymlink(jsonPath)) return jsonPath;
 
   const jsoncPath = getTuiConfigJsonc();
-  if (existsSync(jsoncPath)) return jsoncPath;
+  if (existsOrSymlink(jsoncPath)) return jsoncPath;
 
   return jsonPath;
 }
 
 export function getExistingConfigPath(): string {
   const jsonPath = getConfigJson();
-  if (existsSync(jsonPath)) return jsonPath;
+  if (existsOrSymlink(jsonPath)) return jsonPath;
 
   const jsoncPath = getConfigJsonc();
-  if (existsSync(jsoncPath)) return jsoncPath;
+  if (existsOrSymlink(jsoncPath)) return jsoncPath;
 
   return jsonPath;
 }

@@ -4,8 +4,8 @@
  * Two consumers need "what did the child session end with?":
  * - `revived-run-tracker` (revive probes, strict v1 transcript shape)
  * - the quiescent host-outcome settle path in `task-session-manager`
- *   (v2 shim shape — `info` carries only `{id, role}`; terminality is
- *   confirmed upstream via `Session.Info.outcome`)
+ *   (v2 shim preserves lifecycle metadata; terminality can be confirmed
+ *   upstream via `Session.Info.outcome`)
  *
  * Both previously carried their own (and subtly different) extraction
  * logic. This module is the single source of truth for reading a v1-style
@@ -29,9 +29,8 @@ interface ChildTranscriptOptions {
   baselineMessageID?: string;
   /** Require `info.time.completed` on the trailing assistant (v1 hosts
    * always provide it once the turn finalizes). Defaults to true; v2
-   * shim shapes pass false because the flat mapping drops `time` —
-   * terminality there is confirmed via the host outcome gate before
-   * this extractor runs. */
+   * shim shapes may pass false when the host outcome gate already
+   * confirmed terminal upstream, or when legacy hosts omitted the field. */
   requireCompletionTime?: boolean;
   /** When the ABSOLUTE trailing message is not an assistant, scan
    * backward for the last assistant and classify that message instead.
@@ -105,12 +104,215 @@ interface LooseMessage {
     role?: unknown;
     error?: unknown;
     finish?: unknown;
-    time?: { completed?: unknown };
+    outcome?: unknown;
+    rawFinish?: unknown;
+    time?: { completed?: unknown; streamed?: unknown };
   };
   parts?: unknown[];
 }
 
 export type TranscriptMessage = LooseMessage;
+
+export const DIAGNOSTIC_MAX_BYTES = 6_144;
+const DIAGNOSTIC_MESSAGE_CHARS = 2_000;
+const DIAGNOSTIC_ITEM_CHARS = 500;
+const DIAGNOSTIC_MESSAGE_PARTS = 100;
+const DIAGNOSTIC_MESSAGES = 40;
+
+/** Slice UTF-16 without splitting a surrogate pair at either boundary. */
+function diagnosticSlice(text: string, start: number, end?: number): string {
+  let sliced = text.slice(start, end);
+  if (/^[\uDC00-\uDFFF]/u.test(sliced)) sliced = sliced.slice(1);
+  if (/[\uD800-\uDBFF]$/u.test(sliced)) sliced = sliced.slice(0, -1);
+  return sliced;
+}
+
+/** Read only known error-message fields; never serialize arbitrary error data. */
+function diagnosticErrorText(error: unknown) {
+  const candidates =
+    typeof error === 'string'
+      ? [error]
+      : isRecord(error)
+        ? [isRecord(error.data) ? error.data.message : undefined, error.message]
+        : [];
+  let truncated = false;
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const text = diagnosticSlice(candidate, -480);
+    truncated ||= candidate.length > text.length;
+    if (text.trim()) return { text, truncated };
+  }
+  return truncated
+    ? { text: '[error details truncated]', truncated: true }
+    : undefined;
+}
+
+/** UTF-8-safe tail trimming, without allocating a copy of an unbounded string. */
+export function diagnosticTail(text: string, maxBytes: number): string {
+  if (maxBytes <= 0) return '';
+  const tail = diagnosticSlice(text, -maxBytes);
+  // Bun's Buffer.byteLength undercounts lone surrogates; encode once instead.
+  let bytes = new TextEncoder().encode(tail).byteLength;
+  let start = 0;
+  let end = tail.length;
+  while (bytes > maxBytes) {
+    const code = tail.charCodeAt(start++);
+    const next = start < end ? tail.charCodeAt(start) : NaN;
+    const dropsLow = next >= 0xdc00 && next <= 0xdfff;
+    // Each cut also removes a leading low and a trailing high, if present.
+    if (code >= 0xd800 && code <= 0xdbff && dropsLow) {
+      bytes -= 4;
+      start++;
+    } else {
+      bytes -= code <= 0x7f ? 1 : code <= 0x7ff ? 2 : 3;
+      if (dropsLow) {
+        bytes -= 3;
+        start++;
+      }
+    }
+    const last = tail.charCodeAt(end - 1);
+    if (start < end && last >= 0xd800 && last <= 0xdbff) {
+      end--;
+      bytes -= 3;
+    }
+  }
+  return tail.slice(start, end);
+}
+
+/** Select before validation so old malformed entries cannot grow the walk. */
+function diagnosticWindow(response: unknown):
+  | { unavailable: string }
+  | {
+      entries: TranscriptMessage[];
+      omittedMessages: number;
+      partsTruncated: boolean;
+    } {
+  if (response === undefined)
+    return { unavailable: 'transcript source not exposed by host' };
+  if (responseError(response) !== undefined)
+    return { unavailable: 'transcript read failed' };
+  if (!isRecord(response) || !Array.isArray(response.data))
+    return { unavailable: 'malformed transcript response' };
+  const omittedMessages = Math.max(
+    0,
+    response.data.length - DIAGNOSTIC_MESSAGES,
+  );
+  let partsTruncated = false;
+  const data = response.data.slice(omittedMessages).map((entry: unknown) => {
+    if (!isRecord(entry) || !Array.isArray(entry.parts)) return entry;
+    if (entry.parts.length > DIAGNOSTIC_MESSAGE_PARTS) partsTruncated = true;
+    return {
+      info: entry.info,
+      parts: entry.parts.slice(-DIAGNOSTIC_MESSAGE_PARTS),
+    };
+  });
+  const entries: TranscriptMessage[] = [];
+  for (const entry of data) {
+    if (
+      !isRecord(entry) ||
+      !isRecord(entry.info) ||
+      (entry.parts !== undefined &&
+        (!Array.isArray(entry.parts) ||
+          entry.parts.some(
+            (part) => !isRecord(part) || typeof part.type !== 'string',
+          )))
+    )
+      return { unavailable: 'malformed transcript entries' };
+    entries.push(entry);
+  }
+  return { entries, omittedMessages, partsTruncated };
+}
+
+/** Bounded, non-final assistant evidence. Never includes tool inputs or
+ * successful tool output. Diagnostic excerpts are not terminal results. */
+export function diagnosticExcerptOf(
+  response: unknown,
+  options: { maxBytes?: number } = {},
+):
+  | { unavailable: string }
+  | { text: string; truncated: string; omittedMessages: number } {
+  const window = diagnosticWindow(response);
+  if ('unavailable' in window) return { unavailable: window.unavailable };
+  const { entries } = window;
+  let charsCut = window.partsTruncated;
+  const budget = Math.max(
+    0,
+    Math.min(DIAGNOSTIC_MAX_BYTES, options.maxBytes ?? DIAGNOSTIC_MAX_BYTES),
+  );
+  const chunks: string[] = [];
+  let omittedMessages = window.omittedMessages;
+  let bytes = 0;
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    if (entry.info?.role !== 'assistant') continue;
+    const pieces: string[] = [];
+    let chars = 0;
+    const add = (text: string, cap: number) => {
+      const room = Math.max(0, DIAGNOSTIC_MESSAGE_CHARS - chars);
+      const clipped =
+        room > 0 ? diagnosticSlice(text, -Math.min(room, cap)) : '';
+      if (text.length > clipped.length) charsCut = true;
+      if (clipped) {
+        pieces.unshift(clipped);
+        chars += clipped.length + 1;
+      }
+    };
+    const detail = diagnosticErrorText(entry.info?.error);
+    if (detail) {
+      if (detail.truncated) charsCut = true;
+      add(`assistant_error: ${detail.text}`, DIAGNOSTIC_ITEM_CHARS);
+    }
+    const parts = Array.isArray(entry.parts) ? entry.parts : [];
+    for (let partIndex = parts.length - 1; partIndex >= 0; partIndex--) {
+      if (chars >= DIAGNOSTIC_MESSAGE_CHARS) {
+        charsCut = true;
+        break;
+      }
+      const part = parts[partIndex];
+      if (!isRecord(part)) continue;
+      if (part.type === 'text' && typeof part.text === 'string')
+        add(part.text, DIAGNOSTIC_MESSAGE_CHARS);
+      if (part.type === 'tool' && isRecord(part.state)) {
+        const status = part.state.status;
+        const error = part.state.error;
+        if (status === 'error' && typeof error === 'string') {
+          if (error.length > 480) charsCut = true;
+          add(
+            `tool_error: ${diagnosticSlice(error, -480)}`,
+            DIAGNOSTIC_ITEM_CHARS,
+          );
+        }
+      }
+    }
+    const text = diagnosticSlice(pieces.join('\n'), -DIAGNOSTIC_MESSAGE_CHARS);
+    chunks.unshift(text);
+    bytes += new TextEncoder().encode(text).byteLength + 1;
+    if (bytes >= budget) {
+      omittedMessages += index;
+      charsCut = true;
+      break;
+    }
+  }
+  const omitted = omittedMessages
+    ? `[... ${omittedMessages} earlier messages omitted ...]\n`
+    : '';
+  let text = chunks.filter(Boolean).join('\n\n');
+  const encoder = new TextEncoder();
+  if (encoder.encode(omitted + text).byteLength > budget) charsCut = true;
+  const marker = charsCut ? '[... truncated ...]\n' : '';
+  text =
+    omitted +
+    marker +
+    diagnosticTail(text, budget - encoder.encode(omitted + marker).byteLength);
+  return {
+    text: diagnosticTail(text, budget),
+    truncated:
+      [omittedMessages ? 'messages' : '', charsCut ? 'chars' : '']
+        .filter(Boolean)
+        .join(',') || 'none',
+    omittedMessages,
+  };
+}
 
 export type TerminalEvidenceVerdict =
   | { verdict: 'completed'; text: string }
@@ -203,7 +405,8 @@ export function classifyTerminalEvidence(
   let target = all.length - 1;
   while (target >= 0 && all[target].info?.role === 'system') target--;
   const trailing = all[target];
-  if (!trailing || trailing.info?.role === 'user') return { verdict: 'absent' };
+  if (!trailing) return { verdict: 'absent' };
+  if (trailing.info?.role === 'user') return { verdict: 'absent' };
   if (trailing.info?.role !== 'assistant')
     return {
       verdict: 'retry',
@@ -224,6 +427,37 @@ export function classifyTerminalEvidence(
       !options.terminalOutcomeConfirmed,
     ),
   );
+}
+
+/** A v1 closure in migrated history, before the host adds v2 lifecycle data. */
+export function classifyMigratedV1Round(
+  response: unknown,
+): TerminalEvidenceVerdict | undefined {
+  if (!isRecord(response) || !Array.isArray(response.data)) return undefined;
+  const messages = response.data as TranscriptMessage[];
+  // Marker-free v2 history resembles migration; wait for lifecycle evidence
+  // rather than guessing that the host has already finished the turn.
+  if (
+    messages.some(
+      (message) =>
+        message.info?.rawFinish !== undefined ||
+        message.info?.time?.streamed !== undefined ||
+        message.info?.outcome !== undefined ||
+        message.info?.role === 'idle',
+    )
+  )
+    return undefined;
+  const assistant = messages.findLast(
+    (message) => message.info?.role === 'assistant',
+  );
+  if (
+    !assistant ||
+    !isRecord(assistant.info?.time) ||
+    typeof assistant.info.time.completed !== 'number' ||
+    (assistant.info?.finish === undefined && assistant.info?.error == null)
+  )
+    return undefined;
+  return classifyTerminalEvidence(response);
 }
 
 export function extractChildTerminalEvidence(

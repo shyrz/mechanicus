@@ -41,6 +41,7 @@ import {
 } from '../cache-safe-injection';
 import type { MessagePart, MessageWithParts } from '../types';
 import { isMessageWithParts, isUserMessageWithParts } from '../types';
+import { messageCreatedAt, parseNativeDelivery } from './native-delivery';
 import { extractTaskSummary, isLateCancelledTaskError } from './status-utils';
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -122,6 +123,8 @@ type SyntheticTerminalProvenanceKind = 'explicit' | 'host-message' | 'legacy';
 const HOST_MESSAGE_OCCURRENCE_PREFIX = 'host-message:';
 
 export interface InjectionState {
+  hostFlavor?: string;
+  observedNativeDeliveries?: Map<string, Map<string, true>>;
   backgroundJobBoard: BackgroundJobStore;
   terminalGate: BackgroundJobTerminalGate;
   lifecycleLedger: BackgroundJobLifecycleLedger;
@@ -1052,6 +1055,122 @@ function reconcileExecutionBatch(
   }
 }
 
+const NATIVE_DELIVERY_PUBLICATION_SKEW_MS = 2_000;
+const NATIVE_DELIVERY_SEEN_CAP = 1024;
+
+function nativeDeliverySeenKey(
+  message: MessageWithParts,
+  partIndex: number,
+  text: string,
+): string {
+  const messageID =
+    typeof message.info.id === 'string' && message.info.id.trim() !== ''
+      ? message.info.id
+      : undefined;
+  const textHash = sha256Hash(text);
+  return messageID === undefined
+    ? `anon:${textHash}`
+    : `${messageID}:${partIndex}:${textHash}`;
+}
+
+function rememberDeliveryKey(seen: Map<string, true>, key: string): void {
+  seen.delete(key);
+  seen.set(key, true);
+  while (seen.size > NATIVE_DELIVERY_SEEN_CAP) {
+    const oldest = seen.keys().next().value;
+    if (oldest === undefined) break;
+    seen.delete(oldest);
+  }
+}
+
+/** Acknowledge only a terminal run already confirmed by the terminal gate.
+ * Parent, timestamp, terminal state and one-shot identity fences keep an old
+ * notice from acknowledging a relaunched or still-running generation. */
+function reconcileObservedNativeDeliveries(
+  state: InjectionState,
+  messages: unknown[],
+): void {
+  state.observedNativeDeliveries ??= new Map<string, Map<string, true>>();
+  const seenByParent = state.observedNativeDeliveries;
+  for (const message of messages) {
+    if (!isMessageWithParts(message)) continue;
+    const parentSessionID = message.info.sessionID;
+    if (!parentSessionID || !state.shouldManageSession(parentSessionID)) {
+      continue;
+    }
+    let seen = seenByParent.get(parentSessionID);
+    if (!seen) {
+      seen = new Map<string, true>();
+      seenByParent.set(parentSessionID, seen);
+    }
+    message.parts.forEach((part, partIndex) => {
+      if (part.type !== 'text' || typeof part.text !== 'string') return;
+      if (isTaggedPart(part, state.metadataKey)) return;
+      const delivery = parseNativeDelivery(
+        part,
+        state.hostFlavor === 'v2' && message.info.role === 'user',
+      );
+      if (!delivery) return;
+      const seenKey = nativeDeliverySeenKey(message, partIndex, part.text);
+      if (seen.has(seenKey)) {
+        rememberDeliveryKey(seen, seenKey);
+        return;
+      }
+      const record = state.backgroundJobBoard.get(delivery.taskID);
+      if (!record || record.parentSessionID !== parentSessionID) return;
+      const deliveryTime = messageCreatedAt(message);
+      if (deliveryTime === undefined) return;
+      if (!record.terminalUnreconciled) {
+        if (
+          record.state === 'running' &&
+          record.lastLiveBusyAt !== undefined &&
+          (deliveryTime < record.lastLiveBusyAt ||
+            deliveryTime < record.lastLaunchedAt)
+        ) {
+          rememberDeliveryKey(seen, seenKey);
+        }
+        return;
+      }
+      // First sight consumes this notice. A later publication must be
+      // acknowledged by its own host delivery, not by replaying this one.
+      rememberDeliveryKey(seen, seenKey);
+      if (deliveryTime < record.lastLaunchedAt) return;
+      if (
+        record.lastLiveBusyAt !== undefined &&
+        deliveryTime < record.lastLiveBusyAt
+      ) {
+        return;
+      }
+      if (
+        record.completedAt !== undefined &&
+        deliveryTime < record.completedAt - NATIVE_DELIVERY_PUBLICATION_SKEW_MS
+      ) {
+        return;
+      }
+      const terminalState = record.terminalState ?? record.state;
+      const interrupted =
+        state.hostFlavor === 'v2' &&
+        delivery.state === 'cancelled' &&
+        (terminalState === 'error' ||
+          terminalState === 'cancelled' ||
+          terminalState === 'stopped');
+      if (
+        !interrupted &&
+        (terminalState !== delivery.state || record.state === 'stopped')
+      ) {
+        return;
+      }
+      reconcileExecutionBatch(state, parentSessionID, [
+        {
+          taskID: record.taskID,
+          generation: record.generation,
+          terminalRevision: record.terminalRevision,
+        },
+      ]);
+    });
+  }
+}
+
 export function rememberInjectedTerminalJobs(
   state: InjectionState,
   parentSessionID: string,
@@ -1153,6 +1272,7 @@ export async function injectBackgroundJobBoard(
   output: { messages?: unknown },
 ): Promise<void> {
   const messages = Array.isArray(output.messages) ? output.messages : [];
+  reconcileObservedNativeDeliveries(state, messages);
 
   if (state.strategy === 'checkpoint-compatible') {
     injectCheckpointBoard(state, messages);

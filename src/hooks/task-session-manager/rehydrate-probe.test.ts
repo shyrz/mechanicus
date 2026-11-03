@@ -79,6 +79,7 @@ function createHook(options: {
   board: BackgroundJobBoard;
   getSession?: (input: Record<string, unknown>) => Promise<unknown>;
   getMessages?: (input: Record<string, unknown>) => Promise<unknown>;
+  getStatus?: (input: Record<string, unknown>) => Promise<unknown>;
   supervisor?: BackgroundJobSupervisor;
   concurrency?: BackgroundTaskConcurrency;
 }) {
@@ -86,7 +87,7 @@ function createHook(options: {
     {
       client: {
         session: {
-          status: mock(async () => ({ data: {} })),
+          status: options.getStatus ?? mock(async () => ({ data: {} })),
           ...(options.getSession ? { get: options.getSession } : {}),
           ...(options.getMessages ? { messages: options.getMessages } : {}),
         },
@@ -103,6 +104,7 @@ function createHook(options: {
       backgroundTaskConcurrency: options.concurrency,
       shouldManageSession: () => true,
       runtimeStatusReconcileDelayMs: 60_000,
+      runtimeStatusTimeoutMs: 50,
     },
   );
 }
@@ -324,6 +326,37 @@ describe('rehydrate session.get existence probe', () => {
     await flushProbe();
 
     expect(board.get('child-live')).toMatchObject({ state: 'running' });
+  });
+
+  test('an unavailable status snapshot re-arms a pending runtime read', async () => {
+    const board = new BackgroundJobBoard();
+    let statusReads = 0;
+    const getStatus = mock(async () => {
+      statusReads += 1;
+      return statusReads === 1 ? {} : { data: {} };
+    });
+    const hook = createHook({
+      board,
+      getSession: mock(async () => ({})),
+      getStatus,
+      getMessages: mock(async () => ({
+        data: [
+          {
+            info: { id: 'assistant-pending', role: 'assistant' },
+            parts: [],
+          },
+        ],
+      })),
+    });
+
+    await runTransform(hook, 'child-runtime-rearm');
+    await Bun.sleep(80);
+
+    expect(getStatus).toHaveBeenCalledTimes(2);
+    expect(board.get('child-runtime-rearm')).toMatchObject({
+      state: 'running',
+      statusUncertain: true,
+    });
   });
 
   test('hosts without session.get skip the probe silently', async () => {

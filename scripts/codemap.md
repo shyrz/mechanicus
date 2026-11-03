@@ -19,6 +19,8 @@
     `src/skills/codemap/SKILL.md`, `src/skills/simplify/SKILL.md`, etc.).
   - Performs clean install smoke by importing the installed server entry with Node and the optional OpenTUI-backed
     `./tui` entry with Bun in a temp project.
+  - Rejects external SDK tool-factory imports and checks registered tool schemas
+    use patched Zod, including when an installed SDK retains an older copy.
 - `verify-opencode-host-smoke.ts`
   - Builds temporary OpenCode environment (bin from `bun add opencode-ai`), mounts the plugin tarball,
     launches `opencode serve`, and probes `http://127.0.0.1:<port>/global/health`.

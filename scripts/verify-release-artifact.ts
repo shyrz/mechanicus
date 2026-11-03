@@ -21,6 +21,7 @@ const suspiciousPathPatterns = [
   /\/home\/[^\s'"`]+(?:node_modules|mechanicus)[^\s'"`]*/,
 ];
 const suspiciousImportPatterns = [/from\s+["']vscode-jsonrpc\/node["']/];
+const sdkToolFactoryImportPattern = /from\s+["']@opencode-ai\/plugin["']/;
 
 const packagedRequiredFiles = [
   'package.json',
@@ -39,6 +40,9 @@ const packagedRequiredFiles = [
   'src/skills/clonedeps/SKILL.md',
   'src/skills/deepwork/SKILL.md',
   'src/skills/verification-planning/SKILL.md',
+  'src/skills/step-back/SKILL.md',
+  'src/skills/deanchor/SKILL.md',
+  'src/skills/ai-estimates/SKILL.md',
   'src/skills/reflect/SKILL.md',
   'src/skills/mechanicus/SKILL.md',
   'src/skills/worktrees/SKILL.md',
@@ -123,11 +127,17 @@ function verifyDistHasNoLeakedPaths() {
       if (!match) continue;
       leaks.push(`${path.relative(repoRoot, file)}: ${match[0]}`);
     }
+    if (file.endsWith('.js')) {
+      const match = content.match(sdkToolFactoryImportPattern);
+      if (match) {
+        leaks.push(`${path.relative(repoRoot, file)}: ${match[0]}`);
+      }
+    }
   }
 
   if (leaks.length > 0) {
     fail(
-      `Built artifact contains machine-specific paths:\n${leaks.join('\n')}`,
+      `Built artifact contains unsafe imports or machine-specific paths:\n${leaks.join('\n')}`,
     );
   }
 }
@@ -220,6 +230,14 @@ function verifyFreshInstall(tarballPath: string) {
       '});',
       'const webfetch = plugin?.tool?.webfetch;',
       "if (typeof webfetch?.execute !== 'function') throw new Error('server plugin did not register webfetch');",
+      'for (const definition of Object.values(plugin.tool ?? {})) {',
+      '  for (const schema of Object.values(definition.args ?? {})) {',
+      '    const version = schema?._zod?.version;',
+      '    if (version?.major !== 4 || version.minor < 6 || (version.minor === 6 && version.patch < 6)) {',
+      "      throw new Error('plugin tool schema uses unpatched Zod');",
+      '    }',
+      '  }',
+      '}',
       'const result = await webfetch.execute({',
       "  url: 'https://example.com/release-smoke',",
       "  format: 'markdown',",
@@ -259,14 +277,10 @@ function verifyFreshInstall(tarballPath: string) {
 
     // v2 hosts install this package with `subpaths: ["server", ""]`; the
     // exports map must resolve ./server to the self-contained bundle.
-    const serverSmokeScript = [
-      "import pkg from 'mechanicus/server';",
-      "if (pkg?.id !== 'mechanicus') throw new Error('server export has an unexpected plugin id');",
-      "if (typeof pkg.server !== 'function') throw new Error('server export is missing a v1 plugin factory');",
-      "if (typeof pkg.setup !== 'function') throw new Error('server export is missing a v2 setup factory');",
-      "console.log('server package loads');",
-      'process.exit(0);',
-    ].join('\n');
+    const serverSmokeScript = smokeScript.replace(
+      "from 'mechanicus';",
+      "from 'mechanicus/server';",
+    );
     console.log('Importing installed server subpath entrypoint...');
     run('node', ['--input-type=module', '--eval', serverSmokeScript], {
       cwd: installDir,

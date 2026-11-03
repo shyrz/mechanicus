@@ -57,12 +57,12 @@ Three builds are produced:
 
 | Export | File | Build | Externals |
 |---|---|---|---|
-| `.` (main) | `dist/index.js` | `build:plugin` | zod, jsdom, @opencode-ai/*, @opentui/* (shared with v1 host) |
-| `./server` | `dist/server/index.js` | `build:v2` | jsdom only (self-contained for v2) |
-| `./tui` | `dist/tui2.js` | `build:tui` | same external set as `build:plugin` (composes the v1 TUI entry; inlines zod) |
+| `.` (main) | `dist/index.js` | `build:plugin` | zod, jsdom, jsonc-parser, @opencode-ai/sdk and its v2 entry, @opencode-ai/plugin/tui, @opentui/*, solid-js; the SDK tool factory is bundled |
+| `./server` | `dist/server/index.js` | `build:v2` | jsdom and jsonc-parser |
+| `./tui` | `dist/tui2.js` | `build:tui` | jsdom, jsonc-parser, @opencode-ai/*, @opentui/*, solid-js; composes the v1 TUI entry and inlines zod |
 
 The optional `@opentui/*` peers track `@opencode/plugin`'s peer floor
-(`>=0.5.10`; pinned exactly at `0.5.11`) so the v2 TUI entry satisfies
+(`>=0.5.10`; pinned exactly at `0.5.16`) so the v2 TUI entry satisfies
 the stable host's peer range.
 
 v2's plugin resolver tries the `server` subpath first
@@ -135,6 +135,12 @@ its probe only ever matters on non-stable host builds.
    shapes: methods the host lacks degrade with an honest log (or are
    omitted entirely, as with `session.get`, so capability probes see the
    truth).
+   Transcript mapping preserves `time`, `finish`/`rawFinish`, `error` and
+   `outcome` so completion evidence remains readable. A native synthetic
+   `<subagent>` completion notice also retains its host metadata. When the
+   context envelope omits its timestamp, the handler reads matching stored
+   history and exposes that time only to the internal delivery observer; the
+   temporary field is removed before the outgoing request is emitted.
 2. Invokes `OhMyOpenCodeLite(pluginInput)` to reuse **all** existing build
    logic (config, agents, tools, hooks, job board, multiplexer, companion).
 3. Runs the v1 `config()` hook against a synthesized config to resolve agent
@@ -159,15 +165,14 @@ its probe only ever matters on non-stable host builds.
       transforms (SystemPart[]/Message.content shape conversion),
       `chat.message` agent tracking, and interview + generic command marker
       dispatch — mutating only the trailing message so earlier content stays
-      byte-identical (provider prompt-cache prefix reuse). While the
-      bridged messages transform runs, parts injected through
-      `cache-safe-injection` carry a v2 `ContentPart.cache`
-      `{type: "ephemeral"}` hint (CacheHint tagging) so providers that
-      honor manual breakpoints cap the injected zone's cache contribution;
-      the hint is scoped per request (an `AsyncLocalStorage` scope around
-      the bridged transform) so concurrent sessions' transforms cannot
-      interleave their set/restore, and the v1 pipeline never enters the
-      scope, so v1 payload bytes never change.
+      byte-identical (provider prompt-cache prefix reuse). After the shared
+      transform, requests containing a phase reminder or background board
+      receive one v2 `ContentPart.cache` `{type: "ephemeral"}` breakpoint
+      on the final stable part. Historical reminders do not each consume a
+      breakpoint, and the volatile trailing board receives none. The bridge
+      copies the target part so the host's original part object stays intact.
+      There is no shared cache-hint state between requests; v1 payload bytes
+      stay unchanged.
     - a native `ctx.session.hook("prompt")` registration (capability-
       guarded): the v2 prompt hook fires **once per admitted input** with
       the eventual inbox User `messageID`, giving the v1 `chat.message`
@@ -225,6 +230,14 @@ its probe only ever matters on non-stable host builds.
       the v1 after-hook output from the error text (so json-error-recovery
       still appends its reminder to a failed call's output), and an
       errored call never presents its result content as a success.
+      A native continuation with `sessionID` but no `agent` bypasses the
+      managed-board relaunch guard and reuses the child's stored inference;
+      v1 explicit-task guards are unchanged. Explicit native continuations
+      keep those guards but do not consume a new-child creation admission.
+      OpenCode v2.2.5 itself rejects
+      that input before plugin hooks because its tool schema requires `agent`
+      and `description`; this bridge guard applies only to hosts that admit
+      the agentless form and is not a claimed v2.2.5 runtime fix.
     - `event` → `ctx.event.subscribe()` loop feeding `mapV2EventToV1`
       (`src/v2/event-adapter.ts`): additive synthesis only — the raw v2 event
       is always dispatched first (the interview bridge depends on it), then
@@ -235,9 +248,10 @@ its probe only ever matters on non-stable host builds.
       cache monitor's session eviction, `properties.sessionID` for the
       task-session-manager's tombstone/board teardown; no `generation` is
       fabricated, so the event-router's unproven-relaunch deletion fence
-      keeps its strength), usage telemetry
-      (`session.usage.updated`/`session.step.ended`) → a deduplicated
-      completed-assistant `message.updated` for the cache monitor, the Form
+      keeps its strength), per-request `session.step.ended` telemetry → a
+      completed-assistant `message.updated` for the cache monitor
+      (deduplicated by `assistantMessageID`; cumulative
+      `session.usage.updated` is not treated as a single request), the Form
       flow (`form.created`/`form.replied`/`form.cancelled`) → v1
       `question.asked`/`question.replied`/`question.rejected`
       (`form.id` → the question request id; forms owned by the `"global"`
@@ -312,7 +326,7 @@ evidence. Independent runtime maps, native returns and cancellation keep their f
 | `/interview` | ✅ | ✅ marker command + trailing-message context bridge | — |
 | Message transforms (phase reminder, skills filter, image routing, display-name rewrite) | ✅ | ✅ via the single context hook | — |
 | Event handling (session tracking, lifecycle, cache telemetry) | ✅ | ✅ event pump + additive v2→v1 synthesis | — |
-| Tool execute hooks (apply-patch recovery, task-session, json-recovery) | ✅ | ✅ `createToolExecuteBridges` with subagent→task normalization | — |
+| Tool execute hooks (apply-patch recovery, task-session, json-recovery) | ✅ | ✅ `createToolExecuteBridges` with subagent→task normalization; rescue accepts native `patch` | — |
 | Built-in MCPs (context7, gh_grep) auto-registered | ✅ | ✅ `ctx.mcp.transform` | `ctx.mcp.transform` is present in all v2.0.x stable hosts; the runtime capability probe is belt-and-suspenders |
 | webfetch secondary-model summaries | ✅ | ✅ via `ctx.generate.text` | host without `ctx.generate` → summaries unavailable (logged) |
 | Background-job state persistence (tombstones, deletion epochs, alias high-water marks) | ➖ process-local | ✅ via `ctx.storage` | optional domain; absent → pure in-memory fallback, zero behavior change (see [Background job state](#background-job-state-rehydrate-probe-and-persistence)) |
@@ -323,6 +337,12 @@ evidence. Independent runtime maps, native returns and cancellation keep their f
 | Orchestrator-wake scheduler | ✅ todo-gated (host `todo`/`children`/`status` APIs) | ✅ children-driven degraded mode (`backgroundJobs.orchestratorWake.mode`) | v2 wake enumerates children via `session.list({parentID})` with an event-tracked fallback, gates on children without a terminal `outcome` (staleness-bounded), and delivers with `queue`; v2's native subagent completion nudges still cover the happy path — the port adds a periodic watchdog for stuck children and unreconciled jobs |
 | `chat.headers` (Copilot `x-initiator` routing) | ✅ | ✅ via `session.hook("model.request")` | transport-level only; auxiliary kinds are covered by v2's built-in Copilot provider hook |
 | Companion app | ✅ | ⚠️ unverified | independent desktop app; test separately against v2 |
+
+Foreground fallback also recognizes v2 structured provider rate-limit, quota,
+auth and internal errors when their message has no matching keyword. HTTP
+status lookup accepts valid integer codes and exact three-digit strings in
+direct, data, cause and response envelopes. This preserves the existing
+configured model chain, retry budgets and task-generation fences.
 
 ## Upstream behaviors to know
 
@@ -370,13 +390,14 @@ currently break this plugin:
   (phase-reminder, background-job-board, post-file-tool-nudge) key on
   user-message `info.agent`/`info.sessionID`, so every injection would
   skip. The v2 context bridge stamps the context event's `sessionID` and
-  the session's known agent (from the event, falling back to the
-  session-prompt bridge's learned state) onto transcript user messages
-  before the bridged messages transform runs — metadata-only envelope
-  enrichment, strictly absence-gated (host-provided values never
-  overwritten), parts/content bytes untouched, idempotent across
-  context events. This also makes the CacheHint-tagged injected parts
-  observable on live v2 hosts.
+  reconstructs each user message's agent from durable `agent-switched`
+  markers in stored history before the shared transform runs. Host-provided
+  identity wins; missing markers or failed reads fall back to the event's
+  current agent, then the session-prompt bridge's learned state. Attribution
+  changes only envelope fields, preserving original content. The same stored
+  history read supplies native-delivery timestamps to completion observers
+  and is skipped when neither enrichment is needed. Historical reminders
+  survive agent switches when durable attribution is available.
 - **Runtime status reconciliation is capability-gated.** v2 has no
   equivalent of the v1 live session-status map (`client.session.status`
   is not a function on v2 hosts; `session.status` is not exposed to
@@ -574,13 +595,44 @@ so delegated subagents can run.
 
 When the foreground model hits a rate limit, the plugin switches the
 session's model (`session.switchModel`) and steers the re-prompt through
-`delivery: "steer"`. A failing `switchModel` call degrades honestly: the
+`delivery: "steer"`. The retry submits only an internal reminder; the original
+user text and attachments stay in session history. Hosts with
+`session.synthetic` use that route without creating another user bubble;
+reduced hosts receive the reminder through `session.prompt` with internal
+metadata. A failing `switchModel` call degrades honestly: the
 re-prompt is still delivered (on the current model) and the plugin's logs
 record that no switch happened — the fallback chain is not aborted. On
 hosts without `session.switchModel`, the fallback replay is rejected with
 a clear error instead of silently replaying on the model that just failed
 (other prompt callers, like the orchestrator-wake scheduler, only pin the
 current model and keep steering).
+
+## Session-scoped preset inference
+
+On hosts providing `session.get`, `session.switchModel`, command registration
+and `ctx.storage`, `/preset <name>` binds an inference snapshot to the current
+session's future native `subagent` children. The snapshot is versioned and
+validated in Host KV. It changes no system prompt, message history, tool set,
+skill, MCP or root model. Child launch records survive plugin reloads and keep
+their execution model/options and fallback chain; rebinding their parent does
+not retroactively change them.
+
+Model switching is awaited before child inference. Temperature and provider
+options are written only to the context hook's `options` request surface; the
+host separates generation keys from provider options. An explicit per-call
+`provider/model#variant` wins. Missing identity/storage, invalid snapshots or
+an unavailable creation barrier reject managed launches rather than silently
+using stale settings. Resuming an old child without a snapshot is allowed and
+leaves its model untouched. An agentless continuation admitted by a capable
+host also reuses that stored inference. On OpenCode v2.2.5, pass `agent`,
+`description`, `prompt` and `sessionID` for a native continuation; its schema
+rejects the agentless form before the plugin can handle it. The supported
+explicit form retains job-board acknowledgement and ownership checks, then
+executes without a new-child creation admission.
+
+Feedback uses the host command error channel because no display-only command
+channel is available. It creates no user message or provider turn. The v2 TUI
+continues to use disk persistence and reload for global preset switching.
 
 ## Background job state: rehydrate probe and persistence
 
@@ -856,11 +908,8 @@ respawn, bounded by the same no-progress cap as v1.
   mutated, earlier content stays byte-identical, and the v1 enforcement
   suite (`src/hooks/cache-safety.property.test.ts` and friends) covers the
   shared transform code the v2 context hook invokes. The one v2-only
-  addition is CacheHint tagging: parts injected through
-  `cache-safe-injection` while the v2 context bridge runs carry
-  `cache: {type: "ephemeral"}` (v2 `ContentPart.cache`). The hint is
-  applied via a per-request scoped default (AsyncLocalStorage — the v2
-  host serves different sessions' requests concurrently, so the scope
-  must be isolated per bridged transform) inside the v2 bridge only — v1
-  callers never set it, so the v1 payload (and its snapshots) stay
-  byte-identical.
+  addition is a single `cache: {type: "ephemeral"}` breakpoint after the
+  shared transform when a phase reminder or background board is present.
+  It is placed on the final stable part, outside the volatile board, and
+  does not use request-shared mutable state. The v1 payload and its snapshots
+  stay byte-identical.

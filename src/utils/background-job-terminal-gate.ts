@@ -950,8 +950,16 @@ export function createBackgroundJobTerminalGate(options: {
     if (evidence.verdict === 'absent' && stable)
       return commit(token, 'stopped', STOPPED_WITHOUT_TERMINAL_RESULT);
     value.retries += 1;
+    // v1 has no separate terminal host outcome. Once the session has stayed
+    // idle and its last assistant turn is complete, an empty result is a
+    // definitive failed delivery rather than evidence worth polling forever.
+    const v1Idle =
+      options.input !== undefined &&
+      (options.input as { hostFlavor?: string }).hostFlavor !== 'v2' &&
+      runtime?.kind === 'quiescent' &&
+      runtime.origin === 'session.status';
     if (
-      terminalOutcome === 'succeeded' &&
+      (terminalOutcome === 'succeeded' || v1Idle) &&
       stable &&
       evidence.verdict === 'retry' &&
       evidence.reason === 'textless' &&

@@ -27,7 +27,7 @@ describe('skills permissions', () => {
     expect(orchestratorPerms['verification-planning']).toBe('allow');
     expect(orchestratorPerms.reflect).toBe('allow');
     expect(orchestratorPerms.worktrees).toBe('allow');
-    expect(orchestratorPerms['mechanicus']).toBe('allow');
+    expect(orchestratorPerms.mechanicus).toBe('allow');
   });
 
   it('should honor explicit skill list overrides', () => {
@@ -45,6 +45,30 @@ describe('skills permissions', () => {
     expect(specificPerms['my-skill']).toBe('allow');
     expect(specificPerms['bad-skill']).toBe('deny');
   });
+
+  it.each(['step-back', 'deanchor', 'ai-estimates'])(
+    '%s is limited to the primary agent and respects permission overrides',
+    (name) => {
+      for (const primary of ['omnissiah', 'orchestrator']) {
+        expect(getSkillPermissionsForAgent(primary)[name]).toBe('allow');
+        expect(
+          getSkillPermissionsForAgent(primary, undefined, [name])[name],
+        ).toBe('deny');
+        expect(getSkillPermissionsForAgent(primary, [])[name]).toBeUndefined();
+      }
+      for (const specialist of [
+        'magos',
+        'logis',
+        'dominus',
+        'artisan',
+        'genetor',
+      ]) {
+        const permissions = getSkillPermissionsForAgent(specialist);
+        expect(permissions['*']).toBe('deny');
+        expect(permissions[name]).toBeUndefined();
+      }
+    },
+  );
 
   it('should honor wildcard in explicit list', () => {
     const wildcardPerms = getSkillPermissionsForAgent('designer', ['*']);

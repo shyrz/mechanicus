@@ -220,7 +220,10 @@ export function getSidebarAgentNames(snapshot: TuiSnapshot): string[] {
     : FALLBACK_SIDEBAR_AGENTS;
 }
 
-type AgentListFn = (input?: unknown) => Promise<unknown>;
+type AgentListFn = (
+  input?: unknown,
+  options?: { signal: AbortSignal },
+) => Promise<unknown>;
 
 function asFunction(value: unknown): AgentListFn | undefined {
   return typeof value === 'function' ? (value as AgentListFn) : undefined;
@@ -254,11 +257,12 @@ function remoteModelId(model: unknown): string | undefined {
     id?: unknown;
   };
   if (typeof rec.providerID !== 'string') return undefined;
+  // v2 aliases share upstream `modelID`; catalogue `id` identifies the model.
   const id =
-    typeof rec.modelID === 'string'
-      ? rec.modelID
-      : typeof rec.id === 'string'
-        ? rec.id
+    typeof rec.id === 'string'
+      ? rec.id
+      : typeof rec.modelID === 'string'
+        ? rec.modelID
         : undefined;
   return id ? `${rec.providerID}/${id}` : undefined;
 }
@@ -292,6 +296,13 @@ function modelsFromAgentList(response: unknown): Record<string, string> {
 export async function fetchRemoteAgentModels(
   client: unknown,
   directory: string,
+  scheduleTimeout: (callback: () => void, delay: number) => () => void = (
+    callback,
+    delay,
+  ) => {
+    const timer = setTimeout(callback, delay);
+    return () => clearTimeout(timer);
+  },
 ): Promise<Record<string, string>> {
   const rec = client as
     | {
@@ -302,19 +313,30 @@ export async function fetchRemoteAgentModels(
     | undefined;
   if (!rec) return {};
 
+  const v1Agents = asFunction(rec.app?.agents);
+  const v2Receiver = rec.agent ?? rec.v2?.agent;
+  const receiver = v1Agents ? rec.app : v2Receiver;
+  const list = v1Agents ?? asFunction(v2Receiver?.list);
+  if (!list) return {};
+  const controller = new AbortController();
+  let cancelTimeout: (() => void) | undefined;
   try {
-    const v1Agents = asFunction(rec.app?.agents);
-    if (v1Agents) {
-      return modelsFromAgentList(await v1Agents.call(rec.app, { directory }));
-    }
-    const v2Receiver = rec.agent ?? rec.v2?.agent;
-    const v2List = asFunction(v2Receiver?.list);
-    if (!v2List) return {};
-    return modelsFromAgentList(
-      await v2List.call(v2Receiver, { location: { directory } }),
+    const timeout = new Promise<unknown>((resolve) => {
+      cancelTimeout = scheduleTimeout(() => {
+        controller.abort();
+        resolve([]);
+      }, 2_000);
+    });
+    const request = list.call(
+      receiver,
+      v1Agents ? { directory } : { location: { directory } },
+      { signal: controller.signal },
     );
+    return modelsFromAgentList(await Promise.race([request, timeout]));
   } catch {
     return {};
+  } finally {
+    cancelTimeout?.();
   }
 }
 
@@ -676,7 +698,6 @@ interface AgentRowTheme {
   text: unknown;
   textMuted: unknown;
   background?: unknown;
-  backgroundElement?: unknown;
   success?: unknown;
   warning?: unknown;
   hover?: unknown;
@@ -719,25 +740,20 @@ export function selectionGuard(renderer: {
 
 export function resolveHoverBackground(theme: {
   background?: unknown;
-  backgroundElement?: unknown;
   text?: unknown;
   hover?: unknown;
 }): unknown {
-  if (theme.hover !== undefined && theme.hover !== null) return theme.hover;
-  if (
-    theme.backgroundElement !== undefined &&
-    theme.backgroundElement !== null
-  ) {
-    return theme.backgroundElement;
-  }
   try {
+    if (theme.hover != null && parseColor(theme.hover as ColorInput).a > 0) {
+      return theme.hover;
+    }
     const bg = parseColor((theme.background ?? '#111111') as ColorInput);
     const fg = parseColor((theme.text ?? '#ffffff') as ColorInput);
     return RGBA.fromValues(
       bg.r * 0.82 + fg.r * 0.18,
       bg.g * 0.82 + fg.g * 0.18,
       bg.b * 0.82 + fg.b * 0.18,
-      bg.a,
+      1,
     );
   } catch {
     return '#2a2a2a';
@@ -1168,7 +1184,6 @@ function renderSidebar(
     borderActive: unknown;
     text: unknown;
     textMuted: unknown;
-    backgroundElement?: unknown;
     success?: unknown;
     warning?: unknown;
     hover?: unknown;

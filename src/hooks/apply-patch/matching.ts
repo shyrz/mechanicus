@@ -48,14 +48,14 @@ export function equalUnicodeTrim(a: string, b: string): boolean {
 
 const autoRescueComparatorEntries: NamedComparator[] = [
   { name: 'exact', exact: true, same: equalExact },
-  { name: 'unicode', exact: false, same: equalUnicodeExact },
   { name: 'trim-end', exact: false, same: equalTrimEnd },
+  { name: 'trim', exact: false, same: equalTrim },
+  { name: 'unicode', exact: false, same: equalUnicodeExact },
   {
     name: 'unicode-trim-end',
     exact: false,
     same: equalUnicodeTrimEnd,
   },
-  { name: 'trim', exact: false, same: equalTrim },
   {
     name: 'unicode-trim',
     exact: false,
@@ -73,9 +73,12 @@ export const autoRescueComparators: LineComparator[] =
 // set: full-trim anchors can cross indentation levels and bind a stale chunk
 // at the wrong depth. Direct contiguous matching (seekMatch, prepared
 // targets) keeps the full native-compatible chain.
-const fuzzyRescueComparators: LineComparator[] = autoRescueComparatorEntries
-  .slice(0, 4)
-  .map((entry) => entry.same);
+const fuzzyRescueComparators: LineComparator[] = [
+  equalExact,
+  equalUnicodeExact,
+  equalTrimEnd,
+  equalUnicodeTrimEnd,
+];
 
 export function prepareAutoRescueTarget(
   target: string,

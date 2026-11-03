@@ -23,8 +23,9 @@ function writeSkill(
   projectDir: string,
   relativeDir: string,
   name: string,
+  source: '.opencode' | '.agents' = '.opencode',
 ): void {
-  const skillDir = path.join(projectDir, '.opencode', 'skills', relativeDir);
+  const skillDir = path.join(projectDir, source, 'skills', relativeDir);
   fs.mkdirSync(skillDir, { recursive: true });
   fs.writeFileSync(
     path.join(skillDir, 'SKILL.md'),
@@ -74,6 +75,59 @@ describe('discoverProjectLocalSkillNames', () => {
     expect(discoverProjectLocalSkillNames(makeProject())).toEqual([]);
   });
 
+  test('combines both local roots with sorted, deduplicated frontmatter names', () => {
+    const projectDir = makeProject();
+    writeSkill(projectDir, 'legacy', 'project-shared');
+    writeSkill(projectDir, 'duplicate', 'project-shared', '.agents');
+    writeSkill(projectDir, 'nested/new', 'agents-only', '.agents');
+
+    expect(discoverProjectLocalSkillNames(projectDir)).toEqual([
+      'agents-only',
+      'project-shared',
+    ]);
+  });
+
+  test('discovers .agents skills when .opencode is absent', () => {
+    const projectDir = makeProject();
+    writeSkill(projectDir, 'only', 'agents-only', '.agents');
+
+    expect(discoverProjectLocalSkillNames(projectDir)).toEqual(['agents-only']);
+  });
+
+  test.each(['.opencode', '.agents'] as const)(
+    'ignores an external %s root while retaining the other local root',
+    (source) => {
+      const projectDir = makeProject();
+      const externalDir = makeProject();
+      const other = source === '.agents' ? '.opencode' : '.agents';
+      writeSkill(externalDir, 'external', 'external-skill', source);
+      writeSkill(projectDir, 'local', 'local-skill', other);
+      fs.symlinkSync(
+        path.join(externalDir, source),
+        path.join(projectDir, source),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      expect(discoverProjectLocalSkillNames(projectDir)).toEqual([
+        'local-skill',
+      ]);
+    },
+  );
+
+  test('does not follow symlinked skills or inherit ancestor skills', () => {
+    const projectDir = makeProject();
+    writeSkill(projectDir, 'ancestor', 'ancestor-skill', '.agents');
+    const child = path.join(projectDir, 'child');
+    writeSkill(child, 'local', 'local-skill', '.agents');
+    fs.symlinkSync(
+      path.join(projectDir, '.agents', 'skills', 'ancestor'),
+      path.join(child, '.agents', 'skills', 'linked'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    expect(discoverProjectLocalSkillNames(child)).toEqual(['local-skill']);
+  });
+
   test('does not follow a project skills root that resolves outside the project', () => {
     const projectDir = makeProject();
     const externalDir = makeProject();
@@ -98,6 +152,28 @@ describe('discoverProjectLocalSkillNames', () => {
 });
 
 describe('skills_include_local', () => {
+  test('includes .agents skills only when opted in and removal still wins', () => {
+    const projectDir = makeProject();
+    writeSkill(projectDir, 'local', 'local-agents', '.agents');
+    writeSkill(projectDir, 'removed', 'removed-agents', '.agents');
+    RuntimeConfig.init(
+      projectDir,
+      PluginConfigSchema.parse({
+        agents: {
+          dominus: {
+            skills_include_local: true,
+            skills_remove: ['removed-agents'],
+          },
+          magos: { skills: [] },
+        },
+      }),
+    );
+    const runtime = RuntimeConfig.get(projectDir);
+    expect(runtime.agent('dominus')?.skills).toContain('local-agents');
+    expect(runtime.agent('dominus')?.skills).not.toContain('removed-agents');
+    expect(runtime.agent('magos')?.skills).not.toContain('local-agents');
+  });
+
   test('adds all project .opencode/skills entries to an agent effective skills', () => {
     const projectDir = makeProject();
     writeSkill(projectDir, 'project-architecture', 'project-architecture');

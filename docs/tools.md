@@ -4,7 +4,20 @@ Built-in tools available to agents beyond the standard file and shell operations
 
 ## apply_patch rescue
 
-Slim only intercepts `apply_patch` before the native tool runs. It rewrites recoverable stale patches, canonizes safe tolerant matches against the real file when unicode/trim drift is the only mismatch, keeps the authored `new_lines` bytes intact, preserves the existing file EOL/final-newline state for updates, validates malformed patches strictly before helper execution, uses a conservative bounded LCS fallback, accumulates helper state when the same path appears in multiple `Update File` hunks, blocks `apply_patch` before native execution if any patch path falls outside the allowed root/worktree, and fails on ambiguity instead of guessing. It does not rewrite `edit` or `write` inputs.
+The rescue hook intercepts v1 `apply_patch` and v2 `patch` before the native
+tool runs. Both use the `patchText` argument. It rewrites recoverable stale
+patches and canonicalizes tolerant matches against the real file. Direct
+matching tries exact and whitespace matches before Unicode normalization,
+so an earlier smart-quoted anchor cannot override a native whitespace match.
+
+Prefix/suffix rescue preserves the original bytes of unchanged context,
+including trailing whitespace and Unicode punctuation. Authored replacement
+lines and existing EOL/final-newline state are retained. Rescue uses
+conservative fuzzy anchors and the bounded LCS fallback. It validates
+malformed patches before execution, accumulates state across repeated
+`Update File` hunks, and fails on ambiguity. Outside-root/worktree targets
+pass through to the native host's permission checks. `edit` and `write`
+inputs are unchanged.
 
 ---
 
@@ -55,7 +68,7 @@ conservatively passes the path through.
 | Tool | Description |
 |------|-------------|
 | `task` | Start a specialist task and return its task ID |
-| `task_status` | Check the status of a task |
+| `task_status` | Check status, or read bounded failure diagnostics with `diagnostic: true` |
 | `task_result` | Retrieve a task's result |
 | `task_message` | Queue a non-interrupting message and return `queued` |
 | `task_cancel` | Stop a generation while retaining its session |
@@ -67,6 +80,19 @@ managed. `task_message` does not interrupt the current generation. `task_cancel`
 stops the generation but retains its session; it does not roll back partial edits.
 After cancelling a write-capable task, inspect and reconcile file changes before
 launching replacement work.
+
+For an `error`, `cancelled`, or `stopped` task,
+`task_status(task_id, diagnostic: true)` reads a bounded excerpt of retained
+assistant text and error evidence. The whole response is capped at 6 KiB;
+tool inputs and successful tool outputs are excluded. This read does not
+consume a result, acknowledge completion, or change board state. The excerpt
+is partial diagnostic evidence, not a final task result: inspect it before
+retrying, reviving, or redelegating failed work. Running tasks and successful
+tasks do not expose diagnostics; use `task_result` for completed output.
+Transcript reads are bounded by a 5-second tool deadline; a timeout is
+reported as unavailable evidence, not proof of a particular failure cause.
+The excerpt is session history and may include earlier generations; it is
+explicitly labelled as not attributed to the current generation.
 
 If the abort request times out while still pending, `task_cancel` reports
 uncertainty and retains its cancellation lease: a late abort must not affect a

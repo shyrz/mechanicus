@@ -10,6 +10,7 @@ import {
   runtimeObservationFromSnapshot,
 } from '../utils/background-job-terminal-gate';
 import {
+  classifyMigratedV1Round,
   classifyTerminalEvidence,
   fetchChildTranscript,
 } from '../utils/child-transcript';
@@ -184,7 +185,14 @@ Use this when the user asks to see a prior task's full result, or before retryin
           taskID,
           options.input.directory,
         );
-        const evidence = classifyTerminalEvidence(response);
+        const isV2 =
+          (options.input as { hostFlavor?: string }).hostFlavor === 'v2';
+        const migrated = isV2 ? classifyMigratedV1Round(response) : undefined;
+        const evidence = migrated ?? classifyTerminalEvidence(response);
+        if (evidence.verdict === 'error')
+          throw new Error(
+            `Task ${requested} ended in error: ${evidence.text || 'no error details available'}`,
+          );
         if (evidence.verdict !== 'completed')
           throw new Error(
             `Task ${requested} shows no terminal evidence of completion; refusing to present partial output as its final result`,

@@ -168,6 +168,43 @@ PATCH`;
     ).toEqual(['prefix', ' \tverbatim  ""  Ω  ', 'suffix']);
   });
 
+  test.each([
+    ['trailing whitespace', 'foo  ', 'bar\t', '\n', '\n'],
+    ['Unicode', '“foo”', '“bar”', '\n', '\n'],
+    ['CRLF without final newline', 'foo  ', 'bar\t', '\r\n', ''],
+  ])(
+    'rewritten fuzzy patch preserves %s in unchanged context',
+    async (_name, prefixLine, suffixLine, eol, finalNewline) => {
+      const root = await createTempDir();
+      const original = [prefixLine, 'stale', suffixLine].join(eol);
+      await writeFixture(root, 'sample.txt', original + finalNewline);
+      const patchPrefix = prefixLine.startsWith('“') ? '"foo"' : 'foo';
+      const patchSuffix = suffixLine.startsWith('“') ? '"bar"' : 'bar';
+      const patchText = [
+        '*** Begin Patch',
+        '*** Update File: sample.txt',
+        '@@',
+        ` ${patchPrefix}`,
+        '-old',
+        '+new',
+        ` ${patchSuffix}`,
+        '*** End Patch',
+      ].join('\n');
+
+      const rewritten = await rewritePatchText(
+        root,
+        patchText,
+        DEFAULT_OPTIONS,
+      );
+      expect(await readText(root, 'sample.txt')).toBe(original + finalNewline);
+      await applyPatch(root, rewritten);
+
+      expect(await readText(root, 'sample.txt')).toBe(
+        [prefixLine, 'new', suffixLine].join(eol) + finalNewline,
+      );
+    },
+  );
+
   test('rewritePatchText removes EOF when a rescue moves the chunk away from the real end', async () => {
     const root = await createTempDir();
     await writeFixture(

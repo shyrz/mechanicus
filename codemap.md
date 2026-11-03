@@ -102,6 +102,8 @@ This codemap covers the plugin repository itself and excludes the nested `openco
   multiplexer behavior remains on the upstream path.
 - Council mode is implemented in `src/agents/`; `council-agents.ts` builds dynamic `councillor-<name>` subagents from council presets, the orchestrator dispatches them, and the council agent synthesizes responses.
 - `src/tools/preset-switch.ts` + `src/tui-preset.ts` implement `/preset` switching: the preset name (or preset edits) is persisted to the user config file and takes effect on the next reload; the agent registry is never hot-swapped mid-session.
+- The v1 preset editor keeps parent declarations and local overrides separate, blocks parent deletion with dependents, and refuses stale saves. `src/config/json-file.ts` preserves JSONC comments and config symlinks during atomic field edits. The v2 global picker shares the validated disk switcher; Companion retains its navigation-only protocol.
+- `src/v2/session-preset-store.ts` + `src/v2/session-preset-command.ts` add a separate capable-v2 session binding for future child inference; it does not change the global disk/TUI behavior or v1 semantics.
 - `src/hooks/task-session-manager/` depends on `src/utils/background-job-board.ts`, `background-job-store.ts`, `background-job-coordinator.ts`, `background-job-supervisor.ts`, `session-runtime-status.ts`, and `task.ts`, and injects prompt content only through `src/hooks/cache-safe-injection.ts`.
 - `src/hooks/cache-monitor/` watches `message.updated` cache telemetry across all sessions and logs prompt-cache-bust/plateau warnings; it is observation-only and never mutates messages.
 - `src/hooks/orchestrator-wake/` reads host todo/children/status APIs (v1)
