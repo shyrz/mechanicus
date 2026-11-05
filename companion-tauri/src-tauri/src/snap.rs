@@ -15,12 +15,15 @@
 //!    envelope is transparent and click-through, so it cannot swallow clicks
 //!    meant for whatever is behind it.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tauri::{LogicalPosition, LogicalSize, WebviewWindow};
+#[cfg(not(target_os = "macos"))]
+use tauri::{LogicalPosition, LogicalSize};
+use tauri::{Manager, WebviewWindow};
 
+use crate::placement::{self, FloatingPosition, WindowPlacement};
 use crate::pointer;
 use crate::workarea::{Rect, ScreenInfo};
 
@@ -99,7 +102,7 @@ pub fn snap_radius() -> f64 {
     })
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SnapTarget {
     Left,
@@ -418,7 +421,10 @@ pub struct OverlayState {
 }
 
 struct Inner {
+    geometry_revision: u64,
+    stopping: bool,
     target: Option<SnapTarget>,
+    floating: FloatingPosition,
     progress: f32,
     hover_expanded: bool,
     /// Expanded content size, refreshed from the plugin state payload.
@@ -476,7 +482,10 @@ impl SnapController {
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             inner: Mutex::new(Inner {
+                geometry_revision: 0,
+                stopping: false,
                 target: None,
+                floating: FloatingPosition::Corner("bottom-right".into()),
                 progress: 0.0,
                 hover_expanded: true,
                 content: (120.0, 120.0),
@@ -496,6 +505,40 @@ impl SnapController {
         })
     }
 
+    pub fn restore(&self, saved: Option<WindowPlacement>, corner: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.floating = match saved {
+            Some(saved) => FloatingPosition::Custom {
+                x: saved.x,
+                y: saved.y,
+            },
+            None => FloatingPosition::Corner(corner.to_string()),
+        };
+        inner.target = saved.and_then(|saved| saved.target);
+        inner.progress = if inner.target.is_some() { 1.0 } else { 0.0 };
+        inner.hover_expanded = inner.target.is_none();
+        inner.applied = None;
+        inner.travel = None;
+        inner.geometry_revision += 1;
+        self.target_bits
+            .store(inner.target.map_or(0, SnapTarget::as_u8), Ordering::Relaxed);
+    }
+
+    fn commit_geometry(&self, revision: u64, apply: impl FnOnce() -> Result<(), String>) {
+        let mut inner = self.inner.lock().unwrap();
+        if inner.dragging || inner.stopping || inner.geometry_revision != revision {
+            return;
+        }
+        if let Err(error) = apply() {
+            inner.applied = None;
+            eprintln!("[companion-tauri] could not apply window placement: {error}");
+        }
+    }
+
+    pub fn stop(&self) {
+        self.inner.lock().unwrap().stopping = true;
+    }
+
     /// Installs freshly measured screen geometry (main thread).
     pub fn set_screen(&self, screen: ScreenInfo) {
         let mut inner = self.inner.lock().unwrap();
@@ -503,6 +546,7 @@ impl SnapController {
             inner.screen = Some(screen);
             // Targets move when the work area changes, so re-apply.
             inner.applied = None;
+            inner.geometry_revision += 1;
         }
     }
 
@@ -520,6 +564,7 @@ impl SnapController {
             inner.applied = None;
             inner.drag_nearest = None;
             inner.travel = None;
+            inner.geometry_revision += 1;
             self.target_bits.store(0, Ordering::Relaxed);
         }
     }
@@ -534,12 +579,28 @@ impl SnapController {
         if inner.content != (w, h) {
             inner.content = (w, h);
             inner.applied = None;
+            inner.geometry_revision += 1;
+        }
+    }
+
+    pub fn set_corner(&self, corner: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        if let FloatingPosition::Corner(current) = &mut inner.floating {
+            if current != corner {
+                *current = corner.to_string();
+                inner.applied = None;
+                inner.geometry_revision += 1;
+            }
         }
     }
 
     pub fn begin_drag(&self) {
         let mut inner = self.inner.lock().unwrap();
+        if inner.stopping {
+            return;
+        }
         inner.dragging = true;
+        inner.geometry_revision += 1;
         inner.drag_end_hint = false;
         inner.last_drag_pos = None;
         inner.last_drag_change = Instant::now();
@@ -581,16 +642,39 @@ impl SnapController {
         self.hint_drag_end();
     }
 
-    pub fn is_snapped(&self) -> bool {
-        self.target_bits.load(Ordering::Relaxed) != 0
-    }
-
     /// The edge the overlay is docked to, if any.
     ///
     /// The state poller reads this to lay the buttons out along that edge: a
     /// side dock stacks them in one column, the bottom dock in one row.
     pub fn target(&self) -> Option<SnapTarget> {
         SnapTarget::from_u8(self.target_bits.load(Ordering::Relaxed))
+    }
+
+    /// A webview may subscribe after the first animation tick was published.
+    pub fn snapshot(&self) -> SnapPayload {
+        let inner = self.inner.lock().unwrap();
+        let content = match inner.target {
+            Some(target) => content_rect(
+                target,
+                target.window_size(inner.content),
+                inner.content,
+                ease(inner.progress),
+            ),
+            None => Rect {
+                x: 0.0,
+                y: 0.0,
+                w: inner.content.0,
+                h: inner.content.1,
+            },
+        };
+        SnapPayload {
+            snapped: inner.target.is_some(),
+            target: inner.target,
+            progress: inner.progress,
+            content: [content.x, content.y, content.w, content.h],
+            expanded: inner.hover_expanded,
+            cursor: None,
+        }
     }
 
     /// Whether a drag is in flight. The state poller must not resize the window
@@ -632,6 +716,92 @@ impl SnapController {
     }
 }
 
+fn floating_drop(inner: &mut Inner, at: (f64, f64)) -> WindowPlacement {
+    let position = FloatingPosition::Custom { x: at.0, y: at.1 };
+    let (x, y) = inner
+        .screen
+        .map(|screen| {
+            let rect = placement::floating_rect(&position, inner.content, screen.work);
+            (rect.x, rect.y)
+        })
+        .unwrap_or(at);
+    inner.floating = FloatingPosition::Custom { x, y };
+    WindowPlacement { x, y, target: None }
+}
+
+/// Check the drag generation on the main thread, immediately before a single
+/// native frame update. An old queued corner/size update cannot interrupt a drag.
+fn apply_geometry(
+    window: &WebviewWindow,
+    controller: &Arc<SnapController>,
+    revision: u64,
+    envelope: Option<Rect>,
+    position: Option<(f64, f64)>,
+) {
+    if envelope.is_none() && position.is_none() {
+        return;
+    }
+    let target = window.clone();
+    let controller = Arc::clone(controller);
+    let _ = window.run_on_main_thread(move || {
+        controller.commit_geometry(revision, || native_geometry(&target, envelope, position));
+    });
+}
+
+#[cfg(target_os = "macos")]
+fn native_geometry(
+    window: &WebviewWindow,
+    envelope: Option<Rect>,
+    position: Option<(f64, f64)>,
+) -> Result<(), String> {
+    use objc2_app_kit::{NSScreen, NSWindow};
+    use objc2_foundation::MainThreadMarker;
+    let mtm = MainThreadMarker::new().ok_or("window placement requires main thread")?;
+    let ptr = window.ns_window().map_err(|error| error.to_string())?;
+    if ptr.is_null() {
+        return Err("native window unavailable".into());
+    }
+    // SAFETY: Tauri owns this live NSWindow; the closure runs on the main thread.
+    let native: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+    let screens = NSScreen::screens(mtm);
+    let height = screens
+        .iter()
+        .next()
+        .ok_or("no display available")?
+        .frame()
+        .size
+        .height;
+    let mut frame = native.frame();
+    let (x, y) = position.unwrap_or((frame.origin.x, height - frame.origin.y - frame.size.height));
+    if let Some(envelope) = envelope {
+        frame.size.width = envelope.w;
+        frame.size.height = envelope.h;
+    }
+    frame.origin.x = x;
+    frame.origin.y = height - y - frame.size.height;
+    native.setFrame_display(frame, true);
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn native_geometry(
+    window: &WebviewWindow,
+    envelope: Option<Rect>,
+    position: Option<(f64, f64)>,
+) -> Result<(), String> {
+    if let Some(envelope) = envelope {
+        window
+            .set_size(LogicalSize::new(envelope.w, envelope.h))
+            .map_err(|e| e.to_string())?;
+    }
+    if let Some((x, y)) = position {
+        window
+            .set_position(LogicalPosition::new(x, y))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Drives hover detection, the collapse/expand animation, and click-through.
 pub fn spawn(
     window: WebviewWindow,
@@ -639,6 +809,7 @@ pub fn spawn(
     cursor: crate::CursorSource,
     on_change: impl Fn(SnapPayload) + Send + 'static,
     on_drag_visibility: impl Fn(bool) + Send + 'static,
+    on_drop: impl Fn(WindowPlacement) + Send + 'static,
 ) {
     std::thread::spawn(move || {
         let mut last_emitted: Option<SnapPayload> = None;
@@ -648,6 +819,7 @@ pub fn spawn(
         // queue, so only call it on transitions to avoid piling up work.
         let mut last_ignore: Option<bool> = None;
         let mut last_overlay: Option<bool> = None;
+        let mut shown = false;
 
         loop {
             std::thread::sleep(TICK);
@@ -685,10 +857,13 @@ pub fn spawn(
                 (cursor_y - pos.y as f64) / scale,
             );
 
-            let (payload_snapshot, desired_ignore, env_to_apply, pos_to_apply);
+            let (payload_snapshot, desired_ignore, env_to_apply, pos_to_apply, revision);
 
             {
                 let mut inner = controller.inner.lock().unwrap();
+                if inner.stopping {
+                    return;
+                }
 
                 // ── Drag settling ──────────────────────────────────────────
                 if inner.dragging {
@@ -718,6 +893,18 @@ pub fn spawn(
                     if !held && !inner.hold_open && inner.last_drag_change.elapsed() >= settle {
                         inner.dragging = false;
                         inner.drag_end_hint = false;
+                        // The native drag loop has ended, so AppKit can now
+                        // measure the display on which the window was released.
+                        drop(inner);
+                        crate::refresh_screen(
+                            window.app_handle().clone(),
+                            &controller,
+                            Some((win.x + win.w / 2.0, win.y + win.h / 2.0)),
+                        );
+                        inner = controller.inner.lock().unwrap();
+                        if inner.stopping {
+                            return;
+                        }
                         let dropped = inner
                             .screen
                             .and_then(|s| resolve_drop(win, s.work, inner.content));
@@ -772,6 +959,22 @@ pub fn spawn(
                             }
                         }
                         inner.drag_nearest = None;
+                        inner.geometry_revision += 1;
+                        let saved = match dropped.zip(inner.screen) {
+                            Some((target, screen)) => {
+                                let (x, y) = target
+                                    .window_pos(screen.work, target.window_size(inner.content));
+                                WindowPlacement {
+                                    x,
+                                    y,
+                                    target: Some(target),
+                                }
+                            }
+                            None => floating_drop(&mut inner, (win.x, win.y)),
+                        };
+                        // Enqueue while holding the same lock used by stop(), so
+                        // the exit flush cannot overtake an observed drop.
+                        on_drop(saved);
 
                         if trace_enabled() {
                             let from = inner.drag_start_pos.unwrap_or(now_pos);
@@ -812,12 +1015,35 @@ pub fn spawn(
                         inner.progress = 0.0;
                     }
                     desired_ignore = false;
+                    let Some(screen) = inner.screen else {
+                        continue;
+                    };
+                    let rect =
+                        placement::floating_rect(&inner.floating, inner.content, screen.work);
+                    let apply = needs_envelope(inner.applied, rect, win);
+                    if apply {
+                        inner.applied = Some(rect);
+                    }
+                    let revision = inner.geometry_revision;
                     drop(inner);
+                    if apply {
+                        apply_geometry(
+                            &window,
+                            &controller,
+                            revision,
+                            Some(rect),
+                            Some((rect.x, rect.y)),
+                        );
+                    }
+                    if !shown {
+                        let _ = window.show();
+                        shown = true;
+                    }
                     let payload = SnapPayload {
                         snapped: false,
                         target: None,
                         progress: 0.0,
-                        content: [0.0, 0.0, win.w, win.h],
+                        content: [0.0, 0.0, rect.w, rect.h],
                         expanded: true,
                         // Floating, the whole window is interactive.
                         cursor: point_in(
@@ -825,8 +1051,8 @@ pub fn spawn(
                             Rect {
                                 x: 0.0,
                                 y: 0.0,
-                                w: win.w,
-                                h: win.h,
+                                w: rect.w,
+                                h: rect.h,
                             },
                             0.0,
                         )
@@ -954,14 +1180,13 @@ pub fn spawn(
                         None
                     },
                 };
+                revision = inner.geometry_revision;
             }
 
-            if let Some(env) = env_to_apply {
-                let _ = window.set_size(LogicalSize::new(env.w, env.h));
-            }
-
-            if let Some((x, y)) = pos_to_apply {
-                let _ = window.set_position(LogicalPosition::new(x, y));
+            apply_geometry(&window, &controller, revision, env_to_apply, pos_to_apply);
+            if !shown {
+                let _ = window.show();
+                shown = true;
             }
 
             if last_ignore != Some(desired_ignore) {
@@ -1016,6 +1241,133 @@ mod tests {
         h: 985.0,
     };
     const CONTENT: (f64, f64) = (80.0, 80.0);
+
+    #[test]
+    fn restoring_a_dock_rebuilds_the_snap_state() {
+        let controller = SnapController::new();
+        controller.restore(
+            Some(crate::placement::WindowPlacement {
+                x: 1800.0,
+                y: 450.0,
+                target: Some(SnapTarget::Right),
+            }),
+            "bottom-right",
+        );
+        assert_eq!(controller.target(), Some(SnapTarget::Right));
+        let inner = controller.inner.lock().unwrap();
+        assert_eq!(inner.progress, 1.0);
+        assert!(!inner.hover_expanded);
+        assert!(inner.travel.is_none());
+    }
+
+    #[test]
+    fn restoring_a_free_position_does_not_snap_nearby_coordinates() {
+        let controller = SnapController::new();
+        controller.restore(
+            Some(crate::placement::WindowPlacement {
+                x: 1800.0,
+                y: 450.0,
+                target: None,
+            }),
+            "bottom-right",
+        );
+        assert_eq!(controller.target(), None);
+        let inner = controller.inner.lock().unwrap();
+        assert_eq!(
+            crate::placement::floating_rect(&inner.floating, (48.0, 48.0), WORK),
+            Rect {
+                x: 1800.0,
+                y: 450.0,
+                w: 48.0,
+                h: 48.0
+            }
+        );
+    }
+
+    #[test]
+    fn a_late_frontend_can_read_the_restored_collapsed_content() {
+        let controller = SnapController::new();
+        controller.set_content_size(48.0, 48.0);
+        controller.restore(
+            Some(WindowPlacement {
+                x: 1800.0,
+                y: 450.0,
+                target: Some(SnapTarget::Right),
+            }),
+            "bottom-right",
+        );
+        let payload = controller.snapshot();
+        assert!(payload.snapped);
+        assert_eq!(payload.target, Some(SnapTarget::Right));
+        assert_eq!(payload.content, [32.0, 0.0, 16.0, 84.0]);
+        assert_eq!(payload.progress, 1.0);
+        assert!(!payload.expanded);
+    }
+
+    #[test]
+    fn queued_geometry_cannot_overwrite_a_new_drag() {
+        let controller = SnapController::new();
+        let revision = controller.inner.lock().unwrap().geometry_revision;
+        controller.begin_drag();
+        let applied = std::cell::Cell::new(false);
+        controller.commit_geometry(revision, || {
+            applied.set(true);
+            Ok(())
+        });
+        assert!(
+            !applied.get(),
+            "stale corner placement interrupted the drag"
+        );
+    }
+
+    #[test]
+    fn queued_geometry_cannot_overwrite_a_new_content_size() {
+        let controller = SnapController::new();
+        let revision = controller.inner.lock().unwrap().geometry_revision;
+        controller.set_content_size(90.0, 90.0);
+        let applied = std::cell::Cell::new(false);
+        controller.commit_geometry(revision, || {
+            applied.set(true);
+            Ok(())
+        });
+        assert!(!applied.get());
+        let revision = controller.inner.lock().unwrap().geometry_revision;
+        controller.commit_geometry(revision, || {
+            applied.set(true);
+            Ok(())
+        });
+        assert!(applied.get(), "current geometry was never applied");
+    }
+
+    #[test]
+    fn free_drop_saves_the_final_origin_on_the_selected_monitor() {
+        let controller = SnapController::new();
+        controller.set_screen(ScreenInfo {
+            frame: Rect {
+                x: 1920.0,
+                y: 0.0,
+                w: 1920.0,
+                h: 1080.0,
+            },
+            work: Rect {
+                x: 1920.0,
+                y: 25.0,
+                w: 1920.0,
+                h: 985.0,
+            },
+        });
+        controller.set_content_size(106.0, 106.0);
+        let mut inner = controller.inner.lock().unwrap();
+        let saved = floating_drop(&mut inner, (1880.0, 200.0));
+        assert_eq!(
+            saved,
+            WindowPlacement {
+                x: 1920.0,
+                y: 200.0,
+                target: None
+            }
+        );
+    }
 
     #[test]
     fn left_and_right_are_flush_and_vertically_centred() {

@@ -15,13 +15,15 @@ The plugin ↔ companion boundary was already clean:
 | --- | --- |
 | State file (read) | `~/.local/share/opencode/storage/mechanicus/companion-state.json` |
 | Command file (write, TUI hosts only) | `~/.local/share/opencode/storage/mechanicus/companion-command.json` |
+| Position file (read/write, Tauri only) | `~/.local/share/opencode/storage/mechanicus/companion-tauri-positions.json` |
 | Env | `MECHANICUS_COMPANION_SESSION_ID`, `MECHANICUS_COMPANION_DEBUG` |
 | Pid files | `companion.pid`, `companion.<sessionId>.pid` |
 
-`companion-state.json` is read-only from here; the command file is this
-process's only write, and it carries clicks rather than state. The state file
-also publishes `host`, which is what tells the companion whether a click can
-open a session or only raise the app.
+`companion-state.json` remains read-only from here. The command file carries
+clicks back to the plugin; the separate position file stores this companion's
+window placement. These paths honor `XDG_DATA_HOME`. The state file also
+publishes `host`, which tells the companion whether a click can open a session
+or only raise the app.
 
 The companion exits when its owning session is removed. It also checks the
 host PID recorded in that session so an abrupt TUI or desktop shutdown does
@@ -37,6 +39,7 @@ companion-tauri/
 ├── src-tauri/          # Rust host: window config, state polling, commands
 │   ├── src/main.rs     # setup, poll loop, payload shaping, commands
 │   ├── src/snap.rs     # snap targets, envelope geometry, drag settling
+│   ├── src/placement.rs # per-project placement storage and floating geometry
 │   ├── src/workarea.rs # display/work-area measurement (AppKit)
 │   ├── src/pointer.rs  # physical mouse-button state (AppKit)
 │   ├── src/activate.rs # raising the host app (AppKit)
@@ -57,7 +60,7 @@ companion-tauri/
 ### Prebuilt macOS Apple silicon binary
 
 The experimental standalone executable is available from the
-[Tauri Companion release](https://github.com/shyrz/mechanicus/releases/tag/companion-tauri-v0.1.1).
+[Tauri Companion release](https://github.com/shyrz/mechanicus/releases/tag/companion-tauri-v0.1.2).
 The release also includes a SHA-256 checksum. The executable is ad hoc signed,
 not notarized.
 
@@ -109,10 +112,29 @@ it to take effect.
   room below. Waiting/busy states use dashed amber and solid green rings, with
   the same distinction on the collapsed handle.
 - Native window drag with a click/drag threshold
-- Per-project window position restore
+- Per-project window position and snap-target persistence
 - Click to reveal the session being shown, as far as the host allows: opened on
   a TUI through a file-based channel to the plugin, and the app raised on the
   desktop app (see [Clicking the overlay](#clicking-the-overlay))
+
+## Remembered placement
+
+Dragging saves the last position and, when docked, the selected edge. The next
+launch restores that placement before showing the window, including a collapsed
+handle for a docked overlay. Projects are identified by their canonical full
+directory paths, so repositories with the same directory name stay separate.
+
+Tauri owns `companion-tauri-positions.json`; writes use a lock and atomic rename
+and never change the plugin's state file. If no Tauri position exists, the
+original companion's saved coordinates for the same full project path are used.
+Otherwise `companion.position` selects the default corner.
+
+The default corner keeps a 10 logical pixel margin inside the display's usable
+work area as the agent grid changes size. A custom floating position keeps its
+top-left origin, adjusting only enough to remain visible. Docked windows stay
+attached to their selected edge. Monitor origins, the menu bar, and Dock are
+included in placement; if a saved display is disconnected, placement falls back
+to the primary display's work area.
 
 ## Snapping
 

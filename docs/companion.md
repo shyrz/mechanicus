@@ -73,6 +73,14 @@ opens. If no custom position is saved for a project, the configured
 Saved positions are clamped to the current screen so the companion stays visible
 after monitor or resolution changes.
 
+The experimental [Tauri Companion](../companion-tauri/README.md#remembered-placement)
+also remembers the selected snap target and restores docked windows as collapsed
+handles. It stores positions separately in `companion-tauri-positions.json`, next
+to `companion-state.json`, and matches projects by their canonical full paths.
+Without a Tauri position, it can restore the original companion's saved position
+for the same project. Default corners keep their work-area margins when the
+agent count changes; a custom floating position keeps its top-left origin.
+
 ---
 
 ## Installer Flag

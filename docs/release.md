@@ -10,6 +10,37 @@ This project has two related release tracks:
 The companion uses separate versioning so the plugin can ship patches without
 rebuilding native binaries every time.
 
+### Experimental Tauri Companion
+
+The [Tauri Companion](../companion-tauri/README.md) has its own
+`companion-tauri-v<version>` tags. Its standalone macOS Apple silicon executable
+ships as a GitHub prerelease. A Tauri-only fix does not require an npm release
+or changes to the original Companion's packaged manifest.
+
+For a Tauri release:
+
+1. Inspect the diff from the previous `companion-tauri-v<version>` tag.
+2. Update the version in `companion-tauri/src-tauri/Cargo.toml`, its package
+   entry in `Cargo.lock`, and `tauri.conf.json`. Update the release link in
+   `companion-tauri/README.md`.
+3. Run the standard checks below, then Rust tests and `cargo build --release
+   --locked` for `companion-tauri/src-tauri`. Verify placement and restart
+   behaviour with the release binary.
+4. Verify the executable's ad hoc signature with `codesign --verify --strict`.
+   Package it as
+   `mechanicus-companion-tauri-v<version>-aarch64-apple-darwin.tar.gz`, with
+   `mechanicus-companion-tauri` at the archive root. Create `SHA256SUMS.txt`
+   for the archive and test the extracted executable.
+5. Commit and push the intended files, create and push an annotated
+   `companion-tauri-v<version>` tag, and publish a GitHub prerelease with the
+   archive and checksum file. Describe the fixes, supported platform, and
+   custom `companion.binaryPath` installation in the release notes.
+6. Download the published assets and verify the checksum, signature, and
+   extracted binary against the tested artifact.
+
+Keep local release artifacts and verification data in the project's
+`.workspace/` directory.
+
 ## 1. Inspect the release diff
 
 Before writing release notes, inspect the actual changes between the previous

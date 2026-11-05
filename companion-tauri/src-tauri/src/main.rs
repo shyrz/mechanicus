@@ -10,6 +10,7 @@
 mod activate;
 mod command;
 mod hit_test;
+mod placement;
 mod pointer;
 mod singleton;
 mod snap;
@@ -19,7 +20,7 @@ mod workarea;
 
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{Emitter, LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Same cadence as the original companion's state watcher.
 const POLL_INTERVAL: Duration = Duration::from_millis(250);
@@ -28,8 +29,6 @@ const EVENT_NAME: &str = "companion://state";
 const SNAP_EVENT: &str = "companion://snap";
 /// Full-screen dim + landing markers, shown only while dragging.
 const OVERLAY_LABEL: &str = "snap-overlay";
-/// Distance from the screen edge, matching the original companion's `GAP`.
-const GAP: f32 = 10.0;
 
 #[derive(Clone, PartialEq, serde::Serialize)]
 struct SessionPayload {
@@ -182,44 +181,10 @@ impl Payload {
     }
 }
 
-/// Applies window geometry: size from the grid, position from the saved
-/// per-project position when available, otherwise the configured anchor.
-fn apply_geometry(window: &tauri::WebviewWindow, payload: &Payload, saved: Option<(f32, f32)>) {
-    let (width, height) = payload.content();
-
-    let _ = window.set_size(LogicalSize::new(width, height));
-
-    let (screen_w, screen_h) = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .map(|m| {
-            let logical = m.size().to_logical::<f32>(m.scale_factor());
-            (logical.width, logical.height)
-        })
-        .unwrap_or((1440.0, 900.0));
-
-    let (x, y) = match saved {
-        Some((sx, sy)) => (sx, sy),
-        None => {
-            let x_max = (screen_w - width - GAP).max(GAP);
-            let y_max = (screen_h - height - GAP).max(GAP);
-            match payload.config.position.as_str() {
-                "bottom-left" => (GAP, y_max),
-                "top-right" => (x_max, GAP),
-                "top-left" => (GAP, GAP),
-                _ => (x_max, y_max),
-            }
-        }
-    };
-
-    let _ = window.set_position(LogicalPosition::new(x, y));
-}
-
 fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::SnapController>) {
     let path = state::state_file_path();
     let mut last: Option<Payload> = None;
-    let mut positioned = false;
+    let mut last_screen_refresh = std::time::Instant::now();
 
     loop {
         let st = state::read_state(&path);
@@ -238,38 +203,19 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
 
         let target_size = payload.content();
         snap.set_content_size(target_size.0 as f64, target_size.1 as f64);
+        snap.set_corner(&payload.config.position);
 
         if let Some(window) = handle.get_webview_window("main") {
-            if !positioned {
-                // Resolve the saved position once, before the frontend starts
-                // dragging the window around.
-                let saved = st
-                    .window_positions
-                    .iter()
-                    .find(|(key, _)| {
-                        std::path::Path::new(key.as_str())
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                            == std::path::Path::new(
-                                payload
-                                    .session
-                                    .as_ref()
-                                    .map(|s| s.cwd.as_str())
-                                    .unwrap_or(""),
-                            )
-                            .file_name()
-                            .and_then(|n| n.to_str())
-                    })
-                    .map(|(_, pos)| (pos.x, pos.y));
-
-                apply_geometry(&window, &payload, saved);
-                positioned = true;
-            } else if last.as_ref() != Some(&payload) && !snap.is_snapped() && !snap.is_dragging() {
-                // Skip while snapped (the window is pinned to its envelope and
-                // only the content inside changes size) and while dragging (the
-                // compositor owns the geometry; resizing mid-drag would fight
-                // it). A size change is picked up on the next idle poll.
-                let _ = window.set_size(LogicalSize::new(target_size.0, target_size.1));
+            if !snap.is_dragging() && last_screen_refresh.elapsed() >= Duration::from_secs(1) {
+                let anchor = window
+                    .outer_position()
+                    .ok()
+                    .zip(window.scale_factor().ok())
+                    .map(|(position, scale)| {
+                        (position.x as f64 / scale, position.y as f64 / scale)
+                    });
+                refresh_screen(handle.clone(), &snap, anchor);
+                last_screen_refresh = std::time::Instant::now();
             }
 
             poll_test_hook(&window, &snap);
@@ -286,9 +232,13 @@ fn poll_loop(handle: tauri::AppHandle, owner: Option<String>, snap: Arc<snap::Sn
 
 /// Initial state for the first paint, so the window is never blank.
 #[tauri::command]
-fn get_state(controller: tauri::State<'_, Arc<snap::SnapController>>) -> Payload {
+fn get_state(
+    window: tauri::WebviewWindow,
+    controller: tauri::State<'_, Arc<snap::SnapController>>,
+) -> Payload {
     let owner = std::env::var("MECHANICUS_COMPANION_SESSION_ID").ok();
     let st = state::read_state(&state::state_file_path());
+    let _ = window.emit(SNAP_EVENT, controller.snapshot());
     build_payload(&st, owner.as_deref(), controller.target())
 }
 
@@ -578,7 +528,14 @@ fn refresh_screen(
     use std::sync::mpsc;
 
     let (tx, rx) = mpsc::channel();
-    let probe = anchor.unwrap_or((0.0, 0.0));
+    let probe = anchor
+        .or_else(|| {
+            let window = app.get_webview_window("main")?;
+            let cursor = window.cursor_position().ok()?;
+            let scale = window.scale_factor().ok()?;
+            Some((cursor.x / scale, cursor.y / scale))
+        })
+        .unwrap_or((0.0, 0.0));
     let dispatched = app.run_on_main_thread(move || {
         let _ = tx.send(workarea::screen_at(probe));
     });
@@ -587,6 +544,12 @@ fn refresh_screen(
     }
     // The main thread is free at this point: this runs before the drag starts.
     if let Ok(Some(info)) = rx.recv_timeout(Duration::from_millis(400)) {
+        if controller.screen().map(|screen| screen.frame) != Some(info.frame) {
+            if let Some(overlay) = app.get_webview_window(OVERLAY_LABEL) {
+                let _ = overlay.set_size(tauri::LogicalSize::new(info.frame.w, info.frame.h));
+                let _ = overlay.set_position(LogicalPosition::new(info.frame.x, info.frame.y));
+            }
+        }
         controller.set_screen(info);
     }
 }
@@ -645,15 +608,42 @@ fn main() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Measured on the main thread, which `setup` already runs on.
-            if let Some(info) = workarea::screen_at((0.0, 0.0)) {
+            let state = state::read_state(&state::state_file_path());
+            let project = state::choose_session(&state.sessions, Some(&owner_session_id))
+                .map(|index| placement::project_key(&state.sessions[index].cwd))
+                .unwrap_or_default();
+            let saved = placement::load(&placement::file_path(), &project)
+                .unwrap_or_else(|error| {
+                    eprintln!("[companion-tauri] could not restore window placement: {error}");
+                    None
+                })
+                .or_else(|| placement::legacy_position(&state, &project));
+            let payload = build_payload(
+                &state,
+                Some(&owner_session_id),
+                saved.and_then(|p| p.target),
+            );
+            snap_controller.restore(saved, &payload.config.position);
+            let content = payload.content();
+            snap_controller.set_content_size(content.0 as f64, content.1 as f64);
+
+            // Select the saved display before showing the window. A disconnected
+            // display falls back to primary, where the saved origin is clamped.
+            if let Some(info) = workarea::screen_at(saved.map_or((0.0, 0.0), |p| (p.x, p.y))) {
                 snap_controller.set_screen(info);
             }
+
+            // Disk I/O and lock contention never run inside the animation loop.
+            let writer = Arc::new(placement::PlacementWriter::new(
+                placement::file_path(),
+                project,
+            ));
+            app.manage(Arc::clone(&writer));
 
             // The dim overlay is created once and only shown while dragging:
             // creating a window mid-drag would have to wait for the main thread
             // to leave the drag loop.
-            if let Err(err) = build_overlay_window(app) {
+            if let Err(err) = build_overlay_window(app, snap_controller.screen()) {
                 eprintln!("[companion-tauri] snap overlay unavailable: {err}");
             }
             if let Err(err) = tooltip::build(app) {
@@ -680,6 +670,9 @@ fn main() {
                             raise_above_markers(&companion);
                         }
                     },
+                    move |saved| {
+                        writer.submit(saved);
+                    },
                 );
             }
 
@@ -689,8 +682,18 @@ fn main() {
             std::thread::spawn(move || poll_loop(handle, owner, controller));
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running companion");
+        .build(tauri::generate_context!())
+        .expect("error while building companion")
+        .run(|handle, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                handle.state::<Arc<snap::SnapController>>().stop();
+                if let Some(writer) = handle.try_state::<Arc<placement::PlacementWriter>>() {
+                    if let Err(error) = writer.flush() {
+                        eprintln!("[companion-tauri] could not flush window placement: {error}");
+                    }
+                }
+            }
+        });
 }
 
 /// Creates the hidden full-screen dim overlay.
@@ -698,7 +701,10 @@ fn main() {
 /// Sized once here to cover the display. Resizing it on every drag start would
 /// add main-thread work to the exact frame the drag begins on, which is when the
 /// frame budget is tightest.
-fn build_overlay_window(app: &tauri::App) -> tauri::Result<()> {
+fn build_overlay_window(
+    app: &tauri::App,
+    screen: Option<workarea::ScreenInfo>,
+) -> tauri::Result<()> {
     let mut builder =
         WebviewWindowBuilder::new(app, OVERLAY_LABEL, WebviewUrl::App("overlay.html".into()))
             .title("snap targets")
@@ -712,7 +718,7 @@ fn build_overlay_window(app: &tauri::App) -> tauri::Result<()> {
             .resizable(false)
             .visible(false);
 
-    if let Some(info) = workarea::screen_at((0.0, 0.0)) {
+    if let Some(info) = screen {
         builder = builder
             .position(info.frame.x, info.frame.y)
             .inner_size(info.frame.w, info.frame.h);

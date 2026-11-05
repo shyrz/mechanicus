@@ -1,6 +1,6 @@
 [package]
 name = "mechanicus-companion-tauri"
-version = "0.1.1"
+version = "0.1.2"
 description = "Tauri-based desktop companion for mechanicus (experimental)"
 edition = "2021"
 rust-version = "1.77"
